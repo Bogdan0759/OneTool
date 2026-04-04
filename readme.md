@@ -12,6 +12,8 @@ one executable, one CLI entrypoint, many capabilities implemented from scratch i
 implemented tools:
 
 - `lastmod` - prints the last modification time of a file
+- `reboot` - reboot the system
+- `shutdown` - shut down the system
 
 ## build
 
