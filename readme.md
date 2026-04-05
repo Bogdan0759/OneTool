@@ -6,7 +6,7 @@ The long-term idea is simple:
 one executable, one CLI entrypoint, many capabilities implemented from scratch inside the project.
 
 
-
+**Warning: Some parts of the code were written by AI because I don't really understand HTTP**
 ## status
 
 implemented tools:
