@@ -1,4 +1,4 @@
-#include "../down.h"
+#include "net.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -7,13 +7,32 @@
 #include <strings.h>
 
 typedef struct {
-    down_conn_t *conn;
+    net_conn_t *conn;
     const unsigned char *prefill;
     size_t prefill_len;
     size_t prefill_pos;
-} down_stream_t;
+} stream_t;
 
-static ssize_t stream_read(down_stream_t *s, unsigned char *dst, size_t cap) {
+static int send_all(net_conn_t *conn, const void *buf, size_t len) {
+    const unsigned char *p = (const unsigned char *)buf;
+    size_t off = 0;
+    while (off < len) {
+        ssize_t n = net_conn_write(conn, p + off, len - off);
+        if (n < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return 1;
+        }
+        if (n == 0) {
+            return 1;
+        }
+        off += (size_t)n;
+    }
+    return 0;
+}
+
+static ssize_t stream_read(stream_t *s, unsigned char *dst, size_t cap) {
     if (s->prefill_pos < s->prefill_len) {
         size_t n = s->prefill_len - s->prefill_pos;
         if (n > cap) {
@@ -23,16 +42,10 @@ static ssize_t stream_read(down_stream_t *s, unsigned char *dst, size_t cap) {
         s->prefill_pos += n;
         return (ssize_t)n;
     }
-    for (;;) {
-        ssize_t n = down_conn_read(s->conn, dst, cap);
-        if (n < 0 && errno == EINTR) {
-            continue;
-        }
-        return n;
-    }
+    return net_conn_read(s->conn, dst, cap);
 }
 
-static int stream_read_exact(down_stream_t *s, unsigned char *dst, size_t len) {
+static int stream_read_exact(stream_t *s, unsigned char *dst, size_t len) {
     size_t off = 0;
     while (off < len) {
         ssize_t n = stream_read(s, dst + off, len - off);
@@ -44,7 +57,7 @@ static int stream_read_exact(down_stream_t *s, unsigned char *dst, size_t len) {
     return 0;
 }
 
-static int stream_read_line(down_stream_t *s, char *line, size_t cap) {
+static int stream_read_line(stream_t *s, char *line, size_t cap) {
     size_t i = 0;
     while (i + 1 < cap) {
         unsigned char c;
@@ -57,11 +70,10 @@ static int stream_read_line(down_stream_t *s, char *line, size_t cap) {
             return 0;
         }
     }
-    line[cap - 1] = '\0';
     return 1;
 }
 
-static int write_all_file(FILE *out, const unsigned char *buf, size_t len) {
+static int write_all(FILE *out, const unsigned char *buf, size_t len) {
     size_t off = 0;
     while (off < len) {
         size_t n = fwrite(buf + off, 1, len - off, out);
@@ -73,27 +85,22 @@ static int write_all_file(FILE *out, const unsigned char *buf, size_t len) {
     return 0;
 }
 
-static int decode_chunked(down_stream_t *s, FILE *out) {
+static int read_chunked(stream_t *s, FILE *out, long long *written) {
     char line[4096];
     unsigned char *tmp = NULL;
-
     for (;;) {
         char *end = NULL;
         unsigned long long chunk_len;
 
         if (stream_read_line(s, line, sizeof(line)) != 0) {
-            fprintf(stderr, "down: failed to read chunk size\n");
             free(tmp);
             return 1;
         }
-
         chunk_len = strtoull(line, &end, 16);
         if (end == line) {
-            fprintf(stderr, "down: invalid chunk size\n");
             free(tmp);
             return 1;
         }
-
         if (chunk_len == 0) {
             do {
                 if (stream_read_line(s, line, sizeof(line)) != 0) {
@@ -104,69 +111,111 @@ static int decode_chunked(down_stream_t *s, FILE *out) {
             break;
         }
 
-        if (chunk_len > (1024ULL * 1024ULL * 1024ULL)) {
-            fprintf(stderr, "down: chunk too large\n");
-            free(tmp);
-            return 1;
-        }
-
         tmp = (unsigned char *)realloc(tmp, (size_t)chunk_len);
         if (tmp == NULL) {
-            fprintf(stderr, "down: out of memory\n");
             return 1;
         }
-
         if (stream_read_exact(s, tmp, (size_t)chunk_len) != 0) {
-            fprintf(stderr, "down: failed to read chunk data\n");
             free(tmp);
             return 1;
         }
-
-        if (write_all_file(out, tmp, (size_t)chunk_len) != 0) {
-            fprintf(stderr, "down: failed to write output\n");
+        if (write_all(out, tmp, (size_t)chunk_len) != 0) {
             free(tmp);
             return 1;
         }
-
+        *written += (long long)chunk_len;
         if (stream_read_line(s, line, sizeof(line)) != 0) {
             free(tmp);
             return 1;
         }
     }
-
     free(tmp);
     return 0;
 }
 
-int down_read_response(down_conn_t *conn, FILE *out, int verbose, down_response_t *resp) {
+int net_http_send_request(
+    net_conn_t *conn,
+    const char *method,
+    const char *path,
+    const char *host,
+    const char *headers[],
+    int header_count,
+    const char *body,
+    const char *user_agent
+) {
+    char head[16384];
+    int n;
+    size_t used;
+    size_t body_len = body ? strlen(body) : 0;
+
+    n = snprintf(
+        head,
+        sizeof(head),
+        "%s %s HTTP/1.1\r\n"
+        "Host: %s\r\n"
+        "User-Agent: %s\r\n"
+        "Accept: */*\r\n"
+        "Connection: close\r\n",
+        method, path, host, user_agent ? user_agent : "onetool-net/0.1"
+    );
+    if (n < 0 || (size_t)n >= sizeof(head)) {
+        return 1;
+    }
+    used = (size_t)n;
+
+    for (int i = 0; i < header_count; i++) {
+        n = snprintf(head + used, sizeof(head) - used, "%s\r\n", headers[i]);
+        if (n < 0 || (size_t)n >= sizeof(head) - used) {
+            return 1;
+        }
+        used += (size_t)n;
+    }
+
+    if (body_len > 0) {
+        n = snprintf(head + used, sizeof(head) - used, "Content-Length: %zu\r\n", body_len);
+        if (n < 0 || (size_t)n >= sizeof(head) - used) {
+            return 1;
+        }
+        used += (size_t)n;
+    }
+
+    n = snprintf(head + used, sizeof(head) - used, "\r\n");
+    if (n < 0 || (size_t)n >= sizeof(head) - used) {
+        return 1;
+    }
+    used += (size_t)n;
+
+    if (send_all(conn, head, used) != 0) {
+        return 1;
+    }
+    if (body_len > 0 && send_all(conn, body, body_len) != 0) {
+        return 1;
+    }
+    return 0;
+}
+
+int net_http_read_response(net_conn_t *conn, FILE *out, int verbose, net_http_response_t *resp) {
     unsigned char buf[8192];
     unsigned char *head = NULL;
     size_t head_len = 0;
     size_t head_cap = 0;
-    ssize_t n;
-    const unsigned char *body_start;
-    size_t body_len;
+    const unsigned char *body_start = NULL;
+    size_t body_len = 0;
+    char *headers_dup = NULL;
+    char *line;
     int content_length_found = 0;
     int chunked = 0;
     long long content_length = -1;
-    char *headers_dup = NULL;
-    char *line;
-    down_stream_t stream;
 
     memset(resp, 0, sizeof(*resp));
-    resp->status_code = 0;
     resp->content_length = -1;
+    resp->body_bytes = 0;
 
     for (;;) {
         size_t old_len = head_len;
         unsigned char *p;
-
-        n = down_conn_read(conn, buf, sizeof(buf));
-        if (n < 0 && errno == EINTR) {
-            continue;
-        }
+        ssize_t n = net_conn_read(conn, buf, sizeof(buf));
         if (n <= 0) {
-            fprintf(stderr, "down: failed to read response headers\n");
             free(head);
             return 1;
         }
@@ -178,7 +227,6 @@ int down_read_response(down_conn_t *conn, FILE *out, int verbose, down_response_
             }
             p = (unsigned char *)realloc(head, new_cap);
             if (p == NULL) {
-                fprintf(stderr, "down: out of memory\n");
                 free(head);
                 return 1;
             }
@@ -204,36 +252,26 @@ int down_read_response(down_conn_t *conn, FILE *out, int verbose, down_response_
 headers_ready:
     headers_dup = strdup((const char *)head);
     if (headers_dup == NULL) {
-        fprintf(stderr, "down: out of memory\n");
         free(head);
         return 1;
     }
 
     line = strtok(headers_dup, "\r\n");
     if (line == NULL || sscanf(line, "HTTP/%*s %d", &resp->status_code) != 1) {
-        fprintf(stderr, "down: invalid HTTP status line\n");
         free(headers_dup);
         free(head);
         return 1;
     }
 
-    for (;;) {
-        line = strtok(NULL, "\r\n");
-        if (line == NULL) {
-            break;
-        }
+    while ((line = strtok(NULL, "\r\n")) != NULL) {
         if (strncasecmp(line, "Content-Length:", 15) == 0) {
             char *v = line + 15;
-            while (*v == ' ' || *v == '\t') {
-                v++;
-            }
+            while (*v == ' ' || *v == '\t') v++;
             content_length = atoll(v);
             content_length_found = 1;
         } else if (strncasecmp(line, "Transfer-Encoding:", 18) == 0) {
             char *v = line + 18;
-            while (*v == ' ' || *v == '\t') {
-                v++;
-            }
+            while (*v == ' ' || *v == '\t') v++;
             if (strstr(v, "chunked") != NULL) {
                 chunked = 1;
             }
@@ -244,34 +282,24 @@ headers_ready:
     resp->content_length = content_length_found ? content_length : -1;
 
     if (verbose) {
-        fprintf(stderr, "down: HTTP %d\n", resp->status_code);
-        if (chunked) {
-            fprintf(stderr, "down: transfer-encoding: chunked\n");
-        } else if (content_length_found) {
-            fprintf(stderr, "down: content-length: %lld\n", content_length);
-        }
+        fprintf(stderr, "net: HTTP %d\n", resp->status_code);
     }
 
-    stream.conn = conn;
-    stream.prefill = body_start;
-    stream.prefill_len = body_len;
-    stream.prefill_pos = 0;
+    stream_t s = { .conn = conn, .prefill = body_start, .prefill_len = body_len, .prefill_pos = 0 };
 
     if (chunked) {
-        if (decode_chunked(&stream, out) != 0) {
+        if (read_chunked(&s, out, &resp->body_bytes) != 0) {
             free(headers_dup);
             free(head);
             return 1;
         }
     } else if (content_length_found) {
         long long remain = content_length;
-        unsigned char io_buf[8192];
-
         if ((long long)body_len > remain) {
             body_len = (size_t)remain;
         }
         if (body_len > 0) {
-            if (write_all_file(out, body_start, body_len) != 0) {
+            if (write_all(out, body_start, body_len) != 0) {
                 free(headers_dup);
                 free(head);
                 return 1;
@@ -279,42 +307,37 @@ headers_ready:
             remain -= (long long)body_len;
         }
         while (remain > 0) {
+            unsigned char io_buf[8192];
             size_t want = remain > (long long)sizeof(io_buf) ? sizeof(io_buf) : (size_t)remain;
-            ssize_t rn = stream_read(&stream, io_buf, want);
-            if (rn <= 0) {
-                fprintf(stderr, "down: response ended early\n");
+            ssize_t n = stream_read(&s, io_buf, want);
+            if (n <= 0 || write_all(out, io_buf, (size_t)n) != 0) {
                 free(headers_dup);
                 free(head);
                 return 1;
             }
-            if (write_all_file(out, io_buf, (size_t)rn) != 0) {
-                free(headers_dup);
-                free(head);
-                return 1;
-            }
-            remain -= (long long)rn;
+            remain -= (long long)n;
         }
+        resp->body_bytes = content_length;
     } else {
-        unsigned char io_buf[8192];
-        if (body_len > 0 && write_all_file(out, body_start, body_len) != 0) {
+        if (body_len > 0 && write_all(out, body_start, body_len) != 0) {
             free(headers_dup);
             free(head);
             return 1;
         }
         for (;;) {
-            ssize_t rn = down_conn_read(conn, io_buf, sizeof(io_buf));
-            if (rn < 0 && errno == EINTR) {
-                continue;
-            }
-            if (rn <= 0) {
+            unsigned char io_buf[8192];
+            ssize_t n = net_conn_read(conn, io_buf, sizeof(io_buf));
+            if (n <= 0) {
                 break;
             }
-            if (write_all_file(out, io_buf, (size_t)rn) != 0) {
+            if (write_all(out, io_buf, (size_t)n) != 0) {
                 free(headers_dup);
                 free(head);
                 return 1;
             }
+            resp->body_bytes += (long long)n;
         }
+        resp->body_bytes += (long long)body_len;
     }
 
     fflush(out);

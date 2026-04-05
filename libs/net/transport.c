@@ -1,4 +1,4 @@
-#include "../down.h"
+#include "net.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -20,7 +20,6 @@ static int wait_connect(int fd, int timeout_sec) {
 
     FD_ZERO(&wfds);
     FD_SET(fd, &wfds);
-
     tv.tv_sec = timeout_sec;
     tv.tv_usec = 0;
 
@@ -40,11 +39,10 @@ static int wait_connect(int fd, int timeout_sec) {
         errno = so_err;
         return 1;
     }
-
     return 0;
 }
 
-static int tcp_connect(const char *host, const char *port, int timeout_sec) {
+static int tcp_connect(const char *host, const char *port, int timeout_sec, int noisy) {
     struct addrinfo hints;
     struct addrinfo *res = NULL;
     struct addrinfo *it;
@@ -58,12 +56,15 @@ static int tcp_connect(const char *host, const char *port, int timeout_sec) {
 
     rc = getaddrinfo(host, port, &hints, &res);
     if (rc != 0) {
-        fprintf(stderr, "down: resolve failed for %s:%s: %s\n", host, port, gai_strerror(rc));
+        if (noisy) {
+            fprintf(stderr, "net: resolve failed for %s:%s: %s\n", host, port, gai_strerror(rc));
+        }
         return -1;
     }
 
     for (it = res; it != NULL; it = it->ai_next) {
         int flags;
+
         fd = socket(it->ai_family, it->ai_socktype, it->ai_protocol);
         if (fd < 0) {
             continue;
@@ -82,46 +83,43 @@ static int tcp_connect(const char *host, const char *port, int timeout_sec) {
             fd = -1;
             continue;
         }
-
         if (rc != 0 && wait_connect(fd, timeout_sec) != 0) {
             close(fd);
             fd = -1;
             continue;
         }
-
         if (fcntl(fd, F_SETFL, flags) < 0) {
             close(fd);
             fd = -1;
             continue;
         }
-
         break;
     }
 
     freeaddrinfo(res);
 
-    if (fd < 0) {
-        fprintf(stderr, "down: connect to %s:%s failed %s\n", host, port, strerror(errno));
+    if (fd < 0 && noisy) {
+        fprintf(stderr, "net: connect to %s:%s failed: %s\n", host, port, strerror(errno));
     }
     return fd;
 }
 
-int down_socket_connect(const down_request_t *req, down_conn_t *conn) {
+int net_conn_open(net_conn_t *conn, const char *host, const char *port, int timeout_sec, int use_tls, const char *tls_server_name, int noisy) {
     SSL_CTX *ctx = NULL;
     SSL *ssl = NULL;
     int fd;
 
     memset(conn, 0, sizeof(*conn));
     conn->fd = -1;
-    conn->use_tls = req->use_tls;
+    conn->use_tls = use_tls;
 
-    fd = tcp_connect(req->host, req->port, req->timeout_sec);
+    fd = tcp_connect(host, port, timeout_sec, noisy);
     if (fd < 0) {
-        return -1;
+        return 1;
     }
-
     conn->fd = fd;
-    if (!req->use_tls) {
+
+    if (!use_tls) {
         return 0;
     }
 
@@ -130,33 +128,41 @@ int down_socket_connect(const down_request_t *req, down_conn_t *conn) {
 
     ctx = SSL_CTX_new(TLS_client_method());
     if (ctx == NULL) {
-        fprintf(stderr, "down: SSL_CTX_new failed\n");
+        if (noisy) {
+            fprintf(stderr, "net: SSL_CTX_new failed\n");
+        }
         close(fd);
         conn->fd = -1;
-        return -1;
+        return 1;
     }
 
     ssl = SSL_new(ctx);
     if (ssl == NULL) {
-        fprintf(stderr, "down: SSL_new failed\n");
+        if (noisy) {
+            fprintf(stderr, "net: SSL_new failed\n");
+        }
         SSL_CTX_free(ctx);
         close(fd);
         conn->fd = -1;
-        return -1;
+        return 1;
     }
 
-    SSL_set_tlsext_host_name(ssl, req->host);
-    SSL_set1_host(ssl, req->host);
+    if (tls_server_name != NULL) {
+        SSL_set_tlsext_host_name(ssl, tls_server_name);
+        SSL_set1_host(ssl, tls_server_name);
+    }
     SSL_set_fd(ssl, fd);
 
     if (SSL_connect(ssl) != 1) {
         unsigned long e = ERR_get_error();
-        fprintf(stderr, "down: TLS handshake failed: %s\n", ERR_error_string(e, NULL));
+        if (noisy) {
+            fprintf(stderr, "net: TLS handshake failed: %s\n", ERR_error_string(e, NULL));
+        }
         SSL_free(ssl);
         SSL_CTX_free(ctx);
         close(fd);
         conn->fd = -1;
-        return -1;
+        return 1;
     }
 
     conn->ssl_ctx = ctx;
@@ -164,7 +170,7 @@ int down_socket_connect(const down_request_t *req, down_conn_t *conn) {
     return 0;
 }
 
-void down_socket_close(down_conn_t *conn) {
+void net_conn_close(net_conn_t *conn) {
     if (conn->ssl != NULL) {
         SSL_shutdown((SSL *)conn->ssl);
         SSL_free((SSL *)conn->ssl);
@@ -180,7 +186,7 @@ void down_socket_close(down_conn_t *conn) {
     }
 }
 
-ssize_t down_conn_read(down_conn_t *conn, void *buf, size_t len) {
+ssize_t net_conn_read(net_conn_t *conn, void *buf, size_t len) {
     if (conn->use_tls) {
         int n;
         do {
@@ -207,7 +213,7 @@ ssize_t down_conn_read(down_conn_t *conn, void *buf, size_t len) {
     }
 }
 
-ssize_t down_conn_write(down_conn_t *conn, const void *buf, size_t len) {
+ssize_t net_conn_write(net_conn_t *conn, const void *buf, size_t len) {
     if (conn->use_tls) {
         int n;
         do {
