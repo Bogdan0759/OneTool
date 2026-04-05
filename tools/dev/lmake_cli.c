@@ -6,6 +6,7 @@
 
 int main(int argc, char *argv[]) {
     (void)argc;
+    printf("This tool is originally developed for Linden SDK project but now it is the part of OneTool so this tool is republished in MPL-2.0 license\n");
     char path[PATH_MAX];
     const char *self = argv[0];
     const char *slash = strrchr(self, '/');
