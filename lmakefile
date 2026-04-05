@@ -1,0 +1,146 @@
+string CC = "clang";
+string CFLAGS = "-O3";
+string LDFLAGS = "-static";
+string LDLIBS = "-lssl -lcrypto -lz -lzstd -ldl -pthread";
+
+string TARGET = "onetool";
+string MAIN_SRC = "main.c";
+string MAIN_OBJ = "main.o";
+
+string LASTMOD_SRC = "tools/filesystem/lastmod.c";
+string LASTMOD_OBJ = "tools/filesystem/lastmod.o";
+string EXEC_SRC = "tools/filesystem/exec.c";
+string EXEC_OBJ = "tools/filesystem/exec.o";
+
+string DOWN_HDR = "tools/network/down/down.h";
+string DOWN_CLI_SRC = "tools/network/down/cli.c";
+string DOWN_CLI_OBJ = "tools/network/down/cli.o";
+string DOWN_PARSE_SRC = "tools/network/down/core/parse.c";
+string DOWN_PARSE_OBJ = "tools/network/down/core/parse.o";
+string DOWN_SEND_SRC = "tools/network/down/core/send.c";
+string DOWN_SEND_OBJ = "tools/network/down/core/send.o";
+string DOWN_SOCKET_SRC = "tools/network/down/net/socket.c";
+string DOWN_SOCKET_OBJ = "tools/network/down/net/socket.o";
+string DOWN_RESPONSE_SRC = "tools/network/down/http/response.c";
+string DOWN_RESPONSE_OBJ = "tools/network/down/http/response.o";
+
+string LMAKE_CLI_SRC = "tools/dev/lmake_cli.c";
+string LMAKE_CLI_OBJ = "tools/dev/lmake_cli.o";
+
+string REBOOT_SRC = "tools/power/reboot.c";
+string REBOOT_OBJ = "tools/power/reboot.o";
+string SHUTDOWN_SRC = "tools/power/shutdown.c";
+string SHUTDOWN_OBJ = "tools/power/shutdown.o";
+
+task all() {
+    build();
+}
+
+task build() {
+    if (@is_outdated(MAIN_OBJ, MAIN_SRC)) {
+        @echo("[CC] %s", MAIN_SRC);
+        @run("%s %s -c %s -o %s", CC, CFLAGS, MAIN_SRC, MAIN_OBJ);
+    }
+
+    if (@is_outdated(LASTMOD_OBJ, LASTMOD_SRC)) {
+        @echo("[CC] %s", LASTMOD_SRC);
+        @run("%s %s -Dmain=lm -c %s -o %s", CC, CFLAGS, LASTMOD_SRC, LASTMOD_OBJ);
+    }
+    if (@is_outdated(EXEC_OBJ, EXEC_SRC)) {
+        @echo("[CC] %s", EXEC_SRC);
+        @run("%s %s -Dmain=ex -c %s -o %s", CC, CFLAGS, EXEC_SRC, EXEC_OBJ);
+    }
+    if (@is_outdated(DOWN_CLI_OBJ, DOWN_CLI_SRC, DOWN_HDR)) {
+        @echo("[CC] %s", DOWN_CLI_SRC);
+        @run("%s %s -Dmain=dn -c %s -o %s", CC, CFLAGS, DOWN_CLI_SRC, DOWN_CLI_OBJ);
+    }
+    if (@is_outdated(LMAKE_CLI_OBJ, LMAKE_CLI_SRC)) {
+        @echo("[CC] %s", LMAKE_CLI_SRC);
+        @run("%s %s -Dmain=lk -c %s -o %s", CC, CFLAGS, LMAKE_CLI_SRC, LMAKE_CLI_OBJ);
+    }
+    if (@is_outdated(REBOOT_OBJ, REBOOT_SRC)) {
+        @echo("[CC] %s", REBOOT_SRC);
+        @run("%s %s -Dmain=rb -c %s -o %s", CC, CFLAGS, REBOOT_SRC, REBOOT_OBJ);
+    }
+    if (@is_outdated(SHUTDOWN_OBJ, SHUTDOWN_SRC)) {
+        @echo("[CC] %s", SHUTDOWN_SRC);
+        @run("%s %s -Dmain=sd -c %s -o %s", CC, CFLAGS, SHUTDOWN_SRC, SHUTDOWN_OBJ);
+    }
+
+    if (@is_outdated(DOWN_PARSE_OBJ, DOWN_PARSE_SRC, DOWN_HDR)) {
+        @echo("[CC] %s", DOWN_PARSE_SRC);
+        @run("%s %s -c %s -o %s", CC, CFLAGS, DOWN_PARSE_SRC, DOWN_PARSE_OBJ);
+    }
+    if (@is_outdated(DOWN_SEND_OBJ, DOWN_SEND_SRC, DOWN_HDR)) {
+        @echo("[CC] %s", DOWN_SEND_SRC);
+        @run("%s %s -c %s -o %s", CC, CFLAGS, DOWN_SEND_SRC, DOWN_SEND_OBJ);
+    }
+    if (@is_outdated(DOWN_SOCKET_OBJ, DOWN_SOCKET_SRC, DOWN_HDR)) {
+        @echo("[CC] %s", DOWN_SOCKET_SRC);
+        @run("%s %s -c %s -o %s", CC, CFLAGS, DOWN_SOCKET_SRC, DOWN_SOCKET_OBJ);
+    }
+    if (@is_outdated(DOWN_RESPONSE_OBJ, DOWN_RESPONSE_SRC, DOWN_HDR)) {
+        @echo("[CC] %s", DOWN_RESPONSE_SRC);
+        @run("%s %s -c %s -o %s", CC, CFLAGS, DOWN_RESPONSE_SRC, DOWN_RESPONSE_OBJ);
+    }
+
+    if (@is_outdated(TARGET,
+        MAIN_OBJ,
+        LASTMOD_OBJ,
+        EXEC_OBJ,
+        DOWN_CLI_OBJ,
+        DOWN_PARSE_OBJ,
+        DOWN_SEND_OBJ,
+        DOWN_SOCKET_OBJ,
+        DOWN_RESPONSE_OBJ,
+        LMAKE_CLI_OBJ,
+        REBOOT_OBJ,
+        SHUTDOWN_OBJ
+    )) {
+        @echo("[LD] %s", TARGET);
+        @run("%s %s %s %s %s %s %s %s %s %s %s %s -o %s %s %s",
+            CC,
+            MAIN_OBJ,
+            LASTMOD_OBJ,
+            EXEC_OBJ,
+            DOWN_CLI_OBJ,
+            DOWN_PARSE_OBJ,
+            DOWN_SEND_OBJ,
+            DOWN_SOCKET_OBJ,
+            DOWN_RESPONSE_OBJ,
+            LMAKE_CLI_OBJ,
+            REBOOT_OBJ,
+            SHUTDOWN_OBJ,
+            TARGET,
+            LDFLAGS,
+            LDLIBS
+        );
+    }
+
+    @echo("[OK] build complete");
+}
+
+task clean() {
+    @echo("[CLEAN] removing build artifacts");
+    @run("rm -f %s", MAIN_OBJ);
+    @run("rm -f %s", TARGET);
+    @run("rm -f %s", LASTMOD_OBJ);
+    @run("rm -f %s", EXEC_OBJ);
+    @run("rm -f %s", DOWN_CLI_OBJ);
+    @run("rm -f %s", DOWN_PARSE_OBJ);
+    @run("rm -f %s", DOWN_SEND_OBJ);
+    @run("rm -f %s", DOWN_SOCKET_OBJ);
+    @run("rm -f %s", DOWN_RESPONSE_OBJ);
+    @run("rm -f %s", LMAKE_CLI_OBJ);
+    @run("rm -f %s", REBOOT_OBJ);
+    @run("rm -f %s", SHUTDOWN_OBJ);
+}
+
+task run() {
+    build();
+    @run("./%s", TARGET);
+}
+
+task rebuild_lmake() {
+    @run("zig build-exe -O ReleaseFast -fstrip -femit-bin=lmake tools/dev/lmake.zig");
+}
