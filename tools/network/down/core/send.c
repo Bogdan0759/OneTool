@@ -92,6 +92,10 @@ int down_run(const down_request_t *req, FILE *out) {
     down_conn_t conn;
     down_response_t resp;
 
+    if (down_check_robots(req) != 0) {
+        return 1;
+    }
+
     memset(&resp, 0, sizeof(resp));
     if (down_socket_connect(req, &conn) != 0) {
         return 1;

@@ -40,6 +40,7 @@ void down_request_init(down_request_t *req) {
     memset(req, 0, sizeof(*req));
     req->timeout_sec = 10;
     req->use_tls = 0;
+    req->ignore_robots = 0;
 }
 
 void down_request_free(down_request_t *req) {
@@ -65,6 +66,7 @@ void down_print_cli_help(const char *tool_name) {
     printf("  -H <header>        add request header, can be used multiple times\n");
     printf("  -d <data>          request body\n");
     printf("  --timeout <sec>    connect timeout in seconds (default 10)\n");
+    printf("  --ignore-robots    ignore robots.txt policy\n");
     printf("  -v                 verbose output to stderr\n");
     printf("  --help             show this help\n");
 }
@@ -249,6 +251,10 @@ int down_parse_cli(int argc, char *argv[], down_request_t *req) {
                 return 1;
             }
             req->timeout_sec = (int)t;
+            continue;
+        }
+        if (strcmp(argv[i], "--ignore-robots") == 0) {
+            req->ignore_robots = 1;
             continue;
         }
 

@@ -19,6 +19,8 @@ string DOWN_PARSE_SRC = "tools/network/down/core/parse.c";
 string DOWN_PARSE_OBJ = "tools/network/down/core/parse.o";
 string DOWN_SEND_SRC = "tools/network/down/core/send.c";
 string DOWN_SEND_OBJ = "tools/network/down/core/send.o";
+string DOWN_ROBOTS_SRC = "tools/network/down/core/robots.c";
+string DOWN_ROBOTS_OBJ = "tools/network/down/core/robots.o";
 string DOWN_SOCKET_SRC = "tools/network/down/net/socket.c";
 string DOWN_SOCKET_OBJ = "tools/network/down/net/socket.o";
 string DOWN_RESPONSE_SRC = "tools/network/down/http/response.c";
@@ -75,6 +77,10 @@ task build() {
         @echo("[CC] %s", DOWN_SEND_SRC);
         @run("%s %s -c %s -o %s", CC, CFLAGS, DOWN_SEND_SRC, DOWN_SEND_OBJ);
     }
+    if (@is_outdated(DOWN_ROBOTS_OBJ, DOWN_ROBOTS_SRC, DOWN_HDR)) {
+        @echo("[CC] %s", DOWN_ROBOTS_SRC);
+        @run("%s %s -c %s -o %s", CC, CFLAGS, DOWN_ROBOTS_SRC, DOWN_ROBOTS_OBJ);
+    }
     if (@is_outdated(DOWN_SOCKET_OBJ, DOWN_SOCKET_SRC, DOWN_HDR)) {
         @echo("[CC] %s", DOWN_SOCKET_SRC);
         @run("%s %s -c %s -o %s", CC, CFLAGS, DOWN_SOCKET_SRC, DOWN_SOCKET_OBJ);
@@ -91,6 +97,7 @@ task build() {
         DOWN_CLI_OBJ,
         DOWN_PARSE_OBJ,
         DOWN_SEND_OBJ,
+        DOWN_ROBOTS_OBJ,
         DOWN_SOCKET_OBJ,
         DOWN_RESPONSE_OBJ,
         LMAKE_CLI_OBJ,
@@ -98,7 +105,7 @@ task build() {
         SHUTDOWN_OBJ
     )) {
         @echo("[LD] %s", TARGET);
-        @run("%s %s %s %s %s %s %s %s %s %s %s %s -o %s %s %s",
+        @run("%s %s %s %s %s %s %s %s %s %s %s %s %s -o %s %s %s",
             CC,
             MAIN_OBJ,
             LASTMOD_OBJ,
@@ -106,6 +113,7 @@ task build() {
             DOWN_CLI_OBJ,
             DOWN_PARSE_OBJ,
             DOWN_SEND_OBJ,
+            DOWN_ROBOTS_OBJ,
             DOWN_SOCKET_OBJ,
             DOWN_RESPONSE_OBJ,
             LMAKE_CLI_OBJ,
@@ -129,6 +137,7 @@ task clean() {
     @run("rm -f %s", DOWN_CLI_OBJ);
     @run("rm -f %s", DOWN_PARSE_OBJ);
     @run("rm -f %s", DOWN_SEND_OBJ);
+    @run("rm -f %s", DOWN_ROBOTS_OBJ);
     @run("rm -f %s", DOWN_SOCKET_OBJ);
     @run("rm -f %s", DOWN_RESPONSE_OBJ);
     @run("rm -f %s", LMAKE_CLI_OBJ);

@@ -11,7 +11,7 @@ int dn(int argc, char *argv[]);
 int lk(int argc, char *argv[]);
 int rb(int argc, char *argv[]);
 int sd(int argc, char *argv[]);
-char version[32] = "0.2.3";
+char version[32] = "0.2.4";
 
 void show_help() {
     printf("OneTool %s\n", version);
