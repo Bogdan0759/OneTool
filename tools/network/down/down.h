@@ -19,6 +19,7 @@ typedef struct {
     int timeout_sec;
     int verbose;
     int use_tls;
+    int ignore_robots;
 } down_request_t;
 
 typedef struct {
@@ -47,6 +48,7 @@ ssize_t down_conn_write(down_conn_t *conn, const void *buf, size_t len);
 int down_send_all(down_conn_t *conn, const void *buf, size_t len);
 int down_send_request(down_conn_t *conn, const down_request_t *req);
 int down_read_response(down_conn_t *conn, FILE *out, int verbose, down_response_t *resp);
+int down_check_robots(const down_request_t *req);
 int down_run(const down_request_t *req, FILE *out);
 
 #endif
