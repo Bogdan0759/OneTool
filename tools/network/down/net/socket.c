@@ -101,7 +101,7 @@ static int tcp_connect(const char *host, const char *port, int timeout_sec) {
     freeaddrinfo(res);
 
     if (fd < 0) {
-        fprintf(stderr, "down: connect to %s:%s failed: %s\n", host, port, strerror(errno));
+        fprintf(stderr, "down: connect to %s:%s failed %s\n", host, port, strerror(errno));
     }
     return fd;
 }

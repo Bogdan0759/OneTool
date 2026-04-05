@@ -15,16 +15,6 @@ static char *down_strdup(const char *s) {
     return p;
 }
 
-static char *down_strndup(const char *s, size_t n) {
-    char *p = (char *)malloc(n + 1);
-    if (p == NULL) {
-        return NULL;
-    }
-    memcpy(p, s, n);
-    p[n] = '\0';
-    return p;
-}
-
 static int set_string(char **dst, const char *src) {
     char *copy = down_strdup(src);
     if (copy == NULL) {
@@ -39,6 +29,7 @@ static int set_string(char **dst, const char *src) {
 void down_request_init(down_request_t *req) {
     memset(req, 0, sizeof(*req));
     req->timeout_sec = 10;
+    req->quiet = 0;
     req->use_tls = 0;
     req->ignore_robots = 0;
 }
@@ -67,107 +58,25 @@ void down_print_cli_help(const char *tool_name) {
     printf("  -d <data>          request body\n");
     printf("  --timeout <sec>    connect timeout in seconds (default 10)\n");
     printf("  --ignore-robots    ignore robots.txt policy\n");
-    printf("  -v                 verbose output to stderr\n");
+    printf("  -v                 verbose diagnostics to stderr\n");
+    printf("  -q, --quiet        quiet mode (no status lines)\n");
     printf("  --help             show this help\n");
 }
 
 int down_parse_url(down_request_t *req) {
-    const char *raw = req->url;
-    const char *p = raw;
-    const char *host_start;
-    const char *path_start;
-    const char *host_end;
-    const char *port_sep;
-    size_t host_len;
-    size_t path_len;
-
-    if (strncmp(p, "http://", 7) == 0) {
-        p += 7;
-    } else if (strncmp(p, "https://", 8) == 0) {
-        req->use_tls = 1;
-        p += 8;
-    }
-
-    host_start = p;
-    path_start = strchr(host_start, '/');
-    if (path_start == NULL) {
-        host_end = host_start + strlen(host_start);
-        path_start = host_end;
-    } else {
-        host_end = path_start;
-    }
-
-    if (host_end == host_start) {
-        fprintf(stderr, "down: invalid URL (empty host)\n");
+    net_url_t u;
+    if (net_parse_http_url(req->url, &u) != 0) {
         return 1;
     }
 
-    port_sep = NULL;
-    for (const char *it = host_start; it < host_end; it++) {
-        if (*it == ':') {
-            port_sep = it;
-            break;
-        }
+    req->use_tls = u.use_tls;
+    if (set_string(&req->host, u.host) != 0 ||
+        set_string(&req->port, u.port) != 0 ||
+        set_string(&req->path, u.path) != 0) {
+        net_free_url(&u);
+        return 1;
     }
-
-    if (port_sep != NULL) {
-        size_t port_len;
-        host_len = (size_t)(port_sep - host_start);
-        if (host_len == 0) {
-            fprintf(stderr, "down: invalid URL (empty host)\n");
-            return 1;
-        }
-        free(req->host);
-        req->host = down_strndup(host_start, host_len);
-        if (req->host == NULL) {
-            fprintf(stderr, "down: out of memory\n");
-            return 1;
-        }
-
-        port_len = (size_t)(host_end - (port_sep + 1));
-        if (port_len == 0) {
-            fprintf(stderr, "down: invalid URL (empty port)\n");
-            return 1;
-        }
-        free(req->port);
-        req->port = down_strndup(port_sep + 1, port_len);
-        if (req->port == NULL) {
-            fprintf(stderr, "down: out of memory\n");
-            return 1;
-        }
-    } else {
-        host_len = (size_t)(host_end - host_start);
-        free(req->host);
-        req->host = down_strndup(host_start, host_len);
-        if (req->host == NULL) {
-            fprintf(stderr, "down: out of memory\n");
-            return 1;
-        }
-
-        if (set_string(&req->port, "80") != 0) {
-            return 1;
-        }
-        if (req->use_tls) {
-            if (set_string(&req->port, "443") != 0) {
-                return 1;
-            }
-        }
-    }
-
-    if (*path_start == '\0') {
-        if (set_string(&req->path, "/") != 0) {
-            return 1;
-        }
-    } else {
-        path_len = strlen(path_start);
-        free(req->path);
-        req->path = down_strndup(path_start, path_len);
-        if (req->path == NULL) {
-            fprintf(stderr, "down: out of memory\n");
-            return 1;
-        }
-    }
-
+    net_free_url(&u);
     return 0;
 }
 
@@ -184,6 +93,10 @@ int down_parse_cli(int argc, char *argv[], down_request_t *req) {
 
         if (strcmp(argv[i], "-v") == 0) {
             req->verbose = 1;
+            continue;
+        }
+        if (strcmp(argv[i], "-q") == 0 || strcmp(argv[i], "--quiet") == 0) {
+            req->quiet = 1;
             continue;
         }
 

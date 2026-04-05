@@ -8,10 +8,11 @@
 int lm(int argc, char *argv[]);
 int ex(int argc, char *argv[]);
 int dn(int argc, char *argv[]);
+int pg(int argc, char *argv[]);
 int lk(int argc, char *argv[]);
 int rb(int argc, char *argv[]);
 int sd(int argc, char *argv[]);
-char version[32] = "0.2.4";
+char version[32] = "0.2.5";
 
 void show_help() {
     printf("OneTool %s\n", version);
@@ -21,6 +22,7 @@ void show_help() {
     printf("  lastmod - print the last modification time of a file\n");
     printf("  exec - execute file (optional: -i interpreter)\n");
     printf("  down - HTTP downloader (curl-like)\n");
+    printf("  ping - ICMP ping with stats\n");
     printf("  lmake - run bundled lmake build tool\n");
     printf("  reboot - reboot the system (optional: -t seconds)\n");
     printf("  shutdown - power off the system (optional: -t seconds)\n");
@@ -84,6 +86,10 @@ int main(int argc, char *argv[]) {
     if (strcmp(argv[1], "down") == 0) {
         tool_argv[0] = argv[1];
         return dn(tool_argc, tool_argv);
+    }
+    if (strcmp(argv[1], "ping") == 0) {
+        tool_argv[0] = argv[1];
+        return pg(tool_argc, tool_argv);
     }
     if (strcmp(argv[1], "lmake") == 0) {
         tool_argv[0] = argv[0];
