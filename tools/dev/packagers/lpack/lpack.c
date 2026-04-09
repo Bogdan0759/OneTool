@@ -138,37 +138,14 @@ static int copy_append_file(int dst_fd, const char *src_path, uint64_t *bytes_wr
     return 0;
 }
 
-static int run_runtime_build(const char *runtime_src, const char *out_file) {
-    char cmd[4096];
-    int n = snprintf(
-        cmd,
-        sizeof(cmd),
-        "clang -O2 -s -fPIE -pie \"%s\" -o \"%s\"",
-        runtime_src,
-        out_file
-    );
-    if (n < 0 || (size_t)n >= sizeof(cmd)) {
-        errno = ENAMETOOLONG;
-        return 1;
-    }
-
-    int rc = system(cmd);
-    if (rc != 0) {
-        errno = ECHILD;
-        return 1;
-    }
-    return 0;
-}
-
 int main(int argc, char *argv[]) {
     lpack_opts_t opts;
     int rc;
-    char runtime_src[2048];
+    char runtime_bin[2048];
     const char *self = argv[0];
     const char *slash = strrchr(self, '/');
     int out_fd = -1;
     uint64_t base_size = 0;
-    mode_t mode = 0;
     lpack_footer_t footer;
     uint64_t written = 0;
     uint64_t interp_size = 0;
@@ -182,43 +159,44 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (access("tools/dev/packagers/lpack/runtime.c", R_OK) == 0) {
-        snprintf(runtime_src, sizeof(runtime_src), "tools/dev/packagers/lpack/runtime.c");
-    } else if (access("./tools/dev/packagers/lpack/runtime.c", R_OK) == 0) {
-        snprintf(runtime_src, sizeof(runtime_src), "./tools/dev/packagers/lpack/runtime.c");
+    if (access("tools/dev/packagers/lpack/runtime.bin", R_OK) == 0) {
+        snprintf(runtime_bin, sizeof(runtime_bin), "tools/dev/packagers/lpack/runtime.bin");
+    } else if (access("./tools/dev/packagers/lpack/runtime.bin", R_OK) == 0) {
+        snprintf(runtime_bin, sizeof(runtime_bin), "./tools/dev/packagers/lpack/runtime.bin");
     } else if (slash != NULL) {
         size_t dir_len = (size_t)(slash - self);
-        if (dir_len + strlen("/tools/dev/packagers/lpack/runtime.c") + 1 > sizeof(runtime_src)) {
-            fprintf(stderr, "lpack: path too long\n");
+        if (dir_len + strlen("/tools/dev/packagers/lpack/runtime.bin") + 1 > sizeof(runtime_bin)) {
+            fprintf(stderr, "path too long\n");
             return 1;
         }
-        memcpy(runtime_src, self, dir_len);
-        runtime_src[dir_len] = '\0';
-        strcat(runtime_src, "/tools/dev/packagers/lpack/runtime.c");
+        memcpy(runtime_bin, self, dir_len);
+        runtime_bin[dir_len] = '\0';
+        strcat(runtime_bin, "/tools/dev/packagers/lpack/runtime.bin");
     } else {
-        fprintf(stderr, "lpack: cannot locate runtime.c\n");
+        fprintf(stderr, "cannot locate runtime.bin\n");
         return 1;
     }
-
-    if (run_runtime_build(runtime_src, opts.output_file) != 0) {
-        fprintf(stderr, "runtime build failed for %s\n", runtime_src);
-        return 1;
-    }
-
-    if (file_size_and_mode(opts.output_file, &base_size, &mode) != 0) {
-        fprintf(stderr, "cant stat output: %s\n", strerror(errno));
-        return 1;
-    }
-    (void)mode;
 
     if (file_size_and_mode(opts.interpreter_file, &interp_size, &interp_mode) != 0) {
         fprintf(stderr, "cant stat interpreter '%s': %s\n", opts.interpreter_file, strerror(errno));
         return 1;
     }
 
-    out_fd = open(opts.output_file, O_WRONLY | O_APPEND);
+    out_fd = open(opts.output_file, O_WRONLY | O_CREAT | O_TRUNC, 0755);
     if (out_fd < 0) {
-        fprintf(stderr, "cant open output for append: %s\n", strerror(errno));
+        fprintf(stderr, "cant open output %s\n", strerror(errno));
+        return 1;
+    }
+
+    if (copy_append_file(out_fd, runtime_bin, &written) != 0) {
+        fprintf(stderr, "failed to copy runtime '%s': %s\n", runtime_bin, strerror(errno));
+        close(out_fd);
+        return 1;
+    }
+    base_size = written;
+    if (base_size == 0) {
+        fprintf(stderr, "runtime binary is empty %s\n", runtime_bin);
+        close(out_fd);
         return 1;
     }
 

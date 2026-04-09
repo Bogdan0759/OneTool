@@ -14,6 +14,11 @@ implemented tools:
 - `lastmod` - prints the last modification time of a file
 - `reboot` - reboot the system
 - `shutdown` - shut down the system
+- `exec` - execute file
+- `down` - HTTP downloader
+- `ping` - ICMP ping with stats
+- `lmake` - run bundled lmake build tool
+- `lpack` - pack lua script into ELF runtime
 
 ## build
 

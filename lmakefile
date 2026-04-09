@@ -36,6 +36,8 @@ string LMAKE_CLI_SRC = "tools/dev/lmake_cli.c";
 string LMAKE_CLI_OBJ = "tools/dev/lmake_cli.o";
 string LPACK_SRC = "tools/dev/packagers/lpack/lpack.c";
 string LPACK_OBJ = "tools/dev/packagers/lpack/lpack.o";
+string LPACK_RUNTIME_SRC = "tools/dev/packagers/lpack/runtime.c";
+string LPACK_RUNTIME_BIN = "tools/dev/packagers/lpack/runtime.bin";
 
 string REBOOT_SRC = "tools/power/reboot.c";
 string REBOOT_OBJ = "tools/power/reboot.o";
@@ -78,6 +80,10 @@ task build() {
     if (@is_outdated(LPACK_OBJ, LPACK_SRC)) {
         @echo("[CC] %s", LPACK_SRC);
         @run("%s %s -Dmain=lp -c %s -o %s", CC, CFLAGS, LPACK_SRC, LPACK_OBJ);
+    }
+    if (@is_outdated(LPACK_RUNTIME_BIN, LPACK_RUNTIME_SRC)) {
+        @echo("[CC] %s", LPACK_RUNTIME_SRC);
+        @run("%s %s -fPIE -pie -s %s -o %s", CC, CFLAGS, LPACK_RUNTIME_SRC, LPACK_RUNTIME_BIN);
     }
     if (@is_outdated(REBOOT_OBJ, REBOOT_SRC)) {
         @echo("[CC] %s", REBOOT_SRC);
@@ -132,6 +138,7 @@ task build() {
         PING_CLI_OBJ,
         LMAKE_CLI_OBJ,
         LPACK_OBJ,
+        LPACK_RUNTIME_BIN,
         REBOOT_OBJ,
         SHUTDOWN_OBJ
     )) {
@@ -163,6 +170,7 @@ task clean() {
     @run("rm -f %s", PING_CLI_OBJ);
     @run("rm -f %s", LMAKE_CLI_OBJ);
     @run("rm -f %s", LPACK_OBJ);
+    @run("rm -f %s", LPACK_RUNTIME_BIN);
     @run("rm -f %s", REBOOT_OBJ);
     @run("rm -f %s", SHUTDOWN_OBJ);
 }
