@@ -10,9 +10,10 @@ int ex(int argc, char *argv[]);
 int dn(int argc, char *argv[]);
 int pg(int argc, char *argv[]);
 int lk(int argc, char *argv[]);
+int lp(int argc, char *argv[]);
 int rb(int argc, char *argv[]);
 int sd(int argc, char *argv[]);
-char version[32] = "0.2.5";
+char version[32] = "0.3.0";
 
 void show_help() {
     printf("OneTool %s\n", version);
@@ -24,6 +25,7 @@ void show_help() {
     printf("  down - HTTP downloader (curl-like)\n");
     printf("  ping - ICMP ping with stats\n");
     printf("  lmake - run bundled lmake build tool\n");
+    printf("  lpack - pack lua script into ELF runtime\n");
     printf("  reboot - reboot the system (optional: -t seconds)\n");
     printf("  shutdown - power off the system (optional: -t seconds)\n");
     printf("\n");
@@ -94,6 +96,10 @@ int main(int argc, char *argv[]) {
     if (strcmp(argv[1], "lmake") == 0) {
         tool_argv[0] = argv[0];
         return lk(tool_argc, tool_argv);
+    }
+    if (strcmp(argv[1], "lpack") == 0) {
+        tool_argv[0] = argv[1];
+        return lp(tool_argc, tool_argv);
     }
     if (strcmp(argv[1], "reboot") == 0) {
         tool_argv[0] = argv[1];

@@ -34,6 +34,8 @@ string NET_ROBOTS_OBJ = "libs/net/robots.o";
 
 string LMAKE_CLI_SRC = "tools/dev/lmake_cli.c";
 string LMAKE_CLI_OBJ = "tools/dev/lmake_cli.o";
+string LPACK_SRC = "tools/dev/packagers/lpack/lpack.c";
+string LPACK_OBJ = "tools/dev/packagers/lpack/lpack.o";
 
 string REBOOT_SRC = "tools/power/reboot.c";
 string REBOOT_OBJ = "tools/power/reboot.o";
@@ -41,7 +43,7 @@ string SHUTDOWN_SRC = "tools/power/shutdown.c";
 string SHUTDOWN_OBJ = "tools/power/shutdown.o";
 string PING_CLI_SRC = "tools/network/ping/cli.c";
 string PING_CLI_OBJ = "tools/network/ping/cli.o";
-string LINK_OBJS = "main.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o tools/network/ping/cli.o tools/dev/lmake_cli.o tools/power/reboot.o tools/power/shutdown.o";
+string LINK_OBJS = "main.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o tools/network/ping/cli.o tools/dev/lmake_cli.o tools/dev/packagers/lpack/lpack.o tools/power/reboot.o tools/power/shutdown.o";
 
 task all() {
     build();
@@ -72,6 +74,10 @@ task build() {
     if (@is_outdated(LMAKE_CLI_OBJ, LMAKE_CLI_SRC)) {
         @echo("[CC] %s", LMAKE_CLI_SRC);
         @run("%s %s -Dmain=lk -c %s -o %s", CC, CFLAGS, LMAKE_CLI_SRC, LMAKE_CLI_OBJ);
+    }
+    if (@is_outdated(LPACK_OBJ, LPACK_SRC)) {
+        @echo("[CC] %s", LPACK_SRC);
+        @run("%s %s -Dmain=lp -c %s -o %s", CC, CFLAGS, LPACK_SRC, LPACK_OBJ);
     }
     if (@is_outdated(REBOOT_OBJ, REBOOT_SRC)) {
         @echo("[CC] %s", REBOOT_SRC);
@@ -125,11 +131,13 @@ task build() {
         NET_ROBOTS_OBJ,
         PING_CLI_OBJ,
         LMAKE_CLI_OBJ,
+        LPACK_OBJ,
         REBOOT_OBJ,
         SHUTDOWN_OBJ
     )) {
         @echo("[LD] %s", TARGET);
         @run("%s %s -o %s %s %s", CC, LINK_OBJS, TARGET, LDFLAGS, LDLIBS);
+        @echo("[CAP] setting cap_net_raw capability on %s", TARGET);
         @run("sudo setcap cap_net_raw+ep %s", TARGET);
 
     }
@@ -154,6 +162,7 @@ task clean() {
     @run("rm -f %s", NET_ROBOTS_OBJ);
     @run("rm -f %s", PING_CLI_OBJ);
     @run("rm -f %s", LMAKE_CLI_OBJ);
+    @run("rm -f %s", LPACK_OBJ);
     @run("rm -f %s", REBOOT_OBJ);
     @run("rm -f %s", SHUTDOWN_OBJ);
 }
