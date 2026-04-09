@@ -34,7 +34,11 @@ make clean
 ```
 
 
-
+## How version counting works
+x.r.f
+x = when r > 9
+r = global update or new tool
+f = small update or bug fix
 
 ## License
 
