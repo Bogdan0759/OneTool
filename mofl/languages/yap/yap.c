@@ -1,6 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <dlfcn.h>
+#endif
 
 
 
@@ -20,6 +25,13 @@ PRINT NFORMAT hello        ; print raw value
 PRINT "hello"              ; print string
 PRINT 123                  ; print number
 
+input
+READINT number
+PRINT number
+
+READINT stores the value into the variable
+and also updates OPRES with the same integer
+
 math operations
 ADD 2, 3
 PRINT OPRES
@@ -35,6 +47,21 @@ GOTO OPRES
 
 math result is stored in system variable OPRES
 return result is stored in system variable RETVAL
+
+external library calls
+CALL "/full/path/libexample.so" add_numbers INT2 2 3
+PRINT OPRES
+
+CALL "C:\\full\\path\\example.dll" "hello" STR1 "world"
+PRINT RETVAL
+
+supported call signatures:
+INT0   = int func(void)
+INT1   = int func(int)
+INT2   = int func(int, int)
+INTSTR1 = int func(const char*)
+STR0   = const char* func(void)
+STR1   = const char* func(const char*)
 
 if blocks
 IF name E "John"
@@ -200,6 +227,10 @@ char* get_next_token(struct lexer* lex) {
         return scan_word_token(lex, text);
     }
 
+    if (match_keyword(text, "READINT")) {
+        return scan_word_token(lex, text);
+    }
+
     if (match_keyword(text, "NFORMAT")) {
         return scan_word_token(lex, text);
     }
@@ -233,6 +264,10 @@ char* get_next_token(struct lexer* lex) {
     }
 
     if (match_keyword(text, "DIV")) {
+        return scan_word_token(lex, text);
+    }
+
+    if (match_keyword(text, "CALL")) {
         return scan_word_token(lex, text);
     }
 
@@ -285,6 +320,7 @@ struct variable {
 struct variable vars[MVARS];
 int var_count = 0;
 char opres_buffer[64] = "0";
+char callret_buffer[MAXVALUE] = "";
 extern char* retval;
 
 int find_var_index(char* name) {
@@ -373,6 +409,13 @@ char* extract_string_value(char* str) {
     return str;
 }
 
+char* token_text(char* token) {
+    if (is_string(token)) {
+        return extract_string_value(token);
+    }
+    return token;
+}
+
 int is_compare_operator(char* token) {
     return strcmp(token, "B") == 0 ||
            strcmp(token, "S") == 0 ||
@@ -408,6 +451,19 @@ int resolve_integer_token(char* value, int use_nformat, int* out) {
 
 void set_opres_int(int value) {
     snprintf(opres_buffer, sizeof(opres_buffer), "%d", value);
+}
+
+int read_int_into_var(char* name) {
+    int value = 0;
+
+    if (scanf("%d", &value) != 1) {
+        printf("invalid integer input\n");
+        return 0;
+    }
+
+    set_opres_int(value);
+    set_var(name, opres_buffer, 0);
+    return 1;
 }
 
 int compare_values(char* left, char* op, char* right) {
@@ -494,6 +550,184 @@ int evaluate_if_condition(char** tokens, int token_count, int* is_valid) {
 
 char* format_value(char* value, int use_nformat) {
     return resolve_token_value(value, use_nformat);
+}
+
+#ifdef _WIN32
+typedef HMODULE yap_library_handle;
+#else
+typedef void* yap_library_handle;
+#endif
+
+yap_library_handle open_library(char* path) {
+#ifdef _WIN32
+    return LoadLibraryA(path);
+#else
+    return dlopen(path, RTLD_NOW);
+#endif
+}
+
+void close_library(yap_library_handle handle) {
+#ifdef _WIN32
+    if (handle) {
+        FreeLibrary(handle);
+    }
+#else
+    if (handle) {
+        dlclose(handle);
+    }
+#endif
+}
+
+void* load_symbol(yap_library_handle handle, char* name) {
+#ifdef _WIN32
+    return (void*)GetProcAddress(handle, name);
+#else
+    return dlsym(handle, name);
+#endif
+}
+
+void print_library_error(char* path, char* symbol) {
+#ifdef _WIN32
+    DWORD err = GetLastError();
+    if (symbol) {
+        printf("cannot load symbol %s from %s (error %lu)\n", symbol, path, (unsigned long)err);
+    } else {
+        printf("cannot load library %s (error %lu)\n", path, (unsigned long)err);
+    }
+#else
+    char* err = dlerror();
+    if (symbol) {
+        printf("cannot load symbol %s from %s: %s\n", symbol, path, err ? err : "unknown error");
+    } else {
+        printf("cannot load library %s: %s\n", path, err ? err : "unknown error");
+    }
+#endif
+}
+
+int execute_call(char** tokens, int token_count) {
+    char* library_path;
+    char* symbol_name;
+    char* signature;
+    yap_library_handle library;
+    void* symbol;
+
+    if (token_count < 4) {
+        printf("invalid CALL syntax\n");
+        return 0;
+    }
+
+    library_path = token_text(tokens[1]);
+    symbol_name = token_text(tokens[2]);
+    signature = tokens[3];
+
+#ifndef _WIN32
+    dlerror();
+#endif
+    library = open_library(library_path);
+    if (!library) {
+        print_library_error(library_path, NULL);
+        return 0;
+    }
+
+#ifndef _WIN32
+    dlerror();
+#endif
+    symbol = load_symbol(library, symbol_name);
+    if (!symbol) {
+        print_library_error(library_path, symbol_name);
+        close_library(library);
+        return 0;
+    }
+
+    if (strcmp(signature, "INT0") == 0) {
+        int (*fn)(void) = (int (*)(void))symbol;
+        if (token_count != 4) {
+            printf("invalid CALL syntax for INT0\n");
+            close_library(library);
+            return 0;
+        }
+        set_opres_int(fn());
+    }
+    else if (strcmp(signature, "INT1") == 0) {
+        int arg0;
+        int (*fn)(int) = (int (*)(int))symbol;
+        if (token_count != 5 || !resolve_integer_token(tokens[4], 0, &arg0)) {
+            printf("INT1 expects one integer argument\n");
+            close_library(library);
+            return 0;
+        }
+        set_opres_int(fn(arg0));
+    }
+    else if (strcmp(signature, "INT2") == 0) {
+        int arg0;
+        int arg1;
+        int (*fn)(int, int) = (int (*)(int, int))symbol;
+        if (token_count != 6 ||
+            !resolve_integer_token(tokens[4], 0, &arg0) ||
+            !resolve_integer_token(tokens[5], 0, &arg1)) {
+            printf("INT2 expects two integer arguments\n");
+            close_library(library);
+            return 0;
+        }
+        set_opres_int(fn(arg0, arg1));
+    }
+    else if (strcmp(signature, "INTSTR1") == 0) {
+        char* arg0;
+        int (*fn)(const char*) = (int (*)(const char*))symbol;
+        if (token_count != 5) {
+            printf("INTSTR1 expects one string argument\n");
+            close_library(library);
+            return 0;
+        }
+        arg0 = resolve_token_value(tokens[4], 0);
+        set_opres_int(fn(arg0));
+    }
+    else if (strcmp(signature, "STR0") == 0) {
+        const char* result;
+        const char* (*fn)(void) = (const char* (*)(void))symbol;
+        if (token_count != 4) {
+            printf("invalid CALL syntax for STR0\n");
+            close_library(library);
+            return 0;
+        }
+        result = fn();
+        if (result) {
+            strncpy(callret_buffer, result, MAXVALUE - 1);
+            callret_buffer[MAXVALUE - 1] = '\0';
+            retval = callret_buffer;
+        } else {
+            callret_buffer[0] = '\0';
+            retval = callret_buffer;
+        }
+    }
+    else if (strcmp(signature, "STR1") == 0) {
+        char* arg0;
+        const char* result;
+        const char* (*fn)(const char*) = (const char* (*)(const char*))symbol;
+        if (token_count != 5) {
+            printf("STR1 expects one string argument\n");
+            close_library(library);
+            return 0;
+        }
+        arg0 = resolve_token_value(tokens[4], 0);
+        result = fn(arg0);
+        if (result) {
+            strncpy(callret_buffer, result, MAXVALUE - 1);
+            callret_buffer[MAXVALUE - 1] = '\0';
+            retval = callret_buffer;
+        } else {
+            callret_buffer[0] = '\0';
+            retval = callret_buffer;
+        }
+    }
+    else {
+        printf("unsupported CALL signature: %s\n", signature);
+        close_library(library);
+        return 0;
+    }
+
+    close_library(library);
+    return 1;
 }
 
 #define MAXLINES 1000
@@ -598,6 +832,18 @@ void exec_line(char** tokens, int token_count) {
                 pos++;
             }
         }
+        else if (strcmp(token, "READINT") == 0) {
+            if (token_count != 2) {
+                printf("invalid READINT syntax\n");
+                current_line = line_count;
+                return;
+            }
+            pos++;
+            if (!read_int_into_var(tokens[pos])) {
+                current_line = line_count;
+            }
+            return;
+        }
         else if (strcmp(token, "SET") == 0) {
             pos++;
             char* var_name = tokens[pos];
@@ -698,6 +944,12 @@ void exec_line(char** tokens, int token_count) {
             }
 
             set_opres_int(result);
+            return;
+        }
+        else if (strcmp(token, "CALL") == 0) {
+            if (!execute_call(tokens, token_count)) {
+                current_line = line_count;
+            }
             return;
         }
         else if (strcmp(token, "IF") == 0) {
