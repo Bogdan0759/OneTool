@@ -103,7 +103,7 @@ After GOTO finish (see RETURN) execution continues on next line after GOTO
 */
 
 
-#define MAXTOKENS 450
+#define MAXTOKENS 28
 
 struct lexer {
     char* text;
@@ -317,13 +317,16 @@ struct variable {
     int is_string;
 };
 
-struct variable vars[MVARS];
+struct variable* vars = NULL;
 int var_count = 0;
 char opres_buffer[64] = "0";
 char callret_buffer[MAXVALUE] = "";
 extern char* retval;
 
 int find_var_index(char* name) {
+    if (!vars) {
+        return -1;
+    }
     for (int i = 0; i < var_count; i++) {
         if (strcmp(vars[i].name, name) == 0) {
             return i;
@@ -733,16 +736,86 @@ int execute_call(char** tokens, int token_count) {
 #define MAXLINES 1000
 #define MAXCALLSTACK 100
 
-char* lines[MAXLINES];
-struct parsed_line parsed_lines[MAXLINES];
+char** lines = NULL;
+struct parsed_line* parsed_lines = NULL;
 int line_count = 0;
+int line_capacity = 0;
 int current_line = 0;
 
-int call_stack_line[MAXCALLSTACK];
+int* call_stack_line = NULL;
 int call_stack_top = 0;
 char* retval = NULL;
 
 void exec_line(char** tokens, int token_count);
+
+int count_source_lines(const char* code) {
+    int count = 0;
+    int in_line = 0;
+
+    for (const char* cursor = code; *cursor != '\0'; cursor++) {
+        if (*cursor == '\n') {
+            if (in_line) {
+                count++;
+                in_line = 0;
+            }
+        } else {
+            in_line = 1;
+        }
+    }
+
+    if (in_line) {
+        count++;
+    }
+
+    return count;
+}
+
+void free_program_state(void) {
+    free(lines);
+    free(parsed_lines);
+    free(vars);
+    free(call_stack_line);
+
+    lines = NULL;
+    parsed_lines = NULL;
+    vars = NULL;
+    call_stack_line = NULL;
+    line_count = 0;
+    line_capacity = 0;
+    var_count = 0;
+    current_line = 0;
+    call_stack_top = 0;
+    retval = NULL;
+}
+
+int allocate_program_state(char* code) {
+    line_capacity = count_source_lines(code);
+    if (line_capacity > MAXLINES) {
+        printf("too many lines\n");
+        line_capacity = 0;
+        return 0;
+    }
+
+    if (line_capacity > 0) {
+        lines = calloc((size_t)line_capacity, sizeof(*lines));
+        parsed_lines = calloc((size_t)line_capacity, sizeof(*parsed_lines));
+        if (!lines || !parsed_lines) {
+            printf("failed to allocate line storage\n");
+            free_program_state();
+            return 0;
+        }
+    }
+
+    vars = calloc(MVARS, sizeof(*vars));
+    call_stack_line = calloc(MAXCALLSTACK, sizeof(*call_stack_line));
+    if (!vars || !call_stack_line) {
+        printf("failed to allocate runtime state\n");
+        free_program_state();
+        return 0;
+    }
+
+    return 1;
+}
 
 int find_matching_endif(int start_line) {
     int depth = 0;
@@ -771,8 +844,11 @@ int return_flag = 0;
 
 void split_lines(char* code) {
     line_count = 0;
+    if (line_capacity == 0) {
+        return;
+    }
     char* line = strtok(code, "\n");
-    while (line != NULL && line_count < MAXLINES) {
+    while (line != NULL && line_count < line_capacity) {
         lines[line_count++] = line;
         line = strtok(NULL, "\n");
     }
@@ -792,11 +868,19 @@ void parse_lines(void) {
 }
 
 void exec(char* code) {
+    free_program_state();
+    if (!allocate_program_state(code)) {
+        return;
+    }
+
     split_lines(code);
     parse_lines();
     
+    var_count = 0;
     call_stack_top = 0;
     retval = NULL;
+    return_flag = 0;
+    callret_buffer[0] = '\0';
     set_opres_int(0);
     
     current_line = 0;
@@ -811,6 +895,8 @@ void exec(char* code) {
             current_line++;
         }
     }
+
+    free_program_state();
 }
 
 void exec_line(char** tokens, int token_count) {
@@ -983,14 +1069,44 @@ void exec_line(char** tokens, int token_count) {
 char* read_file(char* path) {
     FILE* file = fopen(path, "r");
     if (!file) {
-        printf("error\n");
+        printf("error opening file\n");
         return NULL;
     }
-    fseek(file, 0, SEEK_END);
+
+    if (fseek(file, 0, SEEK_END) != 0) {
+        printf("error seeking file\n");
+        fclose(file);
+        return NULL;
+    }
+
     long size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    char* buffer = malloc(size + 1);
-    fread(buffer, 1, size, file);
+    if (size < 0) {
+        printf("error reading file size\n");
+        fclose(file);
+        return NULL;
+    }
+
+    if (fseek(file, 0, SEEK_SET) != 0) {
+        printf("error seeking file\n");
+        fclose(file);
+        return NULL;
+    }
+
+    char* buffer = malloc((size_t)size + 1);
+    if (!buffer) {
+        printf("failed to allocate file buffer\n");
+        fclose(file);
+        return NULL;
+    }
+
+    size_t read_size = fread(buffer, 1, (size_t)size, file);
+    if (read_size != (size_t)size) {
+        printf("error reading file\n");
+        free(buffer);
+        fclose(file);
+        return NULL;
+    }
+
     buffer[size] = '\0';
     fclose(file);
     return buffer;
