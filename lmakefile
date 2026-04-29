@@ -6,6 +6,10 @@ string LDLIBS = "-lssl -lcrypto -lz -lzstd -ldl -pthread";
 string TARGET = "onetool";
 string MAIN_SRC = "main.c";
 string MAIN_OBJ = "main.o";
+string TOOL_REGISTRY_HDR = "tool_registry.h";
+string EXTRA_TOOLS_MANIFEST = "extra_tools.manifest";
+string EXTRA_TOOLS_SCRIPT = "tools/dev/build_extra_tools.sh";
+string EXTRA_TOOLS_BUNDLE_OBJ = "generated/extra_tools_bundle.o";
 
 string LASTMOD_SRC = "tools/filesystem/lastmod.c";
 string LASTMOD_OBJ = "tools/filesystem/lastmod.o";
@@ -52,7 +56,7 @@ task all() {
 }
 
 task build() {
-    if (@is_outdated(MAIN_OBJ, MAIN_SRC)) {
+    if (@is_outdated(MAIN_OBJ, MAIN_SRC, TOOL_REGISTRY_HDR)) {
         @echo("[CC] %s", MAIN_SRC);
         @run("%s %s -c %s -o %s", CC, CFLAGS, MAIN_SRC, MAIN_OBJ);
     }
@@ -123,6 +127,9 @@ task build() {
         @run("%s %s -c %s -o %s", CC, CFLAGS, NET_ROBOTS_SRC, NET_ROBOTS_OBJ);
     }
 
+    @echo("[GEN] extra tools");
+    @run("CC='%s' CFLAGS='%s' sh %s %s %s", CC, CFLAGS, EXTRA_TOOLS_SCRIPT, EXTRA_TOOLS_MANIFEST, EXTRA_TOOLS_BUNDLE_OBJ);
+
     if (@is_outdated(TARGET,
         MAIN_OBJ,
         LASTMOD_OBJ,
@@ -140,10 +147,11 @@ task build() {
         LPACK_OBJ,
         LPACK_RUNTIME_BIN,
         REBOOT_OBJ,
-        SHUTDOWN_OBJ
+        SHUTDOWN_OBJ,
+        EXTRA_TOOLS_BUNDLE_OBJ
     )) {
         @echo("[LD] %s", TARGET);
-        @run("%s %s -o %s %s %s", CC, LINK_OBJS, TARGET, LDFLAGS, LDLIBS);
+        @run("%s %s %s -o %s %s %s", CC, LINK_OBJS, EXTRA_TOOLS_BUNDLE_OBJ, TARGET, LDFLAGS, LDLIBS);
         @echo("[CAP] setting cap_net_raw capability on %s", TARGET);
         @run("sudo setcap cap_net_raw+ep %s", TARGET);
 
@@ -173,6 +181,14 @@ task clean() {
     @run("rm -f %s", LPACK_RUNTIME_BIN);
     @run("rm -f %s", REBOOT_OBJ);
     @run("rm -f %s", SHUTDOWN_OBJ);
+    @run("rm -f %s", EXTRA_TOOLS_BUNDLE_OBJ);
+    @run("rm -f %s", "generated/extra_tools_registry.c");
+    @run("rm -f %s", "generated/extra_tools_registry.o");
+    @run("rm -f %s", "generated/.tmp/extra_tools_bundle.o.tmp");
+    @run("rm -f %s", "generated/.tmp/extra_tools_registry.c.tmp");
+    @run("rm -rf %s", "generated/extra_tools");
+    @run("rm -rf %s", "generated/.tmp");
+    @run("rm -rf %s", "generated");
 }
 
 task run() {

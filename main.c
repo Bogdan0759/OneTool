@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "tool_registry.h"
+
 int lm(int argc, char *argv[]);
 int ex(int argc, char *argv[]);
 int dn(int argc, char *argv[]);
@@ -15,19 +17,60 @@ int rb(int argc, char *argv[]);
 int sd(int argc, char *argv[]);
 char version[32] = "0.3.1";
 
+static const struct onetool_tool builtin_tools[] = {
+    { "lastmod", lm, "print the last modification time of a file", ONETOOL_ARGV0_TOOL_NAME },
+    { "exec", ex, "execute file (optional: -i interpreter)", ONETOOL_ARGV0_TOOL_NAME },
+    { "down", dn, "HTTP downloader (curl-like)", ONETOOL_ARGV0_TOOL_NAME },
+    { "ping", pg, "ICMP ping with stats", ONETOOL_ARGV0_TOOL_NAME },
+    { "lmake", lk, "run bundled lmake build tool", ONETOOL_ARGV0_BINARY_PATH },
+    { "lpack", lp, "pack lua script into ELF runtime", ONETOOL_ARGV0_TOOL_NAME },
+    { "reboot", rb, "reboot the system (optional: -t seconds)", ONETOOL_ARGV0_TOOL_NAME },
+    { "shutdown", sd, "power off the system (optional: -t seconds)", ONETOOL_ARGV0_TOOL_NAME },
+};
+
+static int builtin_tool_count = sizeof(builtin_tools) / sizeof(builtin_tools[0]);
+
+static void print_tool_list(const struct onetool_tool *tools, int count) {
+    for (int i = 0; i < count; i++) {
+        printf("  %s - %s\n", tools[i].name, tools[i].description);
+    }
+}
+
+static const struct onetool_tool *find_tool(const char *name) {
+    for (int i = 0; i < builtin_tool_count; i++) {
+        if (strcmp(name, builtin_tools[i].name) == 0) {
+            return &builtin_tools[i];
+        }
+    }
+
+    for (int i = 0; i < onetool_extra_tool_count; i++) {
+        if (strcmp(name, onetool_extra_tools[i].name) == 0) {
+            return &onetool_extra_tools[i];
+        }
+    }
+
+    return NULL;
+}
+
+static int run_tool(const struct onetool_tool *tool, int argc, char *argv[], const char *onetool_argv0) {
+    if (tool->argv0_mode == ONETOOL_ARGV0_BINARY_PATH) {
+        argv[0] = (char *)onetool_argv0;
+    } else {
+        argv[0] = (char *)tool->name;
+    }
+
+    return tool->entry(argc, argv);
+}
+
 void show_help() {
     printf("OneTool %s\n", version);
     printf("usage: %s <tool> [args] -to fd/path\n", "onetool");
     printf("\n");
     printf("available tools:\n");
-    printf("  lastmod - print the last modification time of a file\n");
-    printf("  exec - execute file (optional: -i interpreter)\n");
-    printf("  down - HTTP downloader (curl-like)\n");
-    printf("  ping - ICMP ping with stats\n");
-    printf("  lmake - run bundled lmake build tool\n");
-    printf("  lpack - pack lua script into ELF runtime\n");
-    printf("  reboot - reboot the system (optional: -t seconds)\n");
-    printf("  shutdown - power off the system (optional: -t seconds)\n");
+    print_tool_list(builtin_tools, builtin_tool_count);
+    if (onetool_extra_tool_count > 0) {
+        print_tool_list(onetool_extra_tools, onetool_extra_tool_count);
+    }
     printf("\n");
     printf("global options:\n");
     printf("  -to fd/path - redirect stdout and stderr to file\n");
@@ -77,37 +120,9 @@ int main(int argc, char *argv[]) {
         close(out_fd);
     }
 
-    if (strcmp(argv[1], "lastmod") == 0) {
-        tool_argv[0] = argv[1];
-        return lm(tool_argc, tool_argv);
-    }
-    if (strcmp(argv[1], "exec") == 0) {
-        tool_argv[0] = argv[1];
-        return ex(tool_argc, tool_argv);
-    }
-    if (strcmp(argv[1], "down") == 0) {
-        tool_argv[0] = argv[1];
-        return dn(tool_argc, tool_argv);
-    }
-    if (strcmp(argv[1], "ping") == 0) {
-        tool_argv[0] = argv[1];
-        return pg(tool_argc, tool_argv);
-    }
-    if (strcmp(argv[1], "lmake") == 0) {
-        tool_argv[0] = argv[0];
-        return lk(tool_argc, tool_argv);
-    }
-    if (strcmp(argv[1], "lpack") == 0) {
-        tool_argv[0] = argv[1];
-        return lp(tool_argc, tool_argv);
-    }
-    if (strcmp(argv[1], "reboot") == 0) {
-        tool_argv[0] = argv[1];
-        return rb(tool_argc, tool_argv);
-    }
-    if (strcmp(argv[1], "shutdown") == 0) {
-        tool_argv[0] = argv[1];
-        return sd(tool_argc, tool_argv);
+    const struct onetool_tool *tool = find_tool(argv[1]);
+    if (tool != NULL) {
+        return run_tool(tool, tool_argc, tool_argv, argv[0]);
     }
 
     if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0 ||
