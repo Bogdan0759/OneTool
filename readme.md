@@ -38,6 +38,31 @@ delete binaries:
 make clean
 ```
 
+### add custom tools
+
+You can bundle extra C tools into `onetool` at build time without editing
+`main.c`.
+
+1. Add a line to [`extra_tools.manifest`](./extra_tools.manifest)
+2. Run `make`
+
+Manifest format:
+
+```text
+name|source|description|argv0_mode|extra_cflags
+```
+
+Example:
+
+```text
+yap|mofl/languages/yap/yap.c|YAP language interpreter|tool|
+```
+
+Notes:
+- the source file must expose a normal `main(int argc, char **argv)`
+- the build renames that `main` automatically during compilation
+- `argv0_mode` can be `tool` or `onetool`
+
 
 ## How version counting works
 x.r.f

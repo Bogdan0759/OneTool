@@ -1,0 +1,10 @@
+# name|source|description|argv0_mode|extra_cflags
+# argv0_mode: tool | onetool
+#
+# Any C file with `main(int argc, char **argv)` can be added here without
+# changing main.c. The build will compile it with -Dmain=<generated_symbol>.
+#
+# Example:
+# mytool|../path/to/mytool.c|custom tool example|tool|
+
+yap|mofl/languages/yap/yap.c|YAP language interpreter|tool|
