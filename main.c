@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "tool_registry.h"
+#include "config/tool_registry.h"
 
 int lm(int argc, char *argv[]);
 int ex(int argc, char *argv[]);
@@ -15,9 +15,10 @@ int lk(int argc, char *argv[]);
 int lp(int argc, char *argv[]);
 int rb(int argc, char *argv[]);
 int sd(int argc, char *argv[]);
-char version[32] = "0.3.1";
+int tui_main(const char *onetool_argv0);
+const char onetool_version[] = "0.4.3";
 
-static const struct onetool_tool builtin_tools[] = {
+const struct onetool_tool onetool_builtin_tools[] = {
     { "lastmod", lm, "print the last modification time of a file", ONETOOL_ARGV0_TOOL_NAME },
     { "exec", ex, "execute file (optional: -i interpreter)", ONETOOL_ARGV0_TOOL_NAME },
     { "down", dn, "HTTP downloader (curl-like)", ONETOOL_ARGV0_TOOL_NAME },
@@ -28,7 +29,7 @@ static const struct onetool_tool builtin_tools[] = {
     { "shutdown", sd, "power off the system (optional: -t seconds)", ONETOOL_ARGV0_TOOL_NAME },
 };
 
-static int builtin_tool_count = sizeof(builtin_tools) / sizeof(builtin_tools[0]);
+const int onetool_builtin_tool_count = sizeof(onetool_builtin_tools) / sizeof(onetool_builtin_tools[0]);
 
 static void print_tool_list(const struct onetool_tool *tools, int count) {
     for (int i = 0; i < count; i++) {
@@ -36,10 +37,30 @@ static void print_tool_list(const struct onetool_tool *tools, int count) {
     }
 }
 
-static const struct onetool_tool *find_tool(const char *name) {
-    for (int i = 0; i < builtin_tool_count; i++) {
-        if (strcmp(name, builtin_tools[i].name) == 0) {
-            return &builtin_tools[i];
+int onetool_total_tool_count(void) {
+    return onetool_builtin_tool_count + onetool_extra_tool_count;
+}
+
+const struct onetool_tool *onetool_get_tool_by_index(int index) {
+    if (index < 0) {
+        return NULL;
+    }
+    if (index < onetool_builtin_tool_count) {
+        return &onetool_builtin_tools[index];
+    }
+
+    index -= onetool_builtin_tool_count;
+    if (index < onetool_extra_tool_count) {
+        return &onetool_extra_tools[index];
+    }
+
+    return NULL;
+}
+
+const struct onetool_tool *onetool_find_tool(const char *name) {
+    for (int i = 0; i < onetool_builtin_tool_count; i++) {
+        if (strcmp(name, onetool_builtin_tools[i].name) == 0) {
+            return &onetool_builtin_tools[i];
         }
     }
 
@@ -52,7 +73,7 @@ static const struct onetool_tool *find_tool(const char *name) {
     return NULL;
 }
 
-static int run_tool(const struct onetool_tool *tool, int argc, char *argv[], const char *onetool_argv0) {
+int onetool_run_tool(const struct onetool_tool *tool, int argc, char *argv[], const char *onetool_argv0) {
     if (tool->argv0_mode == ONETOOL_ARGV0_BINARY_PATH) {
         argv[0] = (char *)onetool_argv0;
     } else {
@@ -62,18 +83,19 @@ static int run_tool(const struct onetool_tool *tool, int argc, char *argv[], con
     return tool->entry(argc, argv);
 }
 
-void show_help() {
-    printf("OneTool %s\n", version);
+void onetool_show_help(void) {
+    printf("OneTool %s\n", onetool_version);
     printf("usage: %s <tool> [args] -to fd/path\n", "onetool");
     printf("\n");
     printf("available tools:\n");
-    print_tool_list(builtin_tools, builtin_tool_count);
+    print_tool_list(onetool_builtin_tools, onetool_builtin_tool_count);
     if (onetool_extra_tool_count > 0) {
         print_tool_list(onetool_extra_tools, onetool_extra_tool_count);
     }
     printf("\n");
     printf("global options:\n");
     printf("  -to fd/path - redirect stdout and stderr to file\n");
+    printf("  tui        - launch the TUI\n");
 }
 
 
@@ -83,8 +105,11 @@ int main(int argc, char *argv[]) {
     const char *to_target = NULL;
 
     if (argc < 2) {
-        show_help();
+        onetool_show_help();
         return 1;
+    }
+    if (strcmp(argv[1], "tui") == 0) {
+        return tui_main(argv[0]);
     }
 
     for (int i = 2; i < argc; i++) {
@@ -120,14 +145,14 @@ int main(int argc, char *argv[]) {
         close(out_fd);
     }
 
-    const struct onetool_tool *tool = find_tool(argv[1]);
+    const struct onetool_tool *tool = onetool_find_tool(argv[1]);
     if (tool != NULL) {
-        return run_tool(tool, tool_argc, tool_argv, argv[0]);
+        return onetool_run_tool(tool, tool_argc, tool_argv, argv[0]);
     }
 
     if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0 ||
         strcmp(argv[1], "help") == 0 || strcmp(argv[1], "list") == 0) {
-        show_help();
+        onetool_show_help();
         return 0;
     }
 

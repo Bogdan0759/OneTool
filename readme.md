@@ -20,6 +20,12 @@ implemented tools:
 - `lmake` - run bundled lmake build tool
 - `lpack` - pack lua script into ELF runtime
 
+
+framework parts:
+
+- `libs/net` - network library for URL parsing, HTTP and transport
+- `libs/TUI` - TUI library
+
 ## build
 
 requirement:
@@ -43,8 +49,8 @@ make clean
 You can bundle extra C tools into `onetool` at build time without editing
 `main.c`.
 
-1. Add a line to [`extra_tools.manifest`](./extra_tools.manifest)
-2. Run `make`
+Add a line to [`config/extra_tools.manifest`](./config/extra_tools.manifest)
+Run `make`
 
 Manifest format:
 
@@ -63,6 +69,27 @@ Notes:
 - the build renames that `main` automatically during compilation
 - `argv0_mode` can be `tool` or `onetool`
 
+## tui
+
+You can launch TUI by:
+
+```bash
+./onetool tui
+```
+
+Themes and built-in tool forms are embedded directly into the binary by [tui.c](./tui.c).
+
+Inside TUI:
+
+- `Enter` opens the selected tool form
+- `N` opens global settings
+- `T` quickly cycles themes
+- inside a tool form, `Enter` runs the tool
+- settings let you change the launch path for tools and edit theme colors live
+
+If a tool does not have a built-in TUI form, OneTool falls back to a
+generic screen with `Extra args`, so all tools can still be launched.
+
 
 ## How version counting works
 x.r.f
@@ -72,4 +99,7 @@ f = small update or bug fix
 
 ## License
 
-This project is distributed under MPL-2.0.
+### This project contains multiple licensing schemes:
+
+#### - mofl/ -  BSD 2-Clause
+#### - other - MPL 2.0
