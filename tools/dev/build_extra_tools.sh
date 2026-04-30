@@ -18,7 +18,7 @@ tool_obj_dir="$bundle_dir/extra_tools"
 registry_c_path="$bundle_dir/extra_tools_registry.c"
 registry_o_path="$bundle_dir/extra_tools_registry.o"
 tmp_dir="$bundle_dir/.tmp"
-header_path="tool_registry.h"
+header_path="config/tool_registry.h"
 script_path=$0
 
 mkdir -p "$bundle_dir" "$tool_obj_dir" "$tmp_dir"
@@ -71,7 +71,7 @@ fi
 
 registry_tmp="$tmp_dir/extra_tools_registry.c.tmp"
 {
-    printf '#include "tool_registry.h"\n\n'
+    printf '#include "config/tool_registry.h"\n\n'
 } > "$registry_tmp"
 
 extra_count=0
