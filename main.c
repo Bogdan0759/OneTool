@@ -9,6 +9,8 @@
 
 int lm(int argc, char *argv[]);
 int ex(int argc, char *argv[]);
+int fi(int argc, char *argv[]);
+int ga(int argc, char *argv[]);
 int dn(int argc, char *argv[]);
 int pg(int argc, char *argv[]);
 int lk(int argc, char *argv[]);
@@ -17,11 +19,13 @@ int rb(int argc, char *argv[]);
 int sd(int argc, char *argv[]);
 int tm(int argc, char *argv[]);
 int tui_main(const char *onetool_argv0);
-const char onetool_version[] = "0.5.0";
+const char onetool_version[] = "0.6.0";
 
 const struct onetool_tool onetool_builtin_tools[] = {
     { "lastmod", lm, "print the last modification time of a file", ONETOOL_ARGV0_TOOL_NAME },
     { "exec", ex, "execute file (optional: -i interpreter)", ONETOOL_ARGV0_TOOL_NAME },
+    { "fsinfo", fi, "print filesystem info", ONETOOL_ARGV0_TOOL_NAME },
+    { "gapi_supported", ga, "check available graphics API", ONETOOL_ARGV0_TOOL_NAME },
     { "down", dn, "HTTP downloader (curl-like)", ONETOOL_ARGV0_TOOL_NAME },
     { "ping", pg, "ICMP ping with stats", ONETOOL_ARGV0_TOOL_NAME },
     { "lmake", lk, "run bundled lmake build tool", ONETOOL_ARGV0_BINARY_PATH },

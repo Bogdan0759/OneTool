@@ -20,7 +20,8 @@ implemented tools:
 - `lmake` - run bundled lmake build tool
 - `lpack` - pack lua script into ELF runtime
 - `taskmng` - TUI task manager with process control
-
+- `gapi_supported` - check available graphics API
+- `fsinfo` - filesystem info
 
 framework parts:
 

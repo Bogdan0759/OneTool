@@ -17,6 +17,10 @@ string LASTMOD_SRC = "tools/filesystem/lastmod.c";
 string LASTMOD_OBJ = "tools/filesystem/lastmod.o";
 string EXEC_SRC = "tools/filesystem/exec.c";
 string EXEC_OBJ = "tools/filesystem/exec.o";
+string FSINFO_SRC = "tools/filesystem/fsinfo.c";
+string FSINFO_OBJ = "tools/filesystem/fsinfo.o";
+string GAPI_SRC = "tools/dev/gapi_supported.c";
+string GAPI_OBJ = "tools/dev/gapi_supported.o";
 
 string DOWN_HDR = "tools/network/down/down.h";
 string DOWN_CLI_SRC = "tools/network/down/cli.c";
@@ -64,7 +68,7 @@ string TASKMNG_TUI_SRC = "tools/system/taskmng/tui.c";
 string TASKMNG_TUI_OBJ = "tools/system/taskmng/tui.o";
 string PING_CLI_SRC = "tools/network/ping/cli.c";
 string PING_CLI_OBJ = "tools/network/ping/cli.o";
-string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o";
+string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/dev/gapi_supported.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o";
 
 task all() {
     build();
@@ -87,6 +91,14 @@ task build() {
     if (@is_outdated(EXEC_OBJ, EXEC_SRC)) {
         @echo("[CC] %s", EXEC_SRC);
         @run("%s %s -Dmain=ex -c %s -o %s", CC, CFLAGS, EXEC_SRC, EXEC_OBJ);
+    }
+    if (@is_outdated(FSINFO_OBJ, FSINFO_SRC)) {
+        @echo("[CC] %s", FSINFO_SRC);
+        @run("%s %s -Dmain=fi -c %s -o %s", CC, CFLAGS, FSINFO_SRC, FSINFO_OBJ);
+    }
+    if (@is_outdated(GAPI_OBJ, GAPI_SRC)) {
+        @echo("[CC] %s", GAPI_SRC);
+        @run("%s %s -Dmain=ga -c %s -o %s", CC, CFLAGS, GAPI_SRC, GAPI_OBJ);
     }
     if (@is_outdated(DOWN_CLI_OBJ, DOWN_CLI_SRC, DOWN_HDR)) {
         @echo("[CC] %s", DOWN_CLI_SRC);
@@ -174,6 +186,8 @@ task build() {
         MAIN_TUI_OBJ,
         LASTMOD_OBJ,
         EXEC_OBJ,
+        FSINFO_OBJ,
+        GAPI_OBJ,
         DOWN_CLI_OBJ,
         DOWN_PARSE_OBJ,
         DOWN_SEND_OBJ,
@@ -212,6 +226,8 @@ task clean() {
     @run("rm -f %s", TARGET);
     @run("rm -f %s", LASTMOD_OBJ);
     @run("rm -f %s", EXEC_OBJ);
+    @run("rm -f %s", FSINFO_OBJ);
+    @run("rm -f %s", GAPI_OBJ);
     @run("rm -f %s", DOWN_CLI_OBJ);
     @run("rm -f %s", DOWN_PARSE_OBJ);
     @run("rm -f %s", DOWN_SEND_OBJ);
