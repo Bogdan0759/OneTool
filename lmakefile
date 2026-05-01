@@ -1,5 +1,5 @@
 string CC = "clang";
-string CFLAGS = "-O3";
+string CFLAGS = "-O3 -flto";
 string LDFLAGS = "-static";
 string LDLIBS = "-lssl -lcrypto -lz -lzstd -ldl -pthread -lncursesw -ltinfo";
 
@@ -53,20 +53,29 @@ string REBOOT_SRC = "tools/power/reboot.c";
 string REBOOT_OBJ = "tools/power/reboot.o";
 string SHUTDOWN_SRC = "tools/power/shutdown.c";
 string SHUTDOWN_OBJ = "tools/power/shutdown.o";
+string TASKMNG_HDR = "tools/system/taskmng/taskmng.h";
+string TASKMNG_INFO_SRC = "tools/system/taskmng/info.c";
+string TASKMNG_INFO_OBJ = "tools/system/taskmng/info.o";
+string TASKMNG_LIST_SRC = "tools/system/taskmng/list.c";
+string TASKMNG_LIST_OBJ = "tools/system/taskmng/list.o";
+string TASKMNG_PROCESS_SRC = "tools/system/taskmng/process.c";
+string TASKMNG_PROCESS_OBJ = "tools/system/taskmng/process.o";
+string TASKMNG_TUI_SRC = "tools/system/taskmng/tui.c";
+string TASKMNG_TUI_OBJ = "tools/system/taskmng/tui.o";
 string PING_CLI_SRC = "tools/network/ping/cli.c";
 string PING_CLI_OBJ = "tools/network/ping/cli.o";
-string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o tools/network/ping/cli.o tools/dev/lmake_cli.o tools/dev/packagers/lpack/lpack.o tools/power/reboot.o tools/power/shutdown.o";
+string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o tools/network/ping/cli.o tools/dev/lmake_cli.o tools/dev/packagers/lpack/lpack.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o";
 
 task all() {
     build();
 }
 
 task build() {
-    if (@is_outdated(MAIN_OBJ, MAIN_SRC, TOOL_REGISTRY_HDR)) {
+    if (@is_outdated(MAIN_OBJ, MAIN_SRC, TOOL_REGISTRY_HDR, TASKMNG_HDR)) {
         @echo("[CC] %s", MAIN_SRC);
         @run("%s %s -c %s -o %s", CC, CFLAGS, MAIN_SRC, MAIN_OBJ);
     }
-    if (@is_outdated(MAIN_TUI_OBJ, MAIN_TUI_SRC, TOOL_REGISTRY_HDR, TUI_HDR)) {
+    if (@is_outdated(MAIN_TUI_OBJ, MAIN_TUI_SRC, TOOL_REGISTRY_HDR, TUI_HDR, TASKMNG_HDR)) {
         @echo("[CC] %s", MAIN_TUI_SRC);
         @run("%s %s %s -c %s -o %s", CC, CFLAGS, TUI_CFLAGS, MAIN_TUI_SRC, MAIN_TUI_OBJ);
     }
@@ -106,6 +115,22 @@ task build() {
     if (@is_outdated(SHUTDOWN_OBJ, SHUTDOWN_SRC)) {
         @echo("[CC] %s", SHUTDOWN_SRC);
         @run("%s %s -Dmain=sd -c %s -o %s", CC, CFLAGS, SHUTDOWN_SRC, SHUTDOWN_OBJ);
+    }
+    if (@is_outdated(TASKMNG_TUI_OBJ, TASKMNG_TUI_SRC, TASKMNG_HDR, TUI_HDR)) {
+        @echo("[CC] %s", TASKMNG_TUI_SRC);
+        @run("%s %s %s -Dmain=tm -c %s -o %s", CC, CFLAGS, TUI_CFLAGS, TASKMNG_TUI_SRC, TASKMNG_TUI_OBJ);
+    }
+    if (@is_outdated(TASKMNG_INFO_OBJ, TASKMNG_INFO_SRC, TASKMNG_HDR)) {
+        @echo("[CC] %s", TASKMNG_INFO_SRC);
+        @run("%s %s -c %s -o %s", CC, CFLAGS, TASKMNG_INFO_SRC, TASKMNG_INFO_OBJ);
+    }
+    if (@is_outdated(TASKMNG_LIST_OBJ, TASKMNG_LIST_SRC, TASKMNG_HDR)) {
+        @echo("[CC] %s", TASKMNG_LIST_SRC);
+        @run("%s %s -c %s -o %s", CC, CFLAGS, TASKMNG_LIST_SRC, TASKMNG_LIST_OBJ);
+    }
+    if (@is_outdated(TASKMNG_PROCESS_OBJ, TASKMNG_PROCESS_SRC, TASKMNG_HDR, TUI_HDR)) {
+        @echo("[CC] %s", TASKMNG_PROCESS_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, TUI_CFLAGS, TASKMNG_PROCESS_SRC, TASKMNG_PROCESS_OBJ);
     }
 
     if (@is_outdated(DOWN_PARSE_OBJ, DOWN_PARSE_SRC, DOWN_HDR, NET_HDR)) {
@@ -164,6 +189,10 @@ task build() {
         LPACK_RUNTIME_BIN,
         REBOOT_OBJ,
         SHUTDOWN_OBJ,
+        TASKMNG_TUI_OBJ,
+        TASKMNG_INFO_OBJ,
+        TASKMNG_LIST_OBJ,
+        TASKMNG_PROCESS_OBJ,
         EXTRA_TOOLS_BUNDLE_OBJ
     )) {
         @echo("[LD] %s", TARGET);
@@ -199,6 +228,10 @@ task clean() {
     @run("rm -f %s", LPACK_RUNTIME_BIN);
     @run("rm -f %s", REBOOT_OBJ);
     @run("rm -f %s", SHUTDOWN_OBJ);
+    @run("rm -f %s", TASKMNG_TUI_OBJ);
+    @run("rm -f %s", TASKMNG_INFO_OBJ);
+    @run("rm -f %s", TASKMNG_LIST_OBJ);
+    @run("rm -f %s", TASKMNG_PROCESS_OBJ);
     @run("rm -f %s", EXTRA_TOOLS_BUNDLE_OBJ);
     @run("rm -f %s", "generated/extra_tools_registry.c");
     @run("rm -f %s", "generated/extra_tools_registry.o");
