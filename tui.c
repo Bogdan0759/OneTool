@@ -342,6 +342,13 @@ static void load_embedded_tool_form(onetool_form_t *form, const struct onetool_t
         copy_string(form->summary, sizeof(form->summary), "Run a file directly or launch it through a chosen interpreter.");
         add_text_field(form, "path", "File path", "", "./script.sh", "./script.sh", "Program or script to execute.");
         add_text_field(form, "interpreter", "Interpreter", "-i", "", "<empty = direct binary>", "Leave this empty to run a binary directly without any interpreter.");
+    } else if (strcmp(tool->name, "fsinfo") == 0) {
+        copy_string(form->title, sizeof(form->title), "Filesystem Info");
+        copy_string(form->summary, sizeof(form->summary), "Inspect a path and print its filesystem and inode information.");
+        add_text_field(form, "path", "Path", "", "/", "/path/to/dir", "Path to inspect.");
+    } else if (strcmp(tool->name, "gapi_supported") == 0) {
+        copy_string(form->title, sizeof(form->title), "gapi check");
+        copy_string(form->summary, sizeof(form->summary), "check all available graphic API");
     } else if (strcmp(tool->name, "down") == 0) {
         copy_string(form->title, sizeof(form->title), "HTTP Downloader");
         copy_string(form->summary, sizeof(form->summary), "Download an HTTP resource with common OneTool options. Advanced flags can still be added through Extra args.");
