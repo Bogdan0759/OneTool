@@ -981,7 +981,11 @@ static int handle_tool_screen_event(onetool_tui_state_t *state, const tui_event_
         return 0;
     }
 
-    if (tool_is_taskmng(selected_tool) &&
+    int is_nav_key = (event->key == TUI_KEY_UP || event->key == TUI_KEY_DOWN || 
+                      event->key == TUI_KEY_PAGE_UP || event->key == TUI_KEY_PAGE_DOWN || 
+                      event->key == TUI_KEY_HOME || event->key == TUI_KEY_END);
+
+    if (tool_is_taskmng(selected_tool) && !is_nav_key &&
         taskmng_handle_key(&state->taskmng_runtime, &state->taskmng_view, &state->taskmng_snapshot, event->key, state->status, sizeof(state->status))) {
         return 0;
     }
