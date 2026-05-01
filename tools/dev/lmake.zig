@@ -371,13 +371,15 @@ const Parser = struct {
 
 const Executor = struct {
     allocator: std.mem.Allocator,
+    io: std.Io,
     program: *const Program,
     vars: std.StringHashMap([]const u8),
     call_stack: std.ArrayList([]const u8),
 
-    fn init(allocator: std.mem.Allocator, program: *const Program) anyerror!Executor {
+    fn init(allocator: std.mem.Allocator, io: std.Io, program: *const Program) anyerror!Executor {
         return .{
             .allocator = allocator,
+            .io = io,
             .program = program,
             .vars = std.StringHashMap([]const u8).init(allocator),
             .call_stack = try std.ArrayList([]const u8).initCapacity(allocator, 0),
@@ -449,7 +451,9 @@ const Executor = struct {
         if (std.mem.eql(u8, name, "echo")) {
             if (want_bool) return error.InvalidExpr;
             const msg = try self.formatArgs(call.args);
-            try std.fs.File.stdout().deprecatedWriter().print("{s}\n", .{msg});
+            var stdout_writer = std.Io.File.stdout().writer(self.io, &.{});
+            try stdout_writer.interface.print("{s}\n", .{msg});
+            try stdout_writer.interface.flush();
             return .void;
         } else if (std.mem.eql(u8, name, "run")) {
             if (want_bool) return error.InvalidExpr;
@@ -459,7 +463,9 @@ const Executor = struct {
         } else if (std.mem.eql(u8, name, "error")) {
             if (want_bool) return error.InvalidExpr;
             const msg = try self.formatArgs(call.args);
-            try std.fs.File.stderr().deprecatedWriter().print("{s}\n", .{msg});
+            var stderr_writer = std.Io.File.stderr().writer(self.io, &.{});
+            try stderr_writer.interface.print("{s}\n", .{msg});
+            try stderr_writer.interface.flush();
             return error.UserError;
         } else if (std.mem.eql(u8, name, "file_exists")) {
             if (call.args.len != 1) return error.InvalidArgs;
@@ -469,9 +475,12 @@ const Executor = struct {
             return .void;
         } else if (std.mem.eql(u8, name, "question")) {
             const msg = try self.formatArgs(call.args);
-            try std.fs.File.stdout().deprecatedWriter().print("{s} ", .{msg});
+            var stdout_writer = std.Io.File.stdout().writer(self.io, &.{});
+            try stdout_writer.interface.print("{s} ", .{msg});
+            try stdout_writer.interface.flush();
             var buf: [64]u8 = undefined;
-            const n = try std.fs.File.stdin().deprecatedReader().read(&buf);
+            var stdin_reader = std.Io.File.stdin().reader(self.io, &.{});
+            const n = try stdin_reader.interface.readSliceShort(&buf);
             const ans = std.mem.trim(u8, buf[0..n], " \t\r\n");
             const yes = ans.len > 0 and (ans[0] == 'y' or ans[0] == 'Y');
             if (want_bool) return .{ .bool = yes };
@@ -518,27 +527,26 @@ const Executor = struct {
     }
 
     fn fileExists(self: *Executor, path: []const u8) bool {
-        _ = self;
-        _ = std.fs.cwd().statFile(path) catch return false;
+        _ = std.Io.Dir.cwd().statFile(self.io, path, .{}) catch return false;
         return true;
     }
 
     fn isOutdated(self: *Executor, out_path: []const u8, deps: []Expr) anyerror!bool {
-        const out_stat = std.fs.cwd().statFile(out_path) catch return true;
+        const out_stat = std.Io.Dir.cwd().statFile(self.io, out_path, .{}) catch return true;
         const out_mtime = out_stat.mtime;
         if (deps.len == 0) return false;
         for (deps) |e| {
             const dep_path = try self.evalString(e);
-            const dep_stat = std.fs.cwd().statFile(dep_path) catch return true;
-            if (dep_stat.mtime > out_mtime) return true;
+            const dep_stat = std.Io.Dir.cwd().statFile(self.io, dep_path, .{}) catch return true;
+            if (dep_stat.mtime.toNanoseconds() > out_mtime.toNanoseconds()) return true;
         }
         return false;
     }
 
     fn isOutdatedDepfile(self: *Executor, out_path: []const u8, depfile_path: []const u8) anyerror!bool {
-        const out_stat = std.fs.cwd().statFile(out_path) catch return true;
+        const out_stat = std.Io.Dir.cwd().statFile(self.io, out_path, .{}) catch return true;
         const out_mtime = out_stat.mtime;
-        const depfile = std.fs.cwd().readFileAlloc(self.allocator, depfile_path, 10 * 1024 * 1024) catch return true;
+        const depfile = std.Io.Dir.cwd().readFileAlloc(self.io, depfile_path, self.allocator, .limited(10 * 1024 * 1024)) catch return true;
 
         var seen_colon = false;
         var i: usize = 0;
@@ -570,8 +578,8 @@ const Executor = struct {
             if (c == ' ' or c == '\t' or c == '\r' or c == '\n') {
                 if (tok.items.len > 0) {
                     const dep_path = tok.items;
-                    const dep_stat = std.fs.cwd().statFile(dep_path) catch return true;
-                    if (dep_stat.mtime > out_mtime) return true;
+                    const dep_stat = std.Io.Dir.cwd().statFile(self.io, dep_path, .{}) catch return true;
+                    if (dep_stat.mtime.toNanoseconds() > out_mtime.toNanoseconds()) return true;
                     tok.clearRetainingCapacity();
                 }
                 i += 1;
@@ -584,8 +592,8 @@ const Executor = struct {
 
         if (tok.items.len > 0) {
             const dep_path = tok.items;
-            const dep_stat = std.fs.cwd().statFile(dep_path) catch return true;
-            if (dep_stat.mtime > out_mtime) return true;
+            const dep_stat = std.Io.Dir.cwd().statFile(self.io, dep_path, .{}) catch return true;
+            if (dep_stat.mtime.toNanoseconds() > out_mtime.toNanoseconds()) return true;
         }
 
         if (!seen_colon) return true;
@@ -594,18 +602,22 @@ const Executor = struct {
 
     fn runCommand(self: *Executor, cmd: []const u8) anyerror!void {
         if (builtin.os.tag == .windows) {
-            var child = std.process.Child.init(&[_][]const u8{ "cmd", "/C", cmd }, self.allocator);
-            const term = try child.spawnAndWait();
+            var child = try std.process.spawn(self.io, .{
+                .argv = &[_][]const u8{ "cmd.exe", "/C", cmd },
+            });
+            const term = try child.wait(self.io);
             switch (term) {
-                .Exited => |code| if (code != 0) return error.CommandFailed,
+                .exited => |code| if (code != 0) return error.CommandFailed,
                 else => return error.CommandFailed,
             }
             return;
         }
-        var child = std.process.Child.init(&[_][]const u8{ "sh", "-c", cmd }, self.allocator);
-        const term = try child.spawnAndWait();
+        var child = try std.process.spawn(self.io, .{
+            .argv = &[_][]const u8{ "/bin/sh", "-c", cmd },
+        });
+        const term = try child.wait(self.io);
         switch (term) {
-            .Exited => |code| if (code != 0) return error.CommandFailed,
+            .exited => |code| if (code != 0) return error.CommandFailed,
             else => return error.CommandFailed,
         }
     }
@@ -638,37 +650,24 @@ fn format(allocator: std.mem.Allocator, fmt: []const u8, args: [][]const u8) ![]
     return try out.toOwnedSlice(allocator);
 }
 
-fn usage() void {
-    const out = std.fs.File.stdout().deprecatedWriter();
-    _ = out.print(
+fn usage(stdout: anytype) !void {
+    try stdout.print(
         "lmake usage:\n  lmake [-f file] [target]\n  lmake --list\n",
         .{},
-    ) catch {};
+    );
+    try stdout.flush();
 }
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-    const arena_alloc = arena.allocator();
-
-    var args_it = std.process.args();
-    var args = try std.ArrayList([]const u8).initCapacity(arena_alloc, 0);
-    while (args_it.next()) |a| {
-        try args.append(arena_alloc, a);
-    }
-
+fn runLmake(io: std.Io, stdout: anytype, arena_alloc: std.mem.Allocator, args: []const []const u8) !void {
     var file_path: []const u8 = "lmakefile";
     var target: ?[]const u8 = null;
     var list_only = false;
 
     var i: usize = 1;
-    while (i < args.items.len) {
-        const a = args.items[i];
+    while (i < args.len) {
+        const a = args[i];
         if (std.mem.eql(u8, a, "-h") or std.mem.eql(u8, a, "--help")) {
-            usage();
+            try usage(stdout);
             return;
         }
         if (std.mem.eql(u8, a, "--list")) {
@@ -677,8 +676,8 @@ pub fn main() !void {
             continue;
         }
         if (std.mem.eql(u8, a, "-f")) {
-            if (i + 1 >= args.items.len) return error.InvalidArgs;
-            file_path = args.items[i + 1];
+            if (i + 1 >= args.len) return error.InvalidArgs;
+            file_path = args[i + 1];
             i += 2;
             continue;
         }
@@ -690,16 +689,16 @@ pub fn main() !void {
         return error.InvalidArgs;
     }
 
-    const src = try std.fs.cwd().readFileAlloc(arena_alloc, file_path, 10 * 1024 * 1024);
+    const src = try std.Io.Dir.cwd().readFileAlloc(io, file_path, arena_alloc, .limited(10 * 1024 * 1024));
 
     var parser = try Parser.init(arena_alloc, src);
     var program = try parser.parseProgram();
 
     if (list_only) {
-        const out = std.fs.File.stdout().deprecatedWriter();
         for (program.task_order) |name| {
-            try out.print("{s}\n", .{name});
+            try stdout.print("{s}\n", .{name});
         }
+        try stdout.flush();
         return;
     }
 
@@ -710,7 +709,45 @@ pub fn main() !void {
         return error.NoTasks;
     };
 
-    var exec = try Executor.init(arena_alloc, &program);
+    var exec = try Executor.init(arena_alloc, io, &program);
     try exec.loadVars();
     try exec.execTask(entry);
+}
+
+pub export fn lk(argc: c_int, argv: [*][*:0]u8) c_int {
+    const environ_slice: [:null]const ?[*:0]const u8 = std.mem.span(std.c.environ);
+    const process_environ: std.process.Environ = .{
+        .block = .{ .slice = environ_slice },
+    };
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
+    defer _ = gpa.deinit();
+    var threaded: std.Io.Threaded = .init(gpa.allocator(), .{
+        .environ = process_environ,
+    });
+    defer threaded.deinit();
+    const io = threaded.io();
+    var stdout_buffer: [256]u8 = undefined;
+    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+    const stdout = &stdout_writer.interface;
+    var stderr_writer = std.Io.File.stderr().writer(io, &.{});
+    var arena = std.heap.ArenaAllocator.init(gpa.allocator());
+    defer arena.deinit();
+    const arena_alloc = arena.allocator();
+    const arg_count: usize = if (argc > 0) @intCast(argc) else 0;
+    const args = arena_alloc.alloc([]const u8, arg_count) catch {
+        _ = stderr_writer.interface.print("lmake: OutOfMemory\n", .{}) catch {};
+        _ = stderr_writer.interface.flush() catch {};
+        return 1;
+    };
+
+    for (0..arg_count) |index| {
+        args[index] = std.mem.span(argv[index]);
+    }
+
+    runLmake(io, stdout, arena_alloc, args) catch |err| {
+        _ = stderr_writer.interface.print("lmake: {s}\n", .{@errorName(err)}) catch {};
+        _ = stderr_writer.interface.flush() catch {};
+        return 1;
+    };
+    return 0;
 }

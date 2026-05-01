@@ -42,8 +42,8 @@ string TUI_SRC = "libs/TUI/tui.c";
 string TUI_LIB_OBJ = "libs/TUI/tui.o";
 string TUI_CFLAGS = "-D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600";
 
-string LMAKE_CLI_SRC = "tools/dev/lmake_cli.c";
-string LMAKE_CLI_OBJ = "tools/dev/lmake_cli.o";
+string LMAKE_ZIG_SRC = "tools/dev/lmake.zig";
+string LMAKE_OBJ = "tools/dev/lmake.o";
 string LPACK_SRC = "tools/dev/packagers/lpack/lpack.c";
 string LPACK_OBJ = "tools/dev/packagers/lpack/lpack.o";
 string LPACK_RUNTIME_SRC = "tools/dev/packagers/lpack/runtime.c";
@@ -64,7 +64,7 @@ string TASKMNG_TUI_SRC = "tools/system/taskmng/tui.c";
 string TASKMNG_TUI_OBJ = "tools/system/taskmng/tui.o";
 string PING_CLI_SRC = "tools/network/ping/cli.c";
 string PING_CLI_OBJ = "tools/network/ping/cli.o";
-string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o tools/network/ping/cli.o tools/dev/lmake_cli.o tools/dev/packagers/lpack/lpack.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o";
+string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o";
 
 task all() {
     build();
@@ -96,9 +96,9 @@ task build() {
         @echo("[CC] %s", PING_CLI_SRC);
         @run("%s %s -Dmain=pg -c %s -o %s", CC, CFLAGS, PING_CLI_SRC, PING_CLI_OBJ);
     }
-    if (@is_outdated(LMAKE_CLI_OBJ, LMAKE_CLI_SRC)) {
-        @echo("[CC] %s", LMAKE_CLI_SRC);
-        @run("%s %s -Dmain=lk -c %s -o %s", CC, CFLAGS, LMAKE_CLI_SRC, LMAKE_CLI_OBJ);
+    if (@is_outdated(LMAKE_OBJ, LMAKE_ZIG_SRC)) {
+        @echo("[ZIG] %s", LMAKE_ZIG_SRC);
+        @run("zig build-obj -O ReleaseFast -lc -femit-bin=%s %s", LMAKE_OBJ, LMAKE_ZIG_SRC);
     }
     if (@is_outdated(LPACK_OBJ, LPACK_SRC)) {
         @echo("[CC] %s", LPACK_SRC);
@@ -184,7 +184,7 @@ task build() {
         NET_ROBOTS_OBJ,
         TUI_LIB_OBJ,
         PING_CLI_OBJ,
-        LMAKE_CLI_OBJ,
+        LMAKE_OBJ,
         LPACK_OBJ,
         LPACK_RUNTIME_BIN,
         REBOOT_OBJ,
@@ -223,7 +223,7 @@ task clean() {
     @run("rm -f %s", NET_ROBOTS_OBJ);
     @run("rm -f %s", TUI_LIB_OBJ);
     @run("rm -f %s", PING_CLI_OBJ);
-    @run("rm -f %s", LMAKE_CLI_OBJ);
+    @run("rm -f %s", LMAKE_OBJ);
     @run("rm -f %s", LPACK_OBJ);
     @run("rm -f %s", LPACK_RUNTIME_BIN);
     @run("rm -f %s", REBOOT_OBJ);
@@ -248,5 +248,5 @@ task run() {
 }
 
 task rebuild_lmake() {
-    @run("zig build-exe -O ReleaseFast -fstrip -femit-bin=lmake tools/dev/lmake.zig");
+    @run("zig build-obj -O ReleaseFast -lc -femit-bin=%s %s", LMAKE_OBJ, LMAKE_ZIG_SRC);
 }
