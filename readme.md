@@ -22,6 +22,7 @@ implemented tools:
 - `taskmng` - TUI task manager with process control
 - `gapi_supported` - check available graphics API
 - `fsinfo` - filesystem info
+- `yap` - YAP language interpreter
 
 framework parts:
 
