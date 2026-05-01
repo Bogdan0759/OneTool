@@ -19,6 +19,7 @@ implemented tools:
 - `ping` - ICMP ping with stats
 - `lmake` - run bundled lmake build tool
 - `lpack` - pack lua script into ELF runtime
+- `taskmng` - TUI task manager with process control
 
 
 framework parts:

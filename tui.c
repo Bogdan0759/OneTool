@@ -1,5 +1,6 @@
 #include "config/tool_registry.h"
 #include "libs/TUI/tui.h"
+#include "tools/system/taskmng/taskmng.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -72,6 +73,9 @@ typedef struct {
     const struct onetool_tool *active_tool;
     int settings_selected_field;
     int settings_return_screen;
+    taskmng_runtime_t taskmng_runtime;
+    taskmng_snapshot_t taskmng_snapshot;
+    taskmng_view_t taskmng_view;
 } onetool_tui_state_t;
 
 enum onetool_screen {
@@ -165,6 +169,10 @@ static void init_embedded_themes(void) {
 
 static void set_status(onetool_tui_state_t *state, const char *text) {
     copy_string(state->status, sizeof(state->status), text);
+}
+
+static int tool_is_taskmng(const struct onetool_tool *tool) {
+    return tool != NULL && strcmp(tool->name, "taskmng") == 0;
 }
 
 static void init_default_form(onetool_form_t *form, const struct onetool_tool *tool) {
@@ -752,16 +760,29 @@ static void draw_tool_screen(onetool_tui_state_t *state, int width, int height) 
     tui_draw_textf(2, height - 3, TUI_STYLE_MUTED, "%d tools", onetool_total_tool_count());
     tui_draw_textf(right_x + 2, 2, TUI_STYLE_ACCENT, "%s", selected_tool != NULL ? selected_tool->name : "none");
     if (selected_tool != NULL) {
-        draw_wrapped_text(right_x + 2, 4, right_width - 4, 4, TUI_STYLE_NORMAL, selected_tool->description);
-        tui_draw_textf(right_x + 2, 10, TUI_STYLE_MUTED, "Theme: %s", g_themes[state->current_theme].name);
-        tui_draw_text(right_x + 2, 11, TUI_STYLE_MUTED, "Run path:");
-        tui_draw_text(right_x + 2, 12, TUI_STYLE_NORMAL, state->launch_dir);
-        tui_draw_text(right_x + 2, 14, TUI_STYLE_NORMAL, "Press Enter to open tool settings.");
-        tui_draw_text(right_x + 2, 15, TUI_STYLE_NORMAL, "Press N for global settings.");
-        tui_draw_text(right_x + 2, 16, TUI_STYLE_NORMAL, "Press T to switch themes quickly.");
-        tui_draw_text(right_x + 2, 17, TUI_STYLE_NORMAL, "Use arrows/PageUp/PageDown to move.");
-        snprintf(preview, sizeof(preview), "Command: onetool %s", selected_tool->name);
-        tui_draw_text(right_x + 2, height - 4, TUI_STYLE_MUTED, preview);
+        if (tool_is_taskmng(selected_tool)) {
+            int taskmng_ok = state->taskmng_runtime.has_snapshot
+                ? taskmng_refresh(&state->taskmng_runtime, &state->taskmng_snapshot)
+                : taskmng_collect(&state->taskmng_runtime, &state->taskmng_snapshot);
+
+            if (taskmng_ok) {
+                taskmng_draw_panel(&state->taskmng_snapshot, &state->taskmng_view, right_x + 2, 4, right_width - 4, height - 9, 1);
+            } else {
+                tui_draw_text(right_x + 2, 4, TUI_STYLE_ERROR, "taskmng: failed to read /proc");
+            }
+            tui_draw_text(right_x + 2, height - 4, TUI_STYLE_MUTED, "W/S scroll | k kill | t term | f freeze | g rescan | h filter");
+        } else {
+            draw_wrapped_text(right_x + 2, 4, right_width - 4, 4, TUI_STYLE_NORMAL, selected_tool->description);
+            tui_draw_textf(right_x + 2, 10, TUI_STYLE_MUTED, "Theme: %s", g_themes[state->current_theme].name);
+            tui_draw_text(right_x + 2, 11, TUI_STYLE_MUTED, "Run path:");
+            tui_draw_text(right_x + 2, 12, TUI_STYLE_NORMAL, state->launch_dir);
+            tui_draw_text(right_x + 2, 14, TUI_STYLE_NORMAL, "Press Enter to open tool settings.");
+            tui_draw_text(right_x + 2, 15, TUI_STYLE_NORMAL, "Press N for global settings.");
+            tui_draw_text(right_x + 2, 16, TUI_STYLE_NORMAL, "Press T to switch themes quickly.");
+            tui_draw_text(right_x + 2, 17, TUI_STYLE_NORMAL, "Use arrows/PageUp/PageDown to move.");
+            snprintf(preview, sizeof(preview), "Command: onetool %s", selected_tool->name);
+            tui_draw_text(right_x + 2, height - 4, TUI_STYLE_MUTED, preview);
+        }
     }
 }
 
@@ -947,8 +968,14 @@ static void run_active_tool(onetool_tui_state_t *state, const char *onetool_argv
 
 static int handle_tool_screen_event(onetool_tui_state_t *state, const tui_event_t *event) {
     int total = onetool_total_tool_count();
+    const struct onetool_tool *selected_tool = onetool_get_tool_by_index(state->selected_tool);
 
     if (event->kind != TUI_EVENT_KEY) {
+        return 0;
+    }
+
+    if (tool_is_taskmng(selected_tool) &&
+        taskmng_handle_key(&state->taskmng_runtime, &state->taskmng_view, &state->taskmng_snapshot, event->key, state->status, sizeof(state->status))) {
         return 0;
     }
 
@@ -985,6 +1012,8 @@ static int handle_tool_screen_event(onetool_tui_state_t *state, const tui_event_
             state->selected_tool = total - 1;
             break;
         case 't':
+            cycle_theme(state, 1);
+            break;
         case 'T':
             cycle_theme(state, 1);
             break;
@@ -992,8 +1021,21 @@ static int handle_tool_screen_event(onetool_tui_state_t *state, const tui_event_
         case 'N':
             open_settings(state, ONETOOL_SCREEN_TOOLS);
             break;
+        case 'w':
+        case 'W':
+        case 's':
+        case 'S':
+        case 'k':
+        case 'K':
+        case 'f':
+        case 'F':
+            break;
         case TUI_KEY_ENTER:
-            open_tool_form(state, onetool_get_tool_by_index(state->selected_tool));
+            if (tool_is_taskmng(selected_tool)) {
+                set_status(state, "Task manager is live in the right panel. Use W/S, k, t, f, g, h.");
+            } else {
+                open_tool_form(state, selected_tool);
+            }
             break;
         default:
             break;
@@ -1168,6 +1210,8 @@ int tui_main(const char *onetool_argv0) {
 
     memset(&state, 0, sizeof(state));
     init_embedded_themes();
+    taskmng_runtime_init(&state.taskmng_runtime);
+    taskmng_view_init(&state.taskmng_view);
 
     if (tui_init() != 0) {
         fprintf(stderr, "failed to initialize TUI\n");
@@ -1180,7 +1224,7 @@ int tui_main(const char *onetool_argv0) {
     if (getcwd(state.launch_dir, sizeof(state.launch_dir)) == NULL) {
         copy_string(state.launch_dir, sizeof(state.launch_dir), ".");
     }
-    set_status(&state, "Use arrows to select a tool, Enter to configure, T to change theme.");
+    set_status(&state, "Use arrows to select a tool. Press T for theme. N for settings");
 
     for (;;) {
         tui_get_size(&width, &height);

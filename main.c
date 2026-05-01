@@ -15,8 +15,9 @@ int lk(int argc, char *argv[]);
 int lp(int argc, char *argv[]);
 int rb(int argc, char *argv[]);
 int sd(int argc, char *argv[]);
+int tm(int argc, char *argv[]);
 int tui_main(const char *onetool_argv0);
-const char onetool_version[] = "0.4.3";
+const char onetool_version[] = "0.5.0";
 
 const struct onetool_tool onetool_builtin_tools[] = {
     { "lastmod", lm, "print the last modification time of a file", ONETOOL_ARGV0_TOOL_NAME },
@@ -27,6 +28,7 @@ const struct onetool_tool onetool_builtin_tools[] = {
     { "lpack", lp, "pack lua script into ELF runtime", ONETOOL_ARGV0_TOOL_NAME },
     { "reboot", rb, "reboot the system (optional: -t seconds)", ONETOOL_ARGV0_TOOL_NAME },
     { "shutdown", sd, "power off the system (optional: -t seconds)", ONETOOL_ARGV0_TOOL_NAME },
+    { "taskmng", tm, "interactive task manager with process control", ONETOOL_ARGV0_TOOL_NAME },
 };
 
 const int onetool_builtin_tool_count = sizeof(onetool_builtin_tools) / sizeof(onetool_builtin_tools[0]);
