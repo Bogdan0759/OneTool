@@ -629,18 +629,72 @@ fn format(allocator: std.mem.Allocator, fmt: []const u8, args: [][]const u8) ![]
     var ai: usize = 0;
     while (i < fmt.len) {
         if (fmt[i] == '%' and i + 1 < fmt.len) {
-            const n = fmt[i + 1];
-            if (n == 's') {
-                if (ai >= args.len) return error.FormatArgs;
-                try out.appendSlice(allocator, args[ai]);
-                ai += 1;
-                i += 2;
-                continue;
-            }
-            if (n == '%') {
+            if (fmt[i + 1] == '%') {
                 try out.append(allocator, '%');
                 i += 2;
                 continue;
+            }
+
+            var j = i + 1;
+            var pad_char: u8 = ' ';
+            var left_align = false;
+            if (j < fmt.len and fmt[j] == '-') {
+                left_align = true;
+                j += 1;
+            }
+            if (j < fmt.len and fmt[j] == '0') {
+                pad_char = '0';
+                j += 1;
+            }
+            var width: usize = 0;
+            while (j < fmt.len and fmt[j] >= '0' and fmt[j] <= '9') {
+                width = width * 10 + (fmt[j] - '0');
+                j += 1;
+            }
+
+            if (j < fmt.len) {
+                const n = fmt[j];
+                if (n == 's' or n == 'd' or n == 'i' or n == 'u' or n == 'x' or n == 'X' or n == 'b' or n == 'c') {
+                    if (ai >= args.len) return error.FormatArgs;
+                    const arg = args[ai];
+                    ai += 1;
+                    i = j + 1;
+
+                    var buf: [256]u8 = undefined;
+                    var slice: []const u8 = "";
+
+                    if (n == 's') {
+                        slice = arg;
+                    } else if (n == 'c') {
+                        const val = std.fmt.parseInt(u8, arg, 0) catch '?';
+                        buf[0] = val;
+                        slice = buf[0..1];
+                    } else {
+                        const val = std.fmt.parseInt(i64, arg, 0) catch 0;
+                        slice = switch (n) {
+                            'd', 'i' => std.fmt.bufPrint(&buf, "{d}", .{val}) catch "",
+                            'u' => std.fmt.bufPrint(&buf, "{d}", .{@as(u64, @bitCast(val))}) catch "",
+                            'x' => std.fmt.bufPrint(&buf, "{x}", .{val}) catch "",
+                            'X' => std.fmt.bufPrint(&buf, "{X}", .{val}) catch "",
+                            'b' => std.fmt.bufPrint(&buf, "{b}", .{val}) catch "",
+                            else => unreachable,
+                        };
+                    }
+
+                    if (width > slice.len) {
+                        const pad_len = width - slice.len;
+                        if (left_align) {
+                            try out.appendSlice(allocator, slice);
+                            try out.appendNTimes(allocator, ' ', pad_len);
+                        } else {
+                            try out.appendNTimes(allocator, pad_char, pad_len);
+                            try out.appendSlice(allocator, slice);
+                        }
+                    } else {
+                        try out.appendSlice(allocator, slice);
+                    }
+                    continue;
+                }
             }
         }
         try out.append(allocator, fmt[i]);
