@@ -6,6 +6,7 @@ int mount_fs(const char *source, const char *target, const char *fstype, unsigne
 void print_status(const char *msg, int success);
 
 void other_setup(void);
+void size_setup(void);
 
 #ifndef main
 #define main cf
@@ -17,6 +18,7 @@ int main(int argc, char *argv[]) {
     (void)argv;
 
     other_setup();
+    size_setup();
 
     s = create_dir("/proc");
     print_status("create /proc", s == 0);
