@@ -146,7 +146,7 @@ int tui_init(void) {
         return 0;
     }
 
-    if (initscr() == NULL) {
+    if (newterm(NULL, stdout, stdin) == NULL) {
         return 1;
     }
 

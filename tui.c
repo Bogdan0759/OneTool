@@ -1,6 +1,7 @@
 #include "config/tool_registry.h"
 #include "libs/TUI/tui.h"
 #include "tools/system/taskmng/taskmng.h"
+int cf(int argc, char *argv[]);
 
 #include <ctype.h>
 #include <errno.h>
@@ -391,6 +392,9 @@ static void load_embedded_tool_form(onetool_form_t *form, const struct onetool_t
         copy_string(form->title, sizeof(form->title), "Shutdown");
         copy_string(form->summary, sizeof(form->summary), "Power off the system now or after a delay.");
         add_text_field(form, "delay", "Delay seconds", "-t", "", "5", "Optional delay before shutdown.");
+    } else if (strcmp(tool->name, "configure") == 0) {
+        copy_string(form->title, sizeof(form->title), "configure linux environment");
+        copy_string(form->summary, sizeof(form->summary), "set up basic environment (mount /proc, /sys, /dev, /tmp).");
     } else {
         form->has_config = 0;
     }
@@ -1225,8 +1229,12 @@ int tui_main(const char *onetool_argv0) {
     taskmng_view_init(&state.taskmng_view);
 
     if (tui_init() != 0) {
-        fprintf(stderr, "failed to initialize TUI\n");
-        return 1;
+        char *cf_argv[] = {"configure", NULL};
+        cf(1, cf_argv);
+        if (tui_init() != 0) {
+            fprintf(stderr, "failed to initialize TUI\n");
+            return 1;
+        }
     }
 
     tui_set_palette(&g_themes[0].palette);
