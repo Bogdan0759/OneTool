@@ -19,8 +19,9 @@ int rb(int argc, char *argv[]);
 int sd(int argc, char *argv[]);
 int tm(int argc, char *argv[]);
 int cf(int argc, char *argv[]);
+int cv(int argc, char *argv[]);
 int tui_main(const char *onetool_argv0);
-const char onetool_version[] = "0.7.1";
+const char onetool_version[] = "0.8.0";
 
 const struct onetool_tool onetool_builtin_tools[] = {
     {"lastmod", lm, "print the last modification time of a file",
@@ -41,6 +42,8 @@ const struct onetool_tool onetool_builtin_tools[] = {
     {"taskmng", tm, "interactive task manager with process control",
      ONETOOL_ARGV0_TOOL_NAME},
     {"configure", cf, "configure basic system environment",
+     ONETOOL_ARGV0_TOOL_NAME},
+    {"cvm", cv, "show current video mode and resolution",
      ONETOOL_ARGV0_TOOL_NAME},
 };
 
