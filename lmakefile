@@ -80,7 +80,9 @@ string CONFIGURE_OTHER_SRC = "tools/system/configure/other.c";
 string CONFIGURE_OTHER_OBJ = "tools/system/configure/other.o";
 string CONFIGURE_SIZE_SRC = "tools/system/configure/size.c";
 string CONFIGURE_SIZE_OBJ = "tools/system/configure/size.o";
-string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/dev/gapi_supported.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o tools/system/configure/size.o";
+string CVM_SRC = "tools/system/video/cvm.c";
+string CVM_OBJ = "tools/system/video/cvm.o";
+string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/dev/gapi_supported.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o tools/system/configure/size.o tools/system/video/cvm.o";
 
 task all() {
     build();
@@ -180,6 +182,10 @@ task build() {
         @echo("[CC] %s", CONFIGURE_SIZE_SRC);
         @run("%s %s -c %s -o %s", CC, CFLAGS, CONFIGURE_SIZE_SRC, CONFIGURE_SIZE_OBJ);
     }
+    if (@is_outdated(CVM_OBJ, CVM_SRC)) {
+        @echo("[CC] %s", CVM_SRC);
+        @run("%s %s -Dmain=cv -c %s -o %s", CC, CFLAGS, CVM_SRC, CVM_OBJ);
+    }
 
     if (@is_outdated(DOWN_PARSE_OBJ, DOWN_PARSE_SRC, DOWN_HDR, NET_HDR)) {
         @echo("[CC] %s", DOWN_PARSE_SRC);
@@ -249,6 +255,7 @@ task build() {
         CONFIGURE_MOUNT_OBJ,
         CONFIGURE_OTHER_OBJ,
         CONFIGURE_SIZE_OBJ,
+        CVM_OBJ,
         EXTRA_TOOLS_BUNDLE_OBJ
     )) {
         @echo("[LD] %s", TARGET);
