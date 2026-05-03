@@ -68,7 +68,17 @@ string TASKMNG_TUI_SRC = "tools/system/taskmng/tui.c";
 string TASKMNG_TUI_OBJ = "tools/system/taskmng/tui.o";
 string PING_CLI_SRC = "tools/network/ping/cli.c";
 string PING_CLI_OBJ = "tools/network/ping/cli.o";
-string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/dev/gapi_supported.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o";
+string CONFIGURE_MAIN_SRC = "tools/system/configure/main.c";
+string CONFIGURE_MAIN_OBJ = "tools/system/configure/main.o";
+string CONFIGURE_CREATE_SRC = "tools/system/configure/create.c";
+string CONFIGURE_CREATE_OBJ = "tools/system/configure/create.o";
+string CONFIGURE_HELPERS_SRC = "tools/system/configure/helpers.c";
+string CONFIGURE_HELPERS_OBJ = "tools/system/configure/helpers.o";
+string CONFIGURE_MOUNT_SRC = "tools/system/configure/mount.c";
+string CONFIGURE_MOUNT_OBJ = "tools/system/configure/mount.o";
+string CONFIGURE_OTHER_SRC = "tools/system/configure/other.c";
+string CONFIGURE_OTHER_OBJ = "tools/system/configure/other.o";
+string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/dev/gapi_supported.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o";
 
 task all() {
     build();
@@ -144,6 +154,26 @@ task build() {
         @echo("[CC] %s", TASKMNG_PROCESS_SRC);
         @run("%s %s %s -c %s -o %s", CC, CFLAGS, TUI_CFLAGS, TASKMNG_PROCESS_SRC, TASKMNG_PROCESS_OBJ);
     }
+    if (@is_outdated(CONFIGURE_MAIN_OBJ, CONFIGURE_MAIN_SRC)) {
+        @echo("[CC] %s", CONFIGURE_MAIN_SRC);
+        @run("%s %s -Dmain=cf -c %s -o %s", CC, CFLAGS, CONFIGURE_MAIN_SRC, CONFIGURE_MAIN_OBJ);
+    }
+    if (@is_outdated(CONFIGURE_CREATE_OBJ, CONFIGURE_CREATE_SRC)) {
+        @echo("[CC] %s", CONFIGURE_CREATE_SRC);
+        @run("%s %s -c %s -o %s", CC, CFLAGS, CONFIGURE_CREATE_SRC, CONFIGURE_CREATE_OBJ);
+    }
+    if (@is_outdated(CONFIGURE_HELPERS_OBJ, CONFIGURE_HELPERS_SRC)) {
+        @echo("[CC] %s", CONFIGURE_HELPERS_SRC);
+        @run("%s %s -c %s -o %s", CC, CFLAGS, CONFIGURE_HELPERS_SRC, CONFIGURE_HELPERS_OBJ);
+    }
+    if (@is_outdated(CONFIGURE_MOUNT_OBJ, CONFIGURE_MOUNT_SRC)) {
+        @echo("[CC] %s", CONFIGURE_MOUNT_SRC);
+        @run("%s %s -c %s -o %s", CC, CFLAGS, CONFIGURE_MOUNT_SRC, CONFIGURE_MOUNT_OBJ);
+    }
+    if (@is_outdated(CONFIGURE_OTHER_OBJ, CONFIGURE_OTHER_SRC)) {
+        @echo("[CC] %s", CONFIGURE_OTHER_SRC);
+        @run("%s %s -c %s -o %s", CC, CFLAGS, CONFIGURE_OTHER_SRC, CONFIGURE_OTHER_OBJ);
+    }
 
     if (@is_outdated(DOWN_PARSE_OBJ, DOWN_PARSE_SRC, DOWN_HDR, NET_HDR)) {
         @echo("[CC] %s", DOWN_PARSE_SRC);
@@ -207,6 +237,11 @@ task build() {
         TASKMNG_INFO_OBJ,
         TASKMNG_LIST_OBJ,
         TASKMNG_PROCESS_OBJ,
+        CONFIGURE_MAIN_OBJ,
+        CONFIGURE_CREATE_OBJ,
+        CONFIGURE_HELPERS_OBJ,
+        CONFIGURE_MOUNT_OBJ,
+        CONFIGURE_OTHER_OBJ,
         EXTRA_TOOLS_BUNDLE_OBJ
     )) {
         @echo("[LD] %s", TARGET);
@@ -248,6 +283,11 @@ task clean() {
     @run("rm -f %s", TASKMNG_INFO_OBJ);
     @run("rm -f %s", TASKMNG_LIST_OBJ);
     @run("rm -f %s", TASKMNG_PROCESS_OBJ);
+    @run("rm -f %s", CONFIGURE_MAIN_OBJ);
+    @run("rm -f %s", CONFIGURE_CREATE_OBJ);
+    @run("rm -f %s", CONFIGURE_HELPERS_OBJ);
+    @run("rm -f %s", CONFIGURE_MOUNT_OBJ);
+    @run("rm -f %s", CONFIGURE_OTHER_OBJ);
     @run("rm -f %s", EXTRA_TOOLS_BUNDLE_OBJ);
     @run("rm -f %s", "generated/extra_tools_registry.c");
     @run("rm -f %s", "generated/extra_tools_registry.o");
