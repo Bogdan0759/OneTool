@@ -23,6 +23,7 @@ implemented tools:
 - `gapi_supported` - check available graphics API
 - `fsinfo` - filesystem info
 - `yap` - YAP language interpreter
+- `userc` - interactive user control (add/del/edit users)
 
 framework parts:
 
