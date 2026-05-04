@@ -184,7 +184,7 @@ void tui_begin_frame(void) {
         return;
     }
 
-    erase();
+    clear();
 }
 
 void tui_end_frame(void) {
@@ -201,7 +201,7 @@ void tui_clear(int style) {
     }
 
     bkgdset(' ' | style_attr(style));
-    erase();
+    clear();
 }
 
 void tui_get_size(int *width, int *height) {
