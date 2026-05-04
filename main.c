@@ -20,8 +20,9 @@ int sd(int argc, char *argv[]);
 int tm(int argc, char *argv[]);
 int cf(int argc, char *argv[]);
 int cv(int argc, char *argv[]);
+int uc(int argc, char *argv[]);
 int tui_main(const char *onetool_argv0);
-const char onetool_version[] = "0.8.0";
+const char onetool_version[] = "0.9.0";
 
 const struct onetool_tool onetool_builtin_tools[] = {
     {"lastmod", lm, "print the last modification time of a file",
@@ -44,6 +45,8 @@ const struct onetool_tool onetool_builtin_tools[] = {
     {"configure", cf, "configure basic system environment",
      ONETOOL_ARGV0_TOOL_NAME},
     {"cvm", cv, "show current video mode and resolution",
+     ONETOOL_ARGV0_TOOL_NAME},
+    {"userc", uc, "interactive user control (add/del/edit users)",
      ONETOOL_ARGV0_TOOL_NAME},
 };
 

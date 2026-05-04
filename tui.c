@@ -1,6 +1,7 @@
 #include "config/tool_registry.h"
 #include "libs/TUI/tui.h"
 #include "tools/system/taskmng/taskmng.h"
+#include "tools/system/userc/userc.h"
 int cf(int argc, char *argv[]);
 
 #include <ctype.h>
@@ -77,6 +78,8 @@ typedef struct {
     taskmng_runtime_t taskmng_runtime;
     taskmng_snapshot_t taskmng_snapshot;
     taskmng_view_t taskmng_view;
+    userc_list_t userc_list;
+    userc_view_t userc_view;
 } onetool_tui_state_t;
 
 enum onetool_screen {
@@ -174,6 +177,10 @@ static void set_status(onetool_tui_state_t *state, const char *text) {
 
 static int tool_is_taskmng(const struct onetool_tool *tool) {
     return tool != NULL && strcmp(tool->name, "taskmng") == 0;
+}
+
+static int tool_is_userc(const struct onetool_tool *tool) {
+    return tool != NULL && strcmp(tool->name, "userc") == 0;
 }
 
 static void init_default_form(onetool_form_t *form, const struct onetool_tool *tool) {
@@ -395,6 +402,9 @@ static void load_embedded_tool_form(onetool_form_t *form, const struct onetool_t
     } else if (strcmp(tool->name, "configure") == 0) {
         copy_string(form->title, sizeof(form->title), "configure linux environment");
         copy_string(form->summary, sizeof(form->summary), "set up basic environment (mount /proc, /sys, /dev, /tmp).");
+    } else if (strcmp(tool->name, "userc") == 0) {
+        copy_string(form->title, sizeof(form->title), "User Control");
+        copy_string(form->summary, sizeof(form->summary), "Interactive tool to manage system users (add, delete, edit).");
     } else {
         form->has_config = 0;
     }
@@ -782,6 +792,9 @@ static void draw_tool_screen(onetool_tui_state_t *state, int width, int height) 
                 tui_draw_text(right_x + 2, 4, TUI_STYLE_ERROR, "taskmng: failed to read /proc");
             }
             tui_draw_text(right_x + 2, height - 4, TUI_STYLE_MUTED, "W/S scroll | k kill | t term | f freeze | g rescan | h filter");
+        } else if (tool_is_userc(selected_tool)) {
+            userc_draw_panel(&state->userc_list, &state->userc_view, right_x + 2, 4, right_width - 4, height - 9);
+            tui_draw_text(right_x + 2, height - 4, TUI_STYLE_MUTED, "A add | D delete | E edit | Arrows scroll");
         } else {
             draw_wrapped_text(right_x + 2, 4, right_width - 4, 4, TUI_STYLE_NORMAL, selected_tool->description);
             tui_draw_textf(right_x + 2, 10, TUI_STYLE_MUTED, "Theme: %s", g_themes[state->current_theme].name);
@@ -994,6 +1007,11 @@ static int handle_tool_screen_event(onetool_tui_state_t *state, const tui_event_
         return 0;
     }
 
+    if (tool_is_userc(selected_tool) && !is_nav_key &&
+        userc_handle_key(&state->userc_list, &state->userc_view, event->key)) {
+        return 0;
+    }
+
     switch (event->key) {
         case 'q':
         case TUI_KEY_ESCAPE:
@@ -1048,6 +1066,8 @@ static int handle_tool_screen_event(onetool_tui_state_t *state, const tui_event_
         case TUI_KEY_ENTER:
             if (tool_is_taskmng(selected_tool)) {
                 set_status(state, "Task manager is live in the right panel. Use W/S, k, t, f, g, h.");
+            } else if (tool_is_userc(selected_tool)) {
+                set_status(state, "User control is live in the right panel. Use A, D, E, arrows.");
             } else {
                 open_tool_form(state, selected_tool);
             }
@@ -1227,6 +1247,8 @@ int tui_main(const char *onetool_argv0) {
     init_embedded_themes();
     taskmng_runtime_init(&state.taskmng_runtime);
     taskmng_view_init(&state.taskmng_view);
+    userc_load_users(&state.userc_list);
+    memset(&state.userc_view, 0, sizeof(state.userc_view));
 
     if (tui_init() != 0) {
         char *cf_argv[] = {"configure", NULL};
