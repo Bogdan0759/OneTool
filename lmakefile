@@ -31,6 +31,8 @@ string DOWN_SEND_SRC = "tools/network/down/core/send.c";
 string DOWN_SEND_OBJ = "tools/network/down/core/send.o";
 string DOWN_ROBOTS_SRC = "tools/network/down/core/robots.c";
 string DOWN_ROBOTS_OBJ = "tools/network/down/core/robots.o";
+string NSETUP_SRC = "tools/network/nsetup.c";
+string NSETUP_OBJ = "tools/network/nsetup.o";
 
 string NET_HDR = "libs/net/net.h";
 string NET_URL_SRC = "libs/net/url.c";
@@ -87,7 +89,7 @@ string USERC_SRC = "tools/system/userc/users.c";
 string USERC_OBJ = "tools/system/userc/users.o";
 string USERC_TUI_SRC = "tools/system/userc/tui.c";
 string USERC_TUI_OBJ = "tools/system/userc/tui.o";
-string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/dev/gapi_supported.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o tools/system/configure/size.o tools/system/video/cvm.o tools/system/userc/users.o tools/system/userc/tui.o";
+string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/dev/gapi_supported.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o tools/network/nsetup.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o tools/system/configure/size.o tools/system/video/cvm.o tools/system/userc/users.o tools/system/userc/tui.o";
 
 task all() {
     build();
@@ -126,6 +128,10 @@ task build() {
     if (@is_outdated(PING_CLI_OBJ, PING_CLI_SRC)) {
         @echo("[CC] %s", PING_CLI_SRC);
         @run("%s %s -Dmain=pg -c %s -o %s", CC, CFLAGS, PING_CLI_SRC, PING_CLI_OBJ);
+    }
+    if (@is_outdated(NSETUP_OBJ, NSETUP_SRC)) {
+        @echo("[CC] %s", NSETUP_SRC);
+        @run("%s %s -Dmain=ns -c %s -o %s", CC, CFLAGS, NSETUP_SRC, NSETUP_OBJ);
     }
     if (@is_outdated(LMAKE_OBJ, LMAKE_ZIG_SRC)) {
         @echo("[ZIG] %s", LMAKE_ZIG_SRC);
@@ -253,6 +259,7 @@ task build() {
         NET_ROBOTS_OBJ,
         TUI_LIB_OBJ,
         PING_CLI_OBJ,
+        NSETUP_OBJ,
         LMAKE_OBJ,
         LPACK_OBJ,
         LPACK_RUNTIME_BIN,
@@ -303,6 +310,7 @@ task clean() {
     @run("rm -f %s", NET_ROBOTS_OBJ);
     @run("rm -f %s", TUI_LIB_OBJ);
     @run("rm -f %s", PING_CLI_OBJ);
+    @run("rm -f %s", NSETUP_OBJ);
     @run("rm -f %s", LMAKE_OBJ);
     @run("rm -f %s", LPACK_OBJ);
     @run("rm -f %s", LPACK_RUNTIME_BIN);
