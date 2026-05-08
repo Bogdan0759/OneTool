@@ -24,6 +24,7 @@ implemented tools:
 - `fsinfo` - filesystem info
 - `yap` - YAP language interpreter
 - `userc` - interactive user control (add/del/edit users)
+- `nsetup` - simple network setup via DHCP
 
 framework parts:
 
