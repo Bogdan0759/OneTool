@@ -13,6 +13,7 @@ int fi(int argc, char *argv[]);
 int ga(int argc, char *argv[]);
 int dn(int argc, char *argv[]);
 int pg(int argc, char *argv[]);
+int ns(int argc, char *argv[]);
 int lk(int argc, char *argv[]);
 int lp(int argc, char *argv[]);
 int rb(int argc, char *argv[]);
@@ -34,6 +35,8 @@ const struct onetool_tool onetool_builtin_tools[] = {
      ONETOOL_ARGV0_TOOL_NAME},
     {"down", dn, "HTTP downloader (curl-like)", ONETOOL_ARGV0_TOOL_NAME},
     {"ping", pg, "ICMP ping with stats", ONETOOL_ARGV0_TOOL_NAME},
+    {"nsetup", ns, "simple network setup via DHCP",
+     ONETOOL_ARGV0_TOOL_NAME},
     {"lmake", lk, "run bundled lmake build tool", ONETOOL_ARGV0_BINARY_PATH},
     {"lpack", lp, "pack lua script into ELF runtime", ONETOOL_ARGV0_TOOL_NAME},
     {"reboot", rb, "reboot the system (optional: -t seconds)",

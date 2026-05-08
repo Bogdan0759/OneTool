@@ -381,6 +381,10 @@ static void load_embedded_tool_form(onetool_form_t *form, const struct onetool_t
         add_text_field(form, "timeout", "Timeout ms", "-W", "1000", "1000", "Per-packet timeout in milliseconds.");
         add_text_field(form, "size", "Payload bytes", "-s", "56", "56", "Payload size.");
         add_toggle_field(form, "quiet", "Quiet summary", "-q", 0, "Print only the summary.");
+    } else if (strcmp(tool->name, "nsetup") == 0) {
+        copy_string(form->title, sizeof(form->title), "Network Setup");
+        copy_string(form->summary, sizeof(form->summary), "Bring up an interface and get IPv4 settings via DHCP.");
+        add_text_field(form, "interface", "Interface", "", "", "ue0", "Optional. Leave empty to show the live interface list and choose in console.");
     } else if (strcmp(tool->name, "lmake") == 0) {
         copy_string(form->title, sizeof(form->title), "LMake");
         copy_string(form->summary, sizeof(form->summary), "Run the bundled lmake build tool from TUI. Set the main target here, then use Extra args for any additional lmake flags.");
