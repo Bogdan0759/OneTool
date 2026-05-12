@@ -395,6 +395,17 @@ static void load_embedded_tool_form(onetool_form_t *form, const struct onetool_t
         add_text_field(form, "input", "Lua script", "", "main.lua", "main.lua", "Input Lua script.");
         add_text_field(form, "interpreter", "Interpreter", "-i", "", "/usr/bin/lua", "Path to the Lua interpreter.");
         add_text_field(form, "output", "Output file", "-o", "a.out", "bundle.out", "Generated ELF file.");
+    } else if (strcmp(tool->name, "mlink") == 0) {
+        copy_string(form->title, sizeof(form->title), "Minimal Linker");
+        copy_string(form->summary, sizeof(form->summary), "Link freestanding ELF64 x86-64 object files into a static executable.");
+        add_text_field(form, "input", "Input file", "", "start.o", "start.o", "Object file or simple archive.");
+        add_text_field(form, "output", "Output file", "-o", "a.out", "app.out", "Generated executable.");
+        add_text_field(form, "entry", "Entry symbol", "-e", "_start", "_start", "Program entry symbol.");
+        add_text_field(form, "base", "Base address", "--base", "0x400000", "0x400000", "Page-aligned image base.");
+        add_text_field(form, "map", "Map file", "-Map", "", "link.map", "Optional link map output.");
+        add_toggle_field(form, "print_map", "Print map", "--print-map", 0, "Print link map to stdout.");
+        add_toggle_field(form, "symbols", "Print symbols", "--print-symbols", 0, "Print resolved global symbols.");
+        add_toggle_field(form, "dry_run", "Dry run", "--dry-run", 0, "Parse and layout without writing output.");
     } else if (strcmp(tool->name, "reboot") == 0) {
         copy_string(form->title, sizeof(form->title), "Reboot");
         copy_string(form->summary, sizeof(form->summary), "Reboot the system now or after a delay.");

@@ -16,6 +16,7 @@ int pg(int argc, char *argv[]);
 int ns(int argc, char *argv[]);
 int lk(int argc, char *argv[]);
 int lp(int argc, char *argv[]);
+int ml(int argc, char *argv[]);
 int rb(int argc, char *argv[]);
 int sd(int argc, char *argv[]);
 int tm(int argc, char *argv[]);
@@ -39,6 +40,7 @@ const struct onetool_tool onetool_builtin_tools[] = {
      ONETOOL_ARGV0_TOOL_NAME},
     {"lmake", lk, "run bundled lmake build tool", ONETOOL_ARGV0_BINARY_PATH},
     {"lpack", lp, "pack lua script into ELF runtime", ONETOOL_ARGV0_TOOL_NAME},
+    {"mlink", ml, "minimalistic ELF64 x86-64 linker", ONETOOL_ARGV0_TOOL_NAME},
     {"reboot", rb, "reboot the system (optional: -t seconds)",
      ONETOOL_ARGV0_TOOL_NAME},
     {"shutdown", sd, "power off the system (optional: -t seconds)",

@@ -19,6 +19,7 @@ implemented tools:
 - `ping` - ICMP ping with stats
 - `lmake` - run bundled lmake build tool
 - `lpack` - pack lua script into ELF runtime
+- `mlink` - minimalistic ELF64 x86-64 linker
 - `taskmng` - TUI task manager with process control
 - `gapi_supported` - check available graphics API
 - `fsinfo` - filesystem info
@@ -94,6 +95,29 @@ Inside TUI:
 
 If a tool does not have a built-in TUI form, OneTool falls back to a
 generic screen with `Extra args`, so all tools can still be launched.
+
+## mlink
+
+`mlink` links freestanding ELF64 x86-64 `.o` files into a static executable.
+It is intentionally small: good for tiny syscall-only programs, kernels,
+boot experiments, and OneTool-style low-level demos.
+
+Example:
+
+```bash
+./onetool mlink start.o util.o -o app.out -Map link.map
+```
+
+Supported MVP features:
+- ELF64 little-endian x86-64 relocatable objects
+- simple `.a` archive member selection
+- `.text`, `.rodata`, `.data`, `.bss` and common symbols
+- `R_X86_64_64`, `R_X86_64_PC32`, `R_X86_64_PLT32`, `R_X86_64_32`, `R_X86_64_32S`
+- custom entry symbol and base address
+- map output, symbol dump and dry-run mode
+
+It does not try to replace system `ld`: no libc startup, dynamic linking,
+linker scripts or shared libraries yet.
 
 
 ## How version counting works
