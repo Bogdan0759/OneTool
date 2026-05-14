@@ -19,6 +19,8 @@ string EXEC_SRC = "tools/filesystem/exec.c";
 string EXEC_OBJ = "tools/filesystem/exec.o";
 string FSINFO_SRC = "tools/filesystem/fsinfo.c";
 string FSINFO_OBJ = "tools/filesystem/fsinfo.o";
+string SIZE_SRC = "tools/filesystem/size.c";
+string SIZE_OBJ = "tools/filesystem/size.o";
 string GAPI_SRC = "tools/dev/gapi_supported.c";
 string GAPI_OBJ = "tools/dev/gapi_supported.o";
 
@@ -47,6 +49,9 @@ string TUI_HDR = "libs/TUI/tui.h";
 string TUI_SRC = "libs/TUI/tui.c";
 string TUI_LIB_OBJ = "libs/TUI/tui.o";
 string TUI_CFLAGS = "-D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600";
+string ELF_HDR = "libs/elf/elf.h";
+string ELF_SRC = "libs/elf/elf.c";
+string ELF_OBJ = "libs/elf/elf.o";
 
 string LMAKE_ZIG_SRC = "tools/dev/lmake.zig";
 string LMAKE_OBJ = "tools/dev/lmake.o";
@@ -108,7 +113,7 @@ string USERC_SRC = "tools/system/userc/users.c";
 string USERC_OBJ = "tools/system/userc/users.o";
 string USERC_TUI_SRC = "tools/system/userc/tui.c";
 string USERC_TUI_OBJ = "tools/system/userc/tui.o";
-string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/dev/gapi_supported.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o tools/network/nsetup.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/dev/mlink/cli.o tools/dev/mlink/object.o tools/dev/mlink/elf-reader.o tools/dev/mlink/symtab.o tools/dev/mlink/layout.o tools/dev/mlink/reloc.o tools/dev/mlink/emit.o tools/dev/mlink/bytes.o tools/dev/mlink/log.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o tools/system/configure/size.o tools/system/video/cvm.o tools/system/userc/users.o tools/system/userc/tui.o";
+string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/filesystem/size.o tools/dev/gapi_supported.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o tools/network/nsetup.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o libs/elf/elf.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/dev/mlink/cli.o tools/dev/mlink/object.o tools/dev/mlink/elf-reader.o tools/dev/mlink/symtab.o tools/dev/mlink/layout.o tools/dev/mlink/reloc.o tools/dev/mlink/emit.o tools/dev/mlink/bytes.o tools/dev/mlink/log.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o tools/system/configure/size.o tools/system/video/cvm.o tools/system/userc/users.o tools/system/userc/tui.o";
 
 task all() {
     build();
@@ -135,6 +140,10 @@ task build() {
     if (@is_outdated(FSINFO_OBJ, FSINFO_SRC)) {
         @echo("[CC] %s", FSINFO_SRC);
         @run("%s %s -Dmain=fi -c %s -o %s", CC, CFLAGS, FSINFO_SRC, FSINFO_OBJ);
+    }
+    if (@is_outdated(SIZE_OBJ, SIZE_SRC, ELF_HDR)) {
+        @echo("[CC] %s", SIZE_SRC);
+        @run("%s %s -Dmain=sz -c %s -o %s", CC, CFLAGS, SIZE_SRC, SIZE_OBJ);
     }
     if (@is_outdated(GAPI_OBJ, GAPI_SRC)) {
         @echo("[CC] %s", GAPI_SRC);
@@ -172,7 +181,7 @@ task build() {
         @echo("[CC] %s", MLINK_OBJECT_SRC);
         @run("%s %s -c %s -o %s", CC, CFLAGS, MLINK_OBJECT_SRC, MLINK_OBJECT_OBJ);
     }
-    if (@is_outdated(MLINK_ELF_READER_OBJ, MLINK_ELF_READER_SRC, MLINK_HDR)) {
+    if (@is_outdated(MLINK_ELF_READER_OBJ, MLINK_ELF_READER_SRC, MLINK_HDR, ELF_HDR)) {
         @echo("[CC] %s", MLINK_ELF_READER_SRC);
         @run("%s %s -c %s -o %s", CC, CFLAGS, MLINK_ELF_READER_SRC, MLINK_ELF_READER_OBJ);
     }
@@ -293,6 +302,10 @@ task build() {
         @echo("[CC] %s", TUI_SRC);
         @run("%s %s %s -c %s -o %s", CC, CFLAGS, TUI_CFLAGS, TUI_SRC, TUI_LIB_OBJ);
     }
+    if (@is_outdated(ELF_OBJ, ELF_SRC, ELF_HDR)) {
+        @echo("[CC] %s", ELF_SRC);
+        @run("%s %s -c %s -o %s", CC, CFLAGS, ELF_SRC, ELF_OBJ);
+    }
 
     @echo("[GEN] extra tools");
     @run("CC='%s' CFLAGS='%s' sh %s %s %s", CC, CFLAGS, EXTRA_TOOLS_SCRIPT, EXTRA_TOOLS_MANIFEST, EXTRA_TOOLS_BUNDLE_OBJ);
@@ -303,6 +316,7 @@ task build() {
         LASTMOD_OBJ,
         EXEC_OBJ,
         FSINFO_OBJ,
+        SIZE_OBJ,
         GAPI_OBJ,
         DOWN_CLI_OBJ,
         DOWN_PARSE_OBJ,
@@ -313,6 +327,7 @@ task build() {
         NET_HTTP_OBJ,
         NET_ROBOTS_OBJ,
         TUI_LIB_OBJ,
+        ELF_OBJ,
         PING_CLI_OBJ,
         NSETUP_OBJ,
         LMAKE_OBJ,
@@ -362,6 +377,7 @@ task clean() {
     @run("rm -f %s", LASTMOD_OBJ);
     @run("rm -f %s", EXEC_OBJ);
     @run("rm -f %s", FSINFO_OBJ);
+    @run("rm -f %s", SIZE_OBJ);
     @run("rm -f %s", GAPI_OBJ);
     @run("rm -f %s", DOWN_CLI_OBJ);
     @run("rm -f %s", DOWN_PARSE_OBJ);
@@ -373,6 +389,7 @@ task clean() {
     @run("rm -f %s", NET_HTTP_OBJ);
     @run("rm -f %s", NET_ROBOTS_OBJ);
     @run("rm -f %s", TUI_LIB_OBJ);
+    @run("rm -f %s", ELF_OBJ);
     @run("rm -f %s", PING_CLI_OBJ);
     @run("rm -f %s", NSETUP_OBJ);
     @run("rm -f %s", LMAKE_OBJ);
