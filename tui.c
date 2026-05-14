@@ -362,6 +362,13 @@ static void load_embedded_tool_form(onetool_form_t *form, const struct onetool_t
         add_choice_option(field, "-A", "sections");
         sync_choice_field(field);
         add_text_field(form, "path", "ELF file", "", "./a.out", "./a.out", "ELF file to inspect.");
+    } else if (strcmp(tool->name, "nm") == 0) {
+        copy_string(form->title, sizeof(form->title), "ELF Symbols");
+        copy_string(form->summary, sizeof(form->summary), "Print symbols from an ELF symbol table.");
+        add_text_field(form, "path", "ELF file", "", "./a.out", "./a.out", "ELF file to inspect.");
+        add_toggle_field(form, "all", "All symbols", "-a", 0, "Include empty and debug symbols.");
+        add_toggle_field(form, "extern", "External only", "-g", 0, "Show only external symbols.");
+        add_toggle_field(form, "undefined", "Undefined only", "-u", 0, "Show only undefined symbols.");
     } else if (strcmp(tool->name, "gapi_supported") == 0) {
         copy_string(form->title, sizeof(form->title), "gapi check");
         copy_string(form->summary, sizeof(form->summary), "check all available graphic API");

@@ -11,6 +11,7 @@ int lm(int argc, char *argv[]);
 int ex(int argc, char *argv[]);
 int fi(int argc, char *argv[]);
 int sz(int argc, char *argv[]);
+int nm(int argc, char *argv[]);
 int ga(int argc, char *argv[]);
 int dn(int argc, char *argv[]);
 int pg(int argc, char *argv[]);
@@ -25,7 +26,7 @@ int cf(int argc, char *argv[]);
 int cv(int argc, char *argv[]);
 int uc(int argc, char *argv[]);
 int tui_main(const char *onetool_argv0);
-const char onetool_version[] = "1.2.0";
+const char onetool_version[] = "1.3.0";
 
 const struct onetool_tool onetool_builtin_tools[] = {
     {"lastmod", lm, "print the last modification time of a file",
@@ -34,6 +35,7 @@ const struct onetool_tool onetool_builtin_tools[] = {
      ONETOOL_ARGV0_TOOL_NAME},
     {"fsinfo", fi, "print filesystem info", ONETOOL_ARGV0_TOOL_NAME},
     {"size", sz, "print ELF section sizes", ONETOOL_ARGV0_TOOL_NAME},
+    {"nm", nm, "print ELF symbols", ONETOOL_ARGV0_TOOL_NAME},
     {"gapi_supported", ga, "check available graphics API",
      ONETOOL_ARGV0_TOOL_NAME},
     {"down", dn, "HTTP downloader (curl-like)", ONETOOL_ARGV0_TOOL_NAME},

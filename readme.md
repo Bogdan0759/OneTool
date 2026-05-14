@@ -27,6 +27,7 @@ implemented tools:
 - `userc` - interactive user control (add/del/edit users)
 - `nsetup` - simple network setup via DHCP
 - `size` - prints elf sections size
+- `nm` - prints elf symbols
 framework parts:
 
 - `libs/net` - network library for URL parsing, HTTP and transport
