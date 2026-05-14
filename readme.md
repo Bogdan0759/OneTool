@@ -33,6 +33,7 @@ framework parts:
 - `libs/net` - network library for URL parsing, HTTP and transport
 - `libs/TUI` - TUI library
 - `libs/elf` - ELF parser lib
+- `libs/memory` - checked allocation helpers
 ## build
 
 requirement:

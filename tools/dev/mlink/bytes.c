@@ -1,4 +1,5 @@
 #include "mlink.h"
+#include "../../../libs/memory/memory.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -7,44 +8,23 @@
 #include <unistd.h>
 
 void *ml_xmalloc(size_t size) {
-    void *p = malloc(size == 0 ? 1 : size);
-    if (p == NULL) {
-        fprintf(stderr, "mlink: out of memory\n");
-        exit(2);
-    }
-    return p;
+    return ot_xmalloc(size);
 }
 
 void *ml_xcalloc(size_t count, size_t size) {
-    void *p = calloc(count == 0 ? 1 : count, size == 0 ? 1 : size);
-    if (p == NULL) {
-        fprintf(stderr, "mlink: out of memory\n");
-        exit(2);
-    }
-    return p;
+    return ot_xcalloc(count, size);
 }
 
 void *ml_xrealloc(void *ptr, size_t size) {
-    void *p = realloc(ptr, size == 0 ? 1 : size);
-    if (p == NULL) {
-        fprintf(stderr, "mlink: out of memory\n");
-        exit(2);
-    }
-    return p;
+    return ot_xrealloc(ptr, size);
 }
 
 char *ml_xstrdup(const char *s) {
-    size_t len = strlen(s);
-    char *copy = ml_xmalloc(len + 1);
-    memcpy(copy, s, len + 1);
-    return copy;
+    return ot_xstrdup(s);
 }
 
 char *ml_xstrndup(const char *s, size_t len) {
-    char *copy = ml_xmalloc(len + 1);
-    memcpy(copy, s, len);
-    copy[len] = '\0';
-    return copy;
+    return ot_xstrndup(s, len);
 }
 
 uint64_t ml_align_up(uint64_t value, uint64_t align) {

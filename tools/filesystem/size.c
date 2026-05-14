@@ -1,5 +1,6 @@
 // size tool: print ELF section sizes
 #include "../../libs/elf/elf.h"
+#include "../../libs/memory/memory.h"
 
 #include <errno.h>
 #include <inttypes.h>
@@ -24,15 +25,6 @@ static void help(const char *tool) {
     printf("  --help                  show this help\n");
 }
 
-static void *xrealloc(void *ptr, size_t size) {
-    void *p = realloc(ptr, size == 0 ? 1 : size);
-    if (p == NULL) {
-        fprintf(stderr, "size: out of memory\n");
-        exit(2);
-    }
-    return p;
-}
-
 static int read_file(const char *path, unsigned char **data_out, size_t *size_out) {
     int fd = open(path, O_RDONLY);
     unsigned char *buf = NULL;
@@ -48,7 +40,7 @@ static int read_file(const char *path, unsigned char **data_out, size_t *size_ou
 
         if (len == cap) {
             size_t next = cap == 0 ? 16384 : cap * 2;
-            buf = xrealloc(buf, next);
+            buf = ot_xrealloc(buf, next);
             cap = next;
         }
 
@@ -68,7 +60,7 @@ static int read_file(const char *path, unsigned char **data_out, size_t *size_ou
     }
 
     close(fd);
-    *data_out = buf == NULL ? xrealloc(NULL, 1) : buf;
+    *data_out = buf == NULL ? ot_xmalloc(1) : buf;
     *size_out = len;
     return 0;
 }

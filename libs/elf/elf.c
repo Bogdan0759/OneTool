@@ -1,4 +1,5 @@
 #include "elf.h"
+#include "../memory/memory.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -15,10 +16,6 @@ static void set_error(char *err, size_t err_size, const char *fmt, ...) {
     va_start(ap, fmt);
     vsnprintf(err, err_size, fmt, ap);
     va_end(ap);
-}
-
-static void *xcalloc(size_t count, size_t size) {
-    return calloc(count == 0 ? 1 : count, size == 0 ? 1 : size);
 }
 
 void ot_elf_init(ot_elf_file_t *elf) {
@@ -46,7 +43,7 @@ char *ot_elf_strdup_from_strtab(const unsigned char *base, size_t size,
     char *s;
 
     if (off >= size) {
-        return strdup("<badstr>");
+        return ot_xstrdup("<badstr>");
     }
 
     end = off;
@@ -54,13 +51,10 @@ char *ot_elf_strdup_from_strtab(const unsigned char *base, size_t size,
         end++;
     }
     if (end >= size) {
-        return strdup("<badstr>");
+        return ot_xstrdup("<badstr>");
     }
 
-    s = malloc(end - off + 1);
-    if (s == NULL) {
-        return NULL;
-    }
+    s = ot_xmalloc(end - off + 1);
     memcpy(s, base + off, end - off);
     s[end - off] = '\0';
     return s;
@@ -104,11 +98,7 @@ int ot_elf_parse(ot_elf_file_t *elf, const char *name,
         return 1;
     }
 
-    sections = xcalloc(shnum, sizeof(sections[0]));
-    if (sections == NULL) {
-        set_error(err, err_size, "%s: out of memory", name);
-        return 1;
-    }
+    sections = ot_xcalloc(shnum, sizeof(sections[0]));
 
     for (uint16_t i = 0; i < shnum; i++) {
         const unsigned char *p = data + shoff + (uint64_t)i * shentsize;
@@ -135,14 +125,6 @@ int ot_elf_parse(ot_elf_file_t *elf, const char *name,
     for (size_t i = 0; i < shnum; i++) {
         sections[i].name = ot_elf_strdup_from_strtab(shstr, shstr_size,
                                                      sections[i].name_offset);
-        if (sections[i].name == NULL) {
-            for (size_t j = 0; j < i; j++) {
-                free(sections[j].name);
-            }
-            free(sections);
-            set_error(err, err_size, "%s: out of memory", name);
-            return 1;
-        }
     }
 
     elf->name = name;
