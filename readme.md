@@ -26,7 +26,7 @@ implemented tools:
 - `yap` - YAP language interpreter
 - `userc` - interactive user control (add/del/edit users)
 - `nsetup` - simple network setup via DHCP
-
+- `size` - prints elf sections size
 framework parts:
 
 - `libs/net` - network library for URL parsing, HTTP and transport
