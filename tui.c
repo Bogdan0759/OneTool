@@ -354,6 +354,14 @@ static void load_embedded_tool_form(onetool_form_t *form, const struct onetool_t
         copy_string(form->title, sizeof(form->title), "Filesystem Info");
         copy_string(form->summary, sizeof(form->summary), "Inspect a path and print its filesystem and inode information.");
         add_text_field(form, "path", "Path", "", "/", "/path/to/dir", "Path to inspect.");
+    } else if (strcmp(tool->name, "size") == 0) {
+        copy_string(form->title, sizeof(form->title), "ELF Size");
+        copy_string(form->summary, sizeof(form->summary), "Show ELF text/data/bss totals or a per-section size table.");
+        field = add_choice_field(form, "format", "Format", "", "-B", "Output format.");
+        add_choice_option(field, "-B", "summary");
+        add_choice_option(field, "-A", "sections");
+        sync_choice_field(field);
+        add_text_field(form, "path", "ELF file", "", "./a.out", "./a.out", "ELF file to inspect.");
     } else if (strcmp(tool->name, "gapi_supported") == 0) {
         copy_string(form->title, sizeof(form->title), "gapi check");
         copy_string(form->summary, sizeof(form->summary), "check all available graphic API");
