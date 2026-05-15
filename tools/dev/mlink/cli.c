@@ -26,6 +26,12 @@ static int parse_args(int argc, char *argv[], ml_context_t *ctx) {
     for (int i = 1; i < argc; i++) {
         const char *arg = argv[i];
 
+        if (strcmp(arg, "--") == 0) {
+            while (++i < argc) {
+                ml_add_input_path(ctx, argv[i]);
+            }
+            break;
+        }
         if (strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0) {
             help(argv[0]);
             return 2;
@@ -54,12 +60,28 @@ static int parse_args(int argc, char *argv[], ml_context_t *ctx) {
             ctx->output_path = argv[++i];
             continue;
         }
+        if (strncmp(arg, "-o=", 3) == 0) {
+            ctx->output_path = arg + 3;
+            continue;
+        }
+        if (strncmp(arg, "--output=", 9) == 0) {
+            ctx->output_path = arg + 9;
+            continue;
+        }
         if (strcmp(arg, "-e") == 0) {
             if (i + 1 >= argc) {
                 fprintf(stderr, "mlink: missing value for -e\n");
                 return 1;
             }
             ctx->entry_name = argv[++i];
+            continue;
+        }
+        if (strncmp(arg, "-e=", 3) == 0) {
+            ctx->entry_name = arg + 3;
+            continue;
+        }
+        if (strncmp(arg, "--entry=", 8) == 0) {
+            ctx->entry_name = arg + 8;
             continue;
         }
         if (strcmp(arg, "--base") == 0) {
@@ -69,6 +91,17 @@ static int parse_args(int argc, char *argv[], ml_context_t *ctx) {
             }
             if ((ctx->base_addr & (ML_PAGE_SIZE - 1)) != 0) {
                 fprintf(stderr, "mlink: --base must be page aligned\n");
+                return 1;
+            }
+            continue;
+        }
+        if (strncmp(arg, "--base=", 7) == 0) {
+            if (ml_parse_u64(arg + 7, &ctx->base_addr) != 0) {
+                fprintf(stderr, "mlink: invalid base value\n");
+                return 1;
+            }
+            if ((ctx->base_addr & (ML_PAGE_SIZE - 1)) != 0) {
+                fprintf(stderr, "mlink: base needed to be  page aligned\n");
                 return 1;
             }
             continue;

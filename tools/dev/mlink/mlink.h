@@ -72,6 +72,7 @@ typedef struct {
     int common;
     int absolute;
     int referenced;
+    int strong_ref;
     uint64_t value;
     uint64_t size;
     uint64_t common_align;

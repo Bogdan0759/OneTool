@@ -138,6 +138,10 @@ static int load_relocs(ml_context_t *ctx, ml_object_t *obj,
             ml_error(ctx, "%s: unsupported relocation entry size", obj->name);
             return 1;
         }
+        if (relsec->size % entsize != 0) {
+            ml_error(ctx, "%s: truncated relocation section", obj->name);
+            return 1;
+        }
         count = (size_t)(relsec->size / entsize);
 
         for (size_t i = 0; i < count; i++) {

@@ -49,8 +49,20 @@ const char *ml_reloc_name(uint32_t type) {
     switch (type) {
     case R_X86_64_64:
         return "R_X86_64_64";
+    case R_X86_64_8:
+        return "R_X86_64_8";
+    case R_X86_64_16:
+        return "R_X86_64_16";
     case R_X86_64_PC32:
         return "R_X86_64_PC32";
+    case R_X86_64_PC64:
+        return "R_X86_64_PC64";
+    case R_X86_64_PC8:
+        return "R_X86_64_PC8";
+    case R_X86_64_PC16:
+        return "R_X86_64_PC16";
+    case R_X86_64_GOTPCREL:
+        return "R_X86_64_GOTPCREL";
     case R_X86_64_32:
         return "R_X86_64_32";
     case R_X86_64_32S:
@@ -59,6 +71,18 @@ const char *ml_reloc_name(uint32_t type) {
         return "R_X86_64_PLT32";
     case R_X86_64_RELATIVE:
         return "R_X86_64_RELATIVE";
+    case R_X86_64_SIZE32:
+        return "R_X86_64_SIZE32";
+    case R_X86_64_SIZE64:
+        return "R_X86_64_SIZE64";
+#ifdef R_X86_64_GOTPCRELX
+    case R_X86_64_GOTPCRELX:
+        return "R_X86_64_GOTPCRELX";
+#endif
+#ifdef R_X86_64_REX_GOTPCRELX
+    case R_X86_64_REX_GOTPCRELX:
+        return "R_X86_64_REX_GOTPCRELX";
+#endif
     default:
         return "R_X86_64_UNKNOWN";
     }
