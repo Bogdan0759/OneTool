@@ -76,6 +76,7 @@ static int selected_objects_reference(ml_context_t *ctx, const char *name) {
         for (size_t j = 0; j < obj->symbol_count; j++) {
             ml_symbol_t *sym = &obj->symbols[j];
             if (symbol_has_name(sym) && sym->undefined && is_global_symbol(sym) &&
+                !is_weak_symbol(sym) &&
                 strcmp(sym->name, name) == 0) {
                 return 1;
             }
@@ -162,8 +163,8 @@ static void record_undefined(ml_context_t *ctx, ml_symbol_t *sym) {
     }
     g = intern_global(ctx, sym->name);
     g->referenced = 1;
-    if (is_weak_symbol(sym)) {
-        g->weak = 1;
+    if (!is_weak_symbol(sym)) {
+        g->strong_ref = 1;
     }
 }
 
@@ -190,7 +191,7 @@ int ml_resolve_symbols(ml_context_t *ctx) {
 
     for (size_t i = 0; i < ctx->global_count; i++) {
         ml_global_t *g = &ctx->globals[i];
-        if (g->referenced && !g->defined && !g->common && !g->weak) {
+        if (g->referenced && g->strong_ref && !g->defined && !g->common) {
             ml_error(ctx, "undefined symbol: %s", g->name);
         }
     }

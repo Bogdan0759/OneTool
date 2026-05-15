@@ -27,7 +27,7 @@ int cf(int argc, char *argv[]);
 int cv(int argc, char *argv[]);
 int uc(int argc, char *argv[]);
 int tui_main(const char *onetool_argv0);
-const char onetool_version[] = "1.3.1";
+const char onetool_version[] = "1.3.2";
 
 const struct onetool_tool onetool_builtin_tools[] = {
     {"lastmod", lm, "print the last modification time of a file",
