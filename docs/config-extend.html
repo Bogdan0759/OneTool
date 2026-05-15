@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OneTool — Configuration & Extensibility</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;max-width:960px;margin:0 auto;padding:2em 1em;color:#222;background:#fafafa}
+h1,h2,h3{color:#1a1a2e;border-bottom:1px solid #ddd;padding-bottom:.3em}
+code{background:#eef;padding:2px 6px;border-radius:3px;font-size:.9em}
+pre{background:#1a1a2e;color:#f0f0f0;padding:1em;border-radius:6px;overflow-x:auto;font-size:.85em}
+pre code{background:transparent;color:inherit;padding:0}
+table{border-collapse:collapse;width:100%;margin:1em 0}
+th,td{border:1px solid #ccc;padding:8px 12px;text-align:left}
+th{background:#1a1a2e;color:#fff}
+.kwd{color:#7ec8e3}.str{color:#a5d6a7}
+</style>
+</head>
+<body>
+
+<h1>OneTool — Configuration & Extensibility</h1>
+<p>This document covers how tools are registered, how new tools can be added, the build system, output redirection, and the init system integration.</p>
+
+<hr>
+<h2>Tool Registry System</h2>
+<p>The registry API defined in <code>config/tool_registry.h</code> provides the plugin-style interface that every OneTool tool must conform to.</p>
+
+<h3>1. Tool Entry Function</h3>
+<pre><span class="kwd">typedef int</span> (*onetool_entry_fn)(<span class="kwd">int</span> argc, <span class="kwd">char</span> *argv[]);</pre>
+<p>Every tool must expose a function with this signature. It receives <code>argc/argv</code> just like a normal <code>main()</code>. Tools can be implemented as standard C programs with <code>int main(int argc, char *argv[])</code> — the build system renames <code>main</code> to a unique symbol automatically.</p>
+
+<h3>2. argv0 Mode</h3>
+<pre><span class="kwd">enum</span> onetool_argv0_mode {
+    <span class="str">ONETOOL_ARGV0_TOOL_NAME</span> = <span class="num">0</span>,   <span class="cmt">// argv[0] set to tool name (most tools)</span>
+    <span class="str">ONETOOL_ARGV0_BINARY_PATH</span> = <span class="num">1</span>, <span class="cmt">// argv[0] set to binary path (lmake)</span>
+};</pre>
+<p><code>TOOL_NAME</code> mode is standard for utilities — <code>argv[0]</code> becomes the tool name like <code>"ping"</code>. <code>BINARY_PATH</code> mode is used by tools that inspect their own binary location (like lmake, which needs to find build scripts relative to the executable).</p>
+
+<h3>3. Tool Structure</h3>
+<pre><span class="kwd">struct</span> onetool_tool {
+    <span class="kwd">const char</span> *name;          <span class="cmt">// CLI name (e.g., "ping")</span>
+    onetool_entry_fn entry;      <span class="cmt">// Entry function pointer</span>
+    <span class="kwd">const char</span> *description;    <span class="cmt">// Help description</span>
+    <span class="kwd">enum</span> onetool_argv0_mode argv0_mode;
+};</pre>
+<p>The tool table is an array of these structs. The dispatcher iterates the array linearly to find a tool by name. Unrecognized tool names print the full tool list as help.</p>
+
+<h2>Adding Built-in Tools (no manifest)</h2>
+<p>Built-in tools are declared in <code>main.c</code> in the <code>onetool_builtin_tools[]</code> array. To add a new built-in tool:</p>
+<ol>
+<li>Implement a function with signature <code>int my_tool(int argc, char *argv[])</code> (or keep it as <code>main()</code> if using the manifest system)</li>
+<li>Add a forward declaration at the top of <code>main.c</code></li>
+<li>Add an entry to <code>onetool_builtin_tools[]</code> with name, function pointer, description, and argv0 mode</li>
+<li>Rebuild</li>
+</ol>
+
+<p><strong>Current built-in tools registered in main.c:</strong> <code>lm</code> (lastmod), <code>ex</code> (exec), <code>fi</code> (fsinfo), <code>fz</code> (fsize), <code>sz</code> (size), <code>nm</code> (nm), <code>rb</code> (reboot), <code>sd</code> (shutdown), <code>ml</code> (mlink), <code>ga</code> (gapi_supported), <code>lp</code> (lpack), <code>pg</code> (ping), <code>ns</code> (nsetup), <code>dn</code> (down), <code>tm</code> (taskmng), <code>uc</code> (userc), <code>cf</code> (configure), <code>cv</code> (cvm), <code>lk</code> (lmake).</p>
+
+<h2>Adding Extra Tools via Manifest</h2>
+<p>Tools can be added without modifying <code>main.c</code> by using the extra tools manifest at <code>config/extra_tools.manifest</code>.</p>
+
+<h3>Manifest Format</h3>
+<pre>name|source|description|argv0_mode|extra_cflags</pre>
+
+<p>Fields:</p>
+<table>
+<tr><th>Field</th><th>Description</th><th>Example</th></tr>
+<tr><td><code>name</code></td><td>CLI tool name</td><td><code>yap</code></td></tr>
+<tr><td><code>source</code></td><td>Path to C source file (relative to project root)</td><td><code>mofl/languages/yap/yap.c</code></td></tr>
+<tr><td><code>description</code></td><td>Help text for tool list</td><td><code>YAP language interpreter</code></td></tr>
+<tr><td><code>argv0_mode</code></td><td><code>tool</code> or <code>onetool</code></td><td><code>tool</code></td></tr>
+<tr><td><code>extra_cflags</code></td><td>Additional compiler flags (optional)</td><td><code>-lm</code></td></tr>
+</table>
+
+<h3>Build Process for Extra Tools</h3>
+<p>The build script <code>tools/dev/build_extra_tools.sh</code> processes the manifest as follows:</p>
+<ol>
+<li>Reads the manifest line by line, splitting on <code>|</code> delimiter</li>
+<li>For each entry, generates a unique symbol name: <code>onetool_extra_main_<name></code></li>
+<li>Compiles the source file with <code>-Dmain=onetool_extra_main_<name></code> — this renames the tool's <code>main()</code> function to the generated symbol via the C preprocessor</li>
+<li>Passes any <code>extra_cflags</code> to the compiler</li>
+<li>The resulting object file is linked into the <code>onetool</code> binary</li>
+<li>At startup, the extra tools are registered via the auto-generated <code>onetool_extra_tools[]</code> array</li>
+<li>The <code>onetool_find_tool()</code> function searches built-in tools first, then extra tools</li>
+</ol>
+
+<p>This mechanism allows third-party tools to be plugged in without touching any core source files.</p>
+
+<h3>Current Extra Tools</h3>
+<table>
+<tr><th>Name</th><th>Source</th><th>Description</th></tr>
+<tr><td><code>yap</code></td><td><code>mofl/languages/yap/yap.c</code> (1132 lines)</td><td>YAP language interpreter</td></tr>
+</table>
+
+<h2>Global Output Redirection</h2>
+<p>OneTool supports a global <code>-to</code> flag that redirects stdout and stderr of any tool invocation:</p>
+<pre>onetool ping 1.1.1.1 -to /tmp/ping.log
+onetool down https://example.com -to fd   <span class="cmt"># redirect to fd 3</span></pre>
+<p>When <code>-to</code> is used, the dispatcher in <code>main()</code> intercepts it before calling the tool:</p>
+<ul>
+<li>If the argument is <code>"fd"</code>, no action is taken — the caller is expected to have already set up file descriptor 3 for output capture. This is used by the TUI when running tools with output capture.</li>
+<li>Otherwise, the argument is treated as a file path. The file is opened with <code>open(path, O_WRONLY|O_CREAT|O_TRUNC, 0644)</code>, and both <code>stdout</code> (fd 1) and <code>stderr</code> (fd 2) are duplicated to the file descriptor via <code>dup2()</code>.</li>
+</ul>
+<p>Note: The <code>-to</code> flag must appear after the tool name, not as a global flag before it. The tool's <code>main()</code> never sees the <code>-to</code> flag — it is consumed by the dispatcher before calling the entry point.</p>
+
+<h2>Build System</h2>
+<h3>Primary Build</h3>
+<pre>make          <span class="cmt"># builds onetool</span>
+make clean    <span class="cmt"># removes built binaries</span></pre>
+<p>Requirements: <code>clang</code> and <code>make</code>. The build process:</p>
+<ol>
+<li>Compiles the shared libraries (<code>libs/TUI/</code>, <code>libs/elf/</code>, <code>libs/memory/</code>, <code>libs/net/</code>)</li>
+<li>Compiles all built-in tool sources</li>
+<li>Runs <code>build_extra_tools.sh</code> to compile manifest-registered tools</li>
+<li>Links everything into a single static ELF64 binary called <code>onetool</code></li>
+</ol>
+
+<h3>lmake Build Tool</h3>
+<p>The bundled lmake (<code>tools/dev/lmake.zig</code>) is written in Zig and compiled separately. It is registered with <code>ONETOOL_ARGV0_BINARY_PATH</code> mode so it can locate build scripts relative to the binary path. The <code>lmakefile</code> in the project root is the build definition consumed by lmake — it replaces a traditional Makefile with OneTool's own build system.</p>
+
+<h2>InitFS</h2>
+<p>The <code>initfs/init</code> file is an embedded init script designed for minimal Linux environments where OneTool acts as <code>/init</code> (PID 1). This enables OneTool to function as the sole binary in a tiny root filesystem — a self-contained userspace.</p>
+
+<h3>Bootstrap Process</h3>
+<p>When OneTool is used as init:</p>
+<ol>
+<li>The kernel starts OneTool as PID 1</li>
+<li>If the TUI tool is launched (or taskmng/userc), the configure tool (<code>cf</code>) is called automatically as a fallback: if <code>tui_init()</code> (which needs <code>/dev/tty</code>) fails, it runs configure first, then retries TUI initialization</li>
+<li>Configure mounts <code>/proc</code>, <code>/sys</code>, <code>/dev</code> (devtmpfs), and <code>/tmp</code> (tmpfs) to bootstrap the basic Linux filesystem layout</li>
+<li>After this bootstrap, the full TUI becomes available</li>
+</ol>
+
+<h2>Makefile Details (lmakefile)</h2>
+<p>The project root contains <code>lmakefile</code> which is the build definition consumed by lmake. This is a custom build system format — not GNU Make syntax. It defines:</p>
+<ul>
+<li>Source file lists for each tool</li>
+<li>Library dependencies</li>
+<li>CFLAGS, LDFLAGS</li>
+<li>Output binary name and location</li>
+</ul>
+
+<h2>Error Handling Conventions</h2>
+<p>All OneTool tools follow consistent conventions:</p>
+<ul>
+<li><strong>Return value:</strong> 0 for success, 1 for failure</li>
+<li><strong>Errors:</strong> Printed to stderr with <code>fprintf(stderr, ...)</code> and <code>strerror(errno)</code> for system call failures</li>
+<li><strong>Usage:</strong> Invalid arguments print usage to stderr and return 1</li>
+<li><strong>Memory:</strong> All heap allocations go through <code>ot_x*()</code> wrappers that abort on OOM</li>
+</ul>
+
+</body>
+</html>

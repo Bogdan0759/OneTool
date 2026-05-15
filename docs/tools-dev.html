@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OneTool — Developer Tools</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;max-width:960px;margin:0 auto;padding:2em 1em;color:#222;background:#fafafa}
+h1,h2,h3,h4{color:#1a1a2e;border-bottom:1px solid #ddd;padding-bottom:.3em}
+h4{border:none;color:#333}
+code{background:#eef;padding:2px 6px;border-radius:3px;font-size:.9em}
+pre{background:#1a1a2e;color:#f0f0f0;padding:1em;border-radius:6px;overflow-x:auto;font-size:.85em}
+pre code{background:transparent;color:inherit;padding:0}
+table{border-collapse:collapse;width:100%;margin:1em 0}
+th,td{border:1px solid #ccc;padding:8px 12px;text-align:left}
+th{background:#1a1a2e;color:#fff}
+</style>
+</head>
+<body>
+
+<h1>OneTool — Developer Tools</h1>
+
+<hr>
+<h2>mlink — Minimal ELF64 x86-64 Linker</h2>
+<p><strong>Entry:</strong> <code>ml()</code> in <code>tools/dev/mlink/</code></p>
+<p>A minimal but fully functional linker for ELF64 x86-64 relocatable object files (<code>.o</code>). It takes one or more object files (and optionally simple <code>.a</code> archives) and produces a static ELF64 executable. mlink is the most complex tool in OneTool, spanning 10 source files with ~1500 lines of code.</p>
+
+<h3>Architecture — File by File</h3>
+<table>
+<tr><th>File</th><th>Lines</th><th>Purpose</th></tr>
+<tr><td><code>mlink.h</code></td><td>160</td><td>Master header: every struct, enum, and function declaration for the entire linker</td></tr>
+<tr><td><code>cli.c</code></td><td>199</td><td>CLI argument parsing (getopt-like), <code>main()</code> orchestrator, link map file writing</td></tr>
+<tr><td><code>bytes.c</code></td><td>144</td><td>File I/O (<code>ml_read_file</code>, <code>ml_write_file_mode</code>), alignment (<code>ml_align_up</code>), byte accessors (<code>ml_get16/32/64</code>, <code>ml_put16/32/64</code>), checked <code>ml_x*</code> alloc wrappers</td></tr>
+<tr><td><code>elf-reader.c</code></td><td>205</td><td>ELF object parser: section classification, symbol loading, relocation loading</td></tr>
+<tr><td><code>object.c</code></td><td>229</td><td>Archive (<code>.a</code>) parser (BSD, GNU, POSIX styles), context init/free, input path management</td></tr>
+<tr><td><code>symtab.c</code></td><td>200</td><td>Symbol resolution: global symbol table, archive member selection, duplicate detection, weak/strong semantics</td></tr>
+<tr><td><code>layout.c</code></td><td>257</td><td>Memory layout: segment computation, section ordering, address assignment, common symbol allocation, entry point verification</td></tr>
+<tr><td><code>reloc.c</code></td><td>367</td><td>Relocation application: all x86-64 relocation types with overflow checking</td></tr>
+<tr><td><code>emit.c</code></td><td>164</td><td>Output generation: ELF header, program headers, section data copying, file writing, map/symbol printing</td></tr>
+<tr><td><code>log.c</code></td><td>89</td><td>Error/verbose logging, section kind names, relocation type names</td></tr>
+</table>
+
+<h3>Core Data Structures — Complete Reference</h3>
+
+<h4><code>ml_context_t</code> — The Linker Context</h4>
+<p>This is the central state object that flows through every linker phase:</p>
+<pre>typedef struct {
+    // Output configuration
+    const char *output_path;    // Output file path (default: "a.out")
+    const char *entry_name;     // Entry symbol name (default: "_start")
+    const char *map_path;       // Optional link map output file
+    uint64_t base_addr;         // Image base address (default: 0x400000)
+    int print_map;              // Print link map to stdout
+    int print_symbols;          // Print resolved symbols to stdout
+    int dry_run;                // Parse + layout only, no output written
+    int verbose;                // Print archive selection messages
+
+    // Input tracking
+    char **inputs;              // Input file path strings
+    size_t input_count;         // Number of input paths
+    size_t input_cap;           // Allocated capacity
+
+    // Object tracking
+    ml_object_t **objects;      // All parsed object files
+    size_t object_count;        // Number of objects
+    size_t object_cap;          // Allocated capacity
+
+    // Symbol table
+    ml_global_t *globals;       // Global symbol table
+    size_t global_count;        // Number of global symbols
+    size_t global_cap;          // Allocated capacity
+
+    // Error state
+    int error_count;            // Number of errors encountered
+
+    // Segment layout
+    uint16_t phnum;             // Number of program headers
+    int has_rodata_segment;     // Has read-only data segment
+    int has_rw_segment;         // Has read-write segment
+    uint64_t rx_filesz;         // RX segment file size
+    uint64_t ro_offset;         // RO segment file offset
+    uint64_t ro_filesz;         // RO segment file size
+    uint64_t data_offset;       // RW segment file offset
+    uint64_t data_filesz;       // RW segment file size (on disk)
+    uint64_t data_memsz;        // RW segment memory size (includes bss)
+    uint64_t final_file_size;   // Total output file size
+    uint64_t entry_addr;        // Resolved entry point address
+} ml_context_t;</pre>
+
+<h4><code>ml_object_t</code> — Parsed Object File</h4>
+<pre>typedef struct ml_object {
+    char *name;                 // Object file name (e.g. "main.o" or "lib.a(member.o)")
+    unsigned char *data;        // Raw file data (owned)
+    size_t size;                // File size
+    int from_archive;           // 1 if extracted from .a archive
+    int selected;               // 1 if this object is included in the link
+    ml_section_t *sections;     // Array of sections
+    size_t section_count;
+    ml_symbol_t *symbols;       // Array of symbols
+    size_t symbol_count;
+    ml_reloc_t *relocs;         // Array of relocations
+    size_t reloc_count;
+} ml_object_t;</pre>
+
+<h4><code>ml_section_t</code> — Internal Section</h4>
+<pre>typedef struct {
+    char *name;                 // Section name (e.g. ".text", ".data")
+    uint32_t type;              // ELF section type (SHT_PROGBITS, SHT_NOBITS, etc.)
+    uint64_t flags;             // SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR, etc.
+    uint64_t align;             // Alignment requirement
+    uint64_t size;              // Total section size
+    uint64_t file_size;         // On-disk size (0 for .bss/NOBITS)
+    unsigned char *image;       // Section content (NULL for NOBITS)
+    ml_section_kind_t kind;     // Classified as TEXT/RODATA/DATA/BSS/SKIP
+    uint64_t out_offset;        // File offset in output
+    uint64_t out_addr;          // Virtual address in output
+} ml_section_t;</pre>
+
+<h4><code>ml_symbol_t</code> — Object-Level Symbol</h4>
+<pre>typedef struct {
+    char *name;                 // Symbol name
+    unsigned char bind;         // STB_LOCAL(0), STB_GLOBAL(1), STB_WEAK(2)
+    unsigned char type;         // STT_NOTYPE(0), STT_OBJECT(1), STT_FUNC(2), etc.
+    uint16_t shndx;             // Section index (SHN_UNDEF=0, SHN_ABS=0xFFF1, SHN_COMMON=0xFFF2)
+    uint64_t value;             // Symbol value (offset within section)
+    uint64_t size;              // Symbol size
+    int undefined;              // 1 if shndx == SHN_UNDEF
+    int common;                 // 1 if shndx == SHN_COMMON
+} ml_symbol_t;</pre>
+
+<h4><code>ml_reloc_t</code> — Relocation Entry</h4>
+<pre>typedef struct {
+    uint32_t target_section;    // Section index to apply relocation to
+    uint32_t symbol_index;      // Symbol index in object's symbol table
+    uint32_t type;              // Relocation type (R_X86_64_*)
+    uint64_t offset;            // Offset within target section
+    int64_t addend;             // Explicit addend (for RELA)
+    int has_addend;             // 1 for RELA, 0 for REL (implicit addend)
+} ml_reloc_t;</pre>
+
+<h4><code>ml_global_t</code> — Resolved Global Symbol</h4>
+<pre>typedef struct {
+    const char *name;           // Symbol name
+    ml_object_t *object;        // Defining object
+    ml_symbol_t *symbol;        // Defining symbol
+    int defined;                // 1 if symbol is defined (non-common)
+    int weak;                   // 1 if symbol is weak
+    int common;                 // 1 if common symbol
+    int absolute;               // 1 if symbol is absolute (SHN_ABS)
+    int referenced;             // 1 if symbol is referenced by any object
+    int strong_ref;             // 1 if referenced by a non-weak reference
+    uint64_t value;             // Resolved value (address)
+    uint64_t size;              // Symbol size
+    uint64_t common_align;      // Alignment for common symbols
+    uint64_t common_addr;       // Assigned address for common symbols
+} ml_global_t;</pre>
+
+<h3>Section Classification — <code>classify_section()</code></h3>
+<p>Each ELF section is classified into one of 5 kinds based on its type, flags, and name:</p>
+<table>
+<tr><th>Kind</th><th>Conditions</th></tr>
+<tr><td><code>ML_SEC_SKIP</code></td><td>No SHF_ALLOC flag, or .eh_frame, .comment, .note.GNU-stack sections</td></tr>
+<tr><td><code>ML_SEC_TEXT</code></td><td>SHF_EXECINSTR flag set (executable code)</td></tr>
+<tr><td><code>ML_SEC_RODATA</code></td><td>Allocatable, not writable, not executable (read-only data)</td></tr>
+<tr><td><code>ML_SEC_DATA</code></td><td>SHF_WRITE set and SHT_PROGBITS (writable initialized data)</td></tr>
+<tr><td><code>ML_SEC_BSS</code></td><td>SHF_WRITE set and SHT_NOBITS (zero-initialized data)</td></tr>
+</table>
+
+<h3>Archive Parsing — <code>load_archive()</code></h3>
+<p>mlink supports three archive formats:</p>
+<ul>
+<li><strong>POSIX/BSD style</strong> (<code>#1/</code> prefix): The member name is stored at the beginning of the member data, followed by the actual object content</li>
+<li><strong>GNU style</strong> (<code>/123</code> long names): The archive has a <code>//</code> member containing a string table; member names reference offsets into it</li>
+<li><strong>Standard short names</strong> (16-byte header field): Names are stored directly in the archive header, space-padded, with optional trailing '/'</li>
+</ul>
+<p>The parser also skips symbol table members (<code>/</code> and <code>/SYM64/</code>). Archive member alignment is enforced (odd sizes are padded).</p>
+
+<h3>Linking Pipeline — 6 Phases</h3>
+
+<h4>Phase 1: Load Inputs (<code>ml_load_input()</code>)</h4>
+<p>Each input path is read from disk via <code>ml_read_file()</code>. The file is identified as either:</p>
+<ul>
+<li><strong>Archive (<code>.a</code>):</strong> Checked via <code>ARMAG</code> magic (<code>"!<arch>\n"</code>). Parsed by <code>load_archive()</code>, each ELF object within is parsed and added to the context as an unselected archive member.</li>
+<li><strong>ELF object (<code>.o</code>):</strong> Checked via <code>ELFMAG</code> magic. Parsed by <code>ml_parse_elf_object()</code> and added as a selected (non-archive) object.</li>
+</ul>
+
+<h4>Phase 2: Parse ELF Objects (<code>ml_parse_elf_object()</code>)</h4>
+<p>Uses the shared <code>ot_elf_parse()</code> from <code>libs/elf</code> to validate the ELF header, then:</p>
+<ol>
+<li><strong>Section loading:</strong> Copies section names, types, flags, sizes, aligns. Classifies each section via <code>classify_section()</code>. Copies section data for PROGBITS sections.</li>
+<li><strong>Symbol loading:</strong> Locates <code>SHT_SYMTAB</code> (entry size must be 24). For each symbol: reads name, bind (STB_GLOBAL/STB_LOCAL/STB_WEAK), type, shndx, value, size, and determines if undefined or common.</li>
+<li><strong>Relocation loading:</strong> Locates <code>SHT_RELA</code> (entry size 24) and <code>SHT_REL</code> (entry size 16). For each relocation: reads offset, symbol index, type, and addend (if RELA).</li>
+</ol>
+
+<h4>Phase 3: Symbol Resolution (<code>ml_resolve_symbols()</code>)</h4>
+<p>Three sub-steps:</p>
+
+<h5>3a. Archive Member Selection (<code>select_archive_members()</code>)</h5>
+<p>Iterates archive members in a fixed-point loop. For each unselected archive member, if any of its defined global symbols are referenced by already-selected objects, the member becomes selected. This loop repeats until no more members are selected (standard Unix linker semantics).</p>
+
+<h5>3b. Global Symbol Definition (<code>define_global()</code>)</h5>
+<p>For each selected object's global symbols:</p>
+<ul>
+<li><strong>Common symbols:</strong> If not already defined, the largest size wins (standard COMDAT-like behavior)</li>
+<li><strong>Defined symbols:</strong> If already defined, strong overrides weak; duplicate strong symbols produce an error; duplicate weak symbols are ignored</li>
+</ul>
+
+<h5>3c. Undefined Reference Tracking (<code>record_undefined()</code>)</h5>
+<p>Records all undefined references. After resolution, any symbol that is strongly referenced but neither defined nor common produces an "undefined symbol" error.</p>
+
+<h4>Phase 4: Layout (<code>ml_layout()</code>)</h4>
+<p>Computes output addresses and file offsets for all sections:</p>
+
+<h5>4a. Segment Detection</h5>
+<p>Scans all sections to determine which segments are needed:</p>
+<ul>
+<li><strong>RX segment</strong> — required if any TEXT sections exist</li>
+<li><strong>RO segment</strong> — required if any RODATA sections exist</li>
+<li><strong>RW segment</strong> — required if any DATA, BSS, or COMMON symbols exist</li>
+</ul>
+
+<h5>4b. Section Ordering</h5>
+<p>Sections are assigned in this order within each object:</p>
+<ol>
+<li><strong>.text</strong> sections — aligned, placed in RX segment</li>
+<li><strong>.rodata</strong> sections — aligned, page-aligned boundary from RX end</li>
+<li><strong>.data</strong> sections — aligned, page-aligned boundary from RO end</li>
+<li><strong>.bss</strong> sections — placed after .data (not written to file)</li>
+</ol>
+
+<h5>4c. Segment Boundaries</h5>
+<table>
+<tr><th>Segment</th><th>File Offset</th><th>Virtual Address</th><th>File Size</th><th>Memory Size</th></tr>
+<tr><td>RX (text)</td><td>0</td><td>base_addr</td><td>text_sections_end</td><td>same</td></tr>
+<tr><td>RO (rodata)</td><td>page_align(rx_end)</td><td>base + offset</td><td>rodata_end - offset</td><td>same</td></tr>
+<tr><td>RW (data+bss)</td><td>page_align(ro_end)</td><td>base + offset</td><td>data_end - offset</td><td>bss_end - offset</td></tr>
+</table>
+
+<h5>4d. Common Symbol Allocation</h5>
+<p>Common symbols are placed after all data sections, with their requested alignment. The largest alignment wins. The BSS memory size is extended to cover common symbols.</p>
+
+<h5>4e. Global Value Resolution</h5>
+<p>Each global symbol's value is computed:</p>
+<ul>
+<li><strong>Defined symbols:</strong> <code>section.out_addr + symbol.value</code></li>
+<li><strong>Absolute symbols:</strong> <code>symbol.value</code> (SHN_ABS)</li>
+<li><strong>Common symbols:</strong> <code>base_addr + common_cursor</code> (with alignment)</li>
+</ul>
+<p>Entry symbol is looked up; if not found, linkage fails.</p>
+
+<h4>Phase 5: Apply Relocations (<code>ml_apply_relocations()</code>)</h4>
+<p>For each selected object, each relocation is patched into the section image:</p>
+
+<h5>Relocation Types Supported</h5>
+<table>
+<tr><th>Type</th><th>Width</th><th>Computation</th><th>Description</th></tr>
+<tr><td><code>R_X86_64_NONE</code></td><td>0</td><td>—</td><td>No operation</td></tr>
+<tr><td><code>R_X86_64_64</code></td><td>8</td><td><code>S + A</code></td><td>64-bit absolute address</td></tr>
+<tr><td><code>R_X86_64_PC32</code></td><td>4</td><td><code>S + A - P</code></td><td>32-bit PC-relative</td></tr>
+<tr><td><code>R_X86_64_PLT32</code></td><td>4</td><td><code>S + A - P</code></td><td>32-bit PLT-relative (treats as PC32 for static link)</td></tr>
+<tr><td><code>R_X86_64_32</code></td><td>4</td><td><code>S + A</code> (unsigned)</td><td>32-bit absolute (zero-extended)</td></tr>
+<tr><td><code>R_X86_64_32S</code></td><td>4</td><td><code>S + A</code> (signed)</td><td>32-bit absolute (sign-extended)</td></tr>
+<tr><td><code>R_X86_64_PC64</code></td><td>8</td><td><code>S + A - P</code></td><td>64-bit PC-relative</td></tr>
+<tr><td><code>R_X86_64_PC16</code></td><td>2</td><td><code>S + A - P</code></td><td>16-bit PC-relative</td></tr>
+<tr><td><code>R_X86_64_PC8</code></td><td>1</td><td><code>S + A - P</code></td><td>8-bit PC-relative</td></tr>
+<tr><td><code>R_X86_64_16</code></td><td>2</td><td><code>S + A</code></td><td>16-bit absolute</td></tr>
+<tr><td><code>R_X86_64_8</code></td><td>1</td><td><code>S + A</code></td><td>8-bit absolute</td></tr>
+<tr><td><code>R_X86_64_SIZE32</code></td><td>4</td><td><code>Z + A</code></td><td>32-bit symbol size</td></tr>
+<tr><td><code>R_X86_64_SIZE64</code></td><td>8</td><td><code>Z + A</code></td><td>64-bit symbol size</td></tr>
+</table>
+<p>Where: <strong>S</strong> = symbol value, <strong>A</strong> = addend, <strong>P</strong> = relocation position (section address + offset), <strong>Z</strong> = symbol size.</p>
+
+<h5>Addend Handling</h5>
+<ul>
+<li><strong>RELA relocations</strong> (<code>SHT_RELA</code>): The addend is stored explicitly in the relocation entry</li>
+<li><strong>REL relocations</strong> (<code>SHT_REL</code>): The addend is read from the section data at the relocation offset (<code>read_implicit_addend()</code>)</li>
+</ul>
+
+<h5>Overflow Checking</h5>
+<p>Every relocation that writes a value has overflow checks via <code>checked_u32()</code>, <code>checked_i32()</code>, <code>checked_u16()</code>, <code>checked_i16()</code>, <code>checked_u8()</code>, <code>checked_i8()</code>. On overflow, an error is reported with the relocation type and section name.</p>
+
+<h4>Phase 6: Emit Output (<code>ml_emit_output()</code>)</h4>
+<p>Generates the final executable:</p>
+
+<h5>6a. ELF Header</h5>
+<p>A 64-byte ELF64 header is constructed:</p>
+<ul>
+<li>Magic: <code>0x7f ELF</code></li>
+<li>Class: <code>ELFCLASS64</code> (2)</li>
+<li>Data: <code>ELFDATA2LSB</code> (1, little-endian)</li>
+<li>Version: <code>EV_CURRENT</code> (1)</li>
+<li>OS/ABI: <code>ELFOSABI_SYSV</code> (0)</li>
+<li>Type: <code>ET_EXEC</code> (2)</li>
+<li>Machine: <code>EM_X86_64</code> (62)</li>
+<li>Entry: resolved entry address</li>
+<li>Program header offset: right after ELF header (64 bytes)</li>
+<li>Program header size: 56 bytes, count = phnum</li>
+<li>Section header table: not written (SHN_UNDEF)</li>
+</ul>
+
+<h5>6b. Program Headers</h5>
+<p>1 to 3 <code>PT_LOAD</code> segments are created:</p>
+<table>
+<tr><th>Segment</th><th>Flags</th><th>Alignment</th></tr>
+<tr><td>RX (text)</td><td><code>PF_R | PF_X</code></td><td>0x1000 (page)</td></tr>
+<tr><td>RO (rodata, optional)</td><td><code>PF_R</code></td><td>0x1000</td></tr>
+<tr><td>RW (data+bss, optional)</td><td><code>PF_R | PF_W</code></td><td>0x1000</td></tr>
+</table>
+<p>Each <code>PT_LOAD</code> has: p_offset, p_vaddr, p_paddr (= vaddr), p_filesz, p_memsz, p_align.</p>
+
+<h5>6c. Section Data</h5>
+<p>All selected objects' sections are copied to the output buffer at their assigned offsets. BSS sections are not copied (they are zero-initialized by the OS loader).</p>
+
+<h5>6d. File Writing</h5>
+<p>Written with <code>ml_write_file_mode()</code> with mode 0755 (executable). On <code>--dry-run</code>, no file is written.</p>
+
+<h5>6e. Link Map Output</h5>
+<p>The <code>ml_print_map()</code> function outputs:</p>
+<ul>
+<li>Output file path and dry-run indicator</li>
+<li>Base address and entry symbol with address</li>
+<li>Each segment: type, offset, vaddr, filesz, memsz</li>
+<li>Each included section: address, size, kind, name, object file</li>
+</ul>
+
+<h5>6f. Symbol Table Output</h5>
+<p>The <code>ml_print_symbols()</code> function outputs all defined global symbols with their resolved addresses.</p>
+
+<h3>Usage</h3>
+<pre>onetool mlink [options] file.o [lib.a ...]
+
+Options:
+  -o file            Output executable (default a.out)
+  -e symbol          Entry symbol (default _start)
+  --base addr        Image base address (default 0x400000, must be page-aligned)
+  -Map file          Write link map to file
+  --print-map        Print link map to stdout
+  --print-symbols    Print global symbols to stdout
+  --dry-run          Parse, resolve and layout without writing output
+  -v, --verbose      Print archive member selection details
+  -h, --help         Show help
+</pre>
+
+<h3>Example</h3>
+<pre>onetool mlink -e _start -o myapp start.o main.o libfoo.a
+</pre>
+
+<h3>Limitations</h3>
+<ul>
+<li>Only ELF64 little-endian x86-64 relocatable objects</li>
+<li>No dynamic linking (static executables only)</li>
+<li>No shared library support</li>
+<li>No section header table in output (SHN_UNDEF)</li>
+<li>No debug section preservation</li>
+<li>Simple archive format only (no thin archives, no dash archives)</li>
+<li>Single architecture (no fat binaries)</li>
+</ul>
+
+<hr>
+<h2>lmake — Bundled Build Tool</h2>
+<p><strong>Source:</strong> <code>tools/dev/lmake.zig</code> (807 lines)</p>
+<p><strong>Language:</strong> Zig</p>
+<p><strong>Entry:</strong> <code>lk()</code> — exported as <code>pub export fn lk(argc: c_int, argv: [*][*:0]u8) c_int</code></p>
+<p><strong>argv0_mode:</strong> <code>ONETOOL_ARGV0_BINARY_PATH</code> — <code>argv[0]</code> is set to the binary path so lmake can locate its build scripts relative to the executable</p>
+<p>lmake is a custom build system written in Zig that reads <code>lmakefile</code> — the project's build definition file. It replaces a traditional Makefile with OneTool's own DSL. Without lmake, the project cannot be built. It is compiled as part of OneTool and invoked via <code>onetool lmake [target]</code>.</p>
+
+<h3>Architecture — Three-Phase Pipeline</h3>
+<p>lmake is structured as a classic compiler pipeline with Tokenizer → Parser → Executor phases, all in a single file:</p>
+
+<table>
+<tr><th>Component</th><th>Lines</th><th>Purpose</th></tr>
+<tr><td><code>Tokenizer</code></td><td>~100</td><td>Lexical analysis: converts lmakefile source text into tokens</td></tr>
+<tr><td><code>Parser</code></td><td>~350</td><td>Syntactic analysis: builds a program AST with tasks and variables</td></tr>
+<tr><td><code>Executor</code></td><td>~150</td><td>Runtime: evaluates variables, executes task commands via shell</td></tr>
+<tr><td><code>runLmake()</code></td><td>~60</td><td>Entry: CLI parsing, file loading, orchestration</td></tr>
+<tr><td><code>format()</code></td><td>~80</td><td>Custom string formatter (printf-like with padding support)</td></tr>
+<tr><td><code>lk()</code></td><td>~40</td><td>C ABI export: allocates arena, parses args, calls runLmake()</td></tr>
+</table>
+
+<h3>Tokenizer — <code>Tokenizer</code> struct</h3>
+<p>The tokenizer reads the lmakefile source text character by character and produces tokens:</p>
+
+<table>
+<tr><th>Token</th><th>Lexeme</th><th>Example</th></tr>
+<tr><td><code>eof</code></td><td>end of file</td><td>—</td></tr>
+<tr><td><code>ident</code></td><td>identifier</td><td><code>CC</code>, <code>CFLAGS</code>, <code>TARGET</code></td></tr>
+<tr><td><code>string</code></td><td>quoted string</td><td><code>"clang"</code>, <code>"onetool"</code></td></tr>
+<tr><td><code>at</code></td><td><code>@</code></td><td>directive prefix</td></tr>
+<tr><td><code>lparen</code></td><td><code>(</code></td><td>grouping start</td></tr>
+<tr><td><code>rparen</code></td><td><code>)</code></td><td>grouping end</td></tr>
+<tr><td><code>eq</code></td><td><code>=</code></td><td>assignment operator</td></tr>
+<tr><td><code>kw_string</code></td><td><code>string</code> keyword</td><td>type keyword for variable declaration</td></tr>
+<tr><td><code>kw_task</code></td><td><code>task</code> keyword</td><td>task definition keyword</td></tr>
+</table>
+
+<p>Identifiers are validated with <code>isIdentStart()</code> (alphabetic or underscore) and <code>isIdentContinue()</code> (alphanumeric or underscore). Comments (<code>//</code>) are skipped entirely during tokenization. The tokenizer tracks line and column numbers for error reporting.</p>
+
+<h3>Parser — <code>Parser</code> struct</h3>
+<p>The parser consumes tokens and constructs a program model with two main data structures:</p>
+
+<h4>Program Model</h4>
+<pre>const Program = struct {
+    vars: std.StringArrayHashMap([]const u8),       // Variable name → value
+    task_order: std.ArrayListUnmanaged([]const u8), // Task names in definition order
+    tasks: std.StringArrayHashMap(Task),             // Task name → Task struct
+};
+
+const Task = struct {
+    name: []const u8,         // Task name (e.g. "all", "clean")
+    body: []const u8,         // Raw command text to execute
+    deps: [][]const u8,       // Dependency task names
+};</pre>
+
+<p><strong>Parsing rules:</strong></p>
+<ul>
+<li><strong>Variable declaration:</strong> <code>string NAME = "value";</code> — stores in <code>program.vars</code>. Variables can reference other variables using <code>@(NAME)</code> syntax in string values.</li>
+<li><strong>Task definition:</strong> <code>task "name" [deps...] { body }</code> — stores the task name, dependency list, and body text.</li>
+<li><strong>Variable references:</strong> Inside string values, <code>@(VARNAME)</code> is replaced with the variable's value during variable loading (before execution). References are resolved with dependency order: the parser collects all <code>@(...)</code> references and substitutes them by looking up in <code>program.vars</code>.</li>
+</ul>
+
+<h3>Executor — <code>Executor</code> struct</h3>
+<p>The executor runs tasks by invoking system commands via shell:</p>
+
+<h4><code>loadVars()</code></h4>
+<p>Iterates all declared variables in definition order. For each variable, scans the value for <code>@(NAME)</code> references and substitutes them. This enables variables to reference previously defined variables (e.g., <code>MAIN_OBJ = "main.o"</code> and later <code>OBJS = "@(MAIN_OBJ) tools.o"</code>).</p>
+
+<h4><code>execTask(name)</code></h4>
+<ol>
+<li>Looks up the task by name in <code>program.tasks</code></li>
+<li>If not found: tries <code>"all"</code> or the first task in definition order</li>
+<li>Recursively executes all dependency tasks first (via <code>execTask()</code>)</li>
+<li>If the task has a body, substitutes variable references in the body text using <code>@(NAME)</code> syntax</li>
+<li>Executes the substituted command via <code>std.Io.Command.run()</code> which spawns a shell (<code>/bin/sh -c "..."</code>)</li>
+<li>Checks the exit code — if non-zero, returns <code>error.CommandFailed</code></li>
+</ol>
+
+<h4><code>format()</code> — Custom Formatter</h4>
+<p>A printf-style string formatter supporting:</p>
+<ul>
+<li><code>%s</code> — string</li>
+<li><code>%d</code>, <code>%i</code> — signed integer</li>
+<li><code>%u</code> — unsigned integer</li>
+<li><code>%x</code>, <code>%X</code> — hexadecimal (lower/upper)</li>
+<li><code>%b</code> — binary</li>
+<li><code>%c</code> — character from integer value</li>
+<li><code>%%</code> — literal percent</li>
+<li>Padding: <code>%10s</code> (right-align), <code>%-10s</code> (left-align), <code>%010d</code> (zero-padded)</li>
+</ul>
+<p>All numeric formatting uses <code>std.fmt.parseInt()</code> for parsing and <code>std.fmt.bufPrint()</code> for output. Arguments are passed as <code>[]const u8</code> slices and parsed to integers on demand.</p>
+
+<h3>CLI Entry — <code>runLmake()</code></h3>
+<p>Parses command-line arguments:</p>
+<pre>lmake [-f <file>] [target]
+lmake --list          # list available targets
+lmake -h, --help      # show usage</pre>
+<ul>
+<li><strong>Default file:</strong> <code>lmakefile</code> in the current directory</li>
+<li><strong>Default target:</strong> <code>"all"</code> if defined, otherwise the first task in the file</li>
+<li><strong>--list:</strong> Prints all task names in definition order</li>
+</ul>
+<p>Reads the lmakefile (max 10MB via <code>.limited(10 * 1024 * 1024)</code>), parses it, loads variables, finds the entry target, then executes it with full dependency resolution.</p>
+
+<h3>C ABI Export — <code>lk()</code></h3>
+<p>The <code>lk()</code> function is exported with <code>pub export fn</code> so it can be called by OneTool's C dispatcher with standard C ABI (<code>argc/argv</code>):</p>
+<ul>
+<li>Creates a <code>std.Io</code> instance with threaded I/O and inherits the process environment from <code>std.c.environ</code></li>
+<li>Uses a <code>DebugAllocator</code> for the main heap and an <code>ArenaAllocator</code> for the parser/executor (all memory freed at once via <code>arena.deinit()</code>)</li>
+<li>Converts C <code>argv</code> pointers to Zig slices</li>
+<li>Calls <code>runLmake()</code> — on error, prints the error name and returns 1</li>
+<li>Returns 0 on success</li>
+</ul>
+
+<h3>lmakefile Format</h3>
+<p>The <code>lmakefile</code> at the project root defines the entire OneTool build. Key sections:</p>
+
+<pre>string CC = "clang";
+string CFLAGS = "-O3 -flto";
+string LDFLAGS = "-static";
+string LDLIBS = "-lssl -lcrypto -lz -lzstd -ldl -pthread -lncursesw -ltinfo";
+string TARGET = "onetool";
+
+// Object file variables for every source file
+string LASTMOD_SRC = "tools/filesystem/lastmod.c";
+string LASTMOD_OBJ = "tools/filesystem/lastmod.o";
+// ... (one string variable per tool source)
+
+task "all" ["onetool"] {}
+
+task "onetool" [
+    "@(MAIN_OBJ)" "@(MAIN_TUI_OBJ)"
+    "@(LASTMOD_OBJ)" "@(EXEC_OBJ)" "@(FSINFO_OBJ)" "@(FSIZE_OBJ)"
+    "@(SIZE_OBJ)" "@(NM_OBJ)" "@(GAPI_OBJ)"
+    "@(DOWN_CLI_OBJ)" "@(DOWN_PARSE_OBJ)" "@(DOWN_SEND_OBJ)" "@(DOWN_ROBOTS_OBJ)"
+    "@(NSETUP_OBJ)" "@(PING_CLI_OBJ)"
+    "@(REBOOT_OBJ)" "@(SHUTDOWN_OBJ)"
+    "@(TASKMNG_INFO_OBJ)" "@(TASKMNG_LIST_OBJ)" "@(TASKMNG_PROCESS_OBJ)" "@(TASKMNG_TUI_OBJ)"
+    "@(USERC_TUI_OBJ)" "@(USERC_USERS_OBJ)"
+    "@(CONFIGURE_MAIN_OBJ)" "@(CONFIGURE_MOUNT_OBJ)" "@(CONFIGURE_CREATE_OBJ)"
+    "@(CONFIGURE_HELPERS_OBJ)" "@(CONFIGURE_SIZE_OBJ)" "@(CONFIGURE_OTHER_OBJ)"
+    "@(CVM_OBJ)"
+    "@(MLINK_BYTES_OBJ)" "@(MLINK_CLI_OBJ)" "@(MLINK_ELF_OBJ)" "@(MLINK_EMIT_OBJ)"
+    "@(MLINK_LAYOUT_OBJ)" "@(MLINK_LOG_OBJ)" "@(MLINK_OBJECT_OBJ)" "@(MLINK_RELOC_OBJ)"
+    "@(MLINK_SYMTAB_OBJ)"
+    "@(LPACK_OBJ)" "@(LPACK_RUNTIME_OBJ)"
+    "@(LMAKE_OBJ)"
+] {
+    "@(CC)" @(CFLAGS) -o "@(TARGET)" @(LDFLAGS) @(LDLIBS) ^
+        @(EXTRA_TOOLS_BUNDLE_OBJ) ^
+        @(MAIN_OBJ) @(MAIN_TUI_OBJ) @(LASTMOD_OBJ) ...
+}
+
+task "clean" [] {
+    rm -f @(TARGET)
+    rm -f @(MAIN_OBJ) @(MAIN_TUI_OBJ)
+    rm -f generated/extra_tools_bundle.o
+    // ...
+}</pre>
+
+<p>The file defines:</p>
+<ul>
+<li><strong>Global settings:</strong> CC, CFLAGS, LDFLAGS, LDLIBS, TARGET</li>
+<li><strong>Source/object pairs:</strong> One <code>string</code> variable per source file for its path and corresponding <code>.o</code> output</li>
+<li><strong>Compilation tasks:</strong> Each source file has a task that compiles it with <code>@(CC) @(CFLAGS) -c -o @(OBJ) @(SRC)</code></li>
+<li><strong>Link task:</strong> The <code>"onetool"</code> task links all objects together with extra tools bundle</li>
+<li><strong>Clean task:</strong> Removes all build artifacts</li>
+</ul>
+
+<h3>Usage</h3>
+<pre>onetool lmake [target]
+onetool lmake --list          # list all available targets
+onetool lmake -h, --help      # show help
+onetool lmake -f lmakefile    # specify custom build file (default: lmakefile)
+</pre>
+
+<h3>Example</h3>
+<pre>onetool lmake clean   # remove all build artifacts
+onetool lmake all     # build the full project (same as just "onetool lmake")
+onetool lmake --list  # show all tasks
+</pre>
+
+<hr>
+<h2>lpack — Lua Packager</h2>
+<p><strong>Entry:</strong> <code>lp()</code> in <code>tools/dev/packagers/lpack/</code></p>
+<p>Bundles a Lua script together with a Lua interpreter into a standalone ELF executable.</p>
+
+<h3>Components</h3>
+<table>
+<tr><th>File</th><th>Purpose</th></tr>
+<tr><td><code>lpack.c</code></td><td>Main packaging logic: reads Lua script and interpreter, concatenates them into an ELF with a runtime stub</td></tr>
+<tr><td><code>runtime.c</code></td><td>Runtime stub that embeds extraction logic: extracts the Lua script at runtime and executes it via the bundled interpreter</td></tr>
+</table>
+
+<h3>Usage</h3>
+<pre>onetool lpack [options] script.lua
+
+Options:
+  -i interpreter  Path to Lua interpreter (default: auto-detect)
+  -o output       Output ELF file (default: a.out)
+</pre>
+
+<h3>Example</h3>
+<pre>onetool lpack -i /usr/bin/lua -o bundle main.lua
+./bundle  # runs main.lua with the bundled interpreter
+</pre>
+
+<hr>
+<h2>gapi_supported — Graphics API Check</h2>
+<p><strong>Entry:</strong> <code>ga()</code> in <code>tools/dev/gapi_supported.c</code></p>
+<p>Detects which graphics APIs are available by trying to <code>dlopen()</code> their shared libraries with a fallback variant.</p>
+
+<table>
+<tr><th>API</th><th>Library</th><th>Fallback</th></tr>
+<tr><td>Vulkan</td><td><code>libvulkan.so.1</code></td><td><code>libvulkan.so</code></td></tr>
+<tr><td>OpenGL</td><td><code>libGL.so.1</code></td><td><code>libGL.so</code></td></tr>
+<tr><td>EGL</td><td><code>libEGL.so.1</code></td><td><code>libEGL.so</code></td></tr>
+<tr><td>OpenGL ES 2.0/3.0</td><td><code>libGLESv2.so.2</code></td><td><code>libGLESv2.so</code></td></tr>
+<tr><td>OpenGL ES 1.1</td><td><code>libGLESv1_CM.so.1</code></td><td><code>libGLESv1_CM.so</code></td></tr>
+<tr><td>OpenCL</td><td><code>libOpenCL.so.1</code></td><td><code>libOpenCL.so</code></td></tr>
+</table>
+
+<p><strong>Usage:</strong> <code>onetool gapi_supported</code></p>
+
+</body>
+</html>

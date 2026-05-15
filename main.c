@@ -11,6 +11,9 @@ int lm(int argc, char *argv[]);
 int ex(int argc, char *argv[]);
 int fi(int argc, char *argv[]);
 int fz(int argc, char *argv[]);
+int ls(int argc, char *argv[]);
+int ca(int argc, char *argv[]);
+int fr(int argc, char *argv[]);
 int sz(int argc, char *argv[]);
 int nm(int argc, char *argv[]);
 int ga(int argc, char *argv[]);
@@ -27,7 +30,7 @@ int cf(int argc, char *argv[]);
 int cv(int argc, char *argv[]);
 int uc(int argc, char *argv[]);
 int tui_main(const char *onetool_argv0);
-const char onetool_version[] = "1.3.2";
+const char onetool_version[] = "1.4.0";
 
 const struct onetool_tool onetool_builtin_tools[] = {
     {"lastmod", lm, "print the last modification time of a file",
@@ -36,6 +39,9 @@ const struct onetool_tool onetool_builtin_tools[] = {
      ONETOOL_ARGV0_TOOL_NAME},
     {"fsinfo", fi, "print filesystem info", ONETOOL_ARGV0_TOOL_NAME},
     {"fsize", fz, "print file size", ONETOOL_ARGV0_TOOL_NAME},
+    {"ls", ls, "list files", ONETOOL_ARGV0_TOOL_NAME},
+    {"cat", ca, "print files content", ONETOOL_ARGV0_TOOL_NAME},
+    {"free", fr, "show memory usage", ONETOOL_ARGV0_TOOL_NAME},
     {"size", sz, "print ELF section sizes", ONETOOL_ARGV0_TOOL_NAME},
     {"nm", nm, "print ELF symbols", ONETOOL_ARGV0_TOOL_NAME},
     {"gapi_supported", ga, "check available graphics API",

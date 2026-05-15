@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OneTool — Filesystem Tools</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;max-width:960px;margin:0 auto;padding:2em 1em;color:#222;background:#fafafa}
+h1,h2,h3{color:#1a1a2e;border-bottom:1px solid #ddd;padding-bottom:.3em}
+code{background:#eef;padding:2px 6px;border-radius:3px;font-size:.9em}
+pre{background:#1a1a2e;color:#f0f0f0;padding:1em;border-radius:6px;overflow-x:auto;font-size:.85em}
+pre code{background:transparent;color:inherit;padding:0}
+table{border-collapse:collapse;width:100%;margin:1em 0}
+th,td{border:1px solid #ccc;padding:8px 12px;text-align:left}
+th{background:#1a1a2e;color:#fff}
+</style>
+</head>
+<body>
+
+<h1>OneTool — Filesystem Tools</h1>
+<p>Six tools for inspecting files and filesystems. All are single-file C programs (except <code>size</code> which uses the shared ELF library).</p>
+
+<hr>
+<h2>lastmod — Last Modification Time</h2>
+<p><strong>Source:</strong> <code>tools/filesystem/lastmod.c</code> (30 lines)</p>
+<p><strong>Entry:</strong> <code>lm()</code></p>
+<p>Prints the last modification time (mtime) of a file in human-readable format.</p>
+
+<h3>Implementation</h3>
+<ol>
+<li>Calls <code>stat(input_file, &file_stat)</code> on the provided path</li>
+<li>Reads <code>st_mtime</code> (a <code>time_t</code>) from the stat result</li>
+<li>Formats with <code>ctime(&last_mod_time)</code> — produces output like <code>last modification time of /etc/hosts is: Thu Apr 15 12:00:00 2025</code></li>
+</ol>
+<p><strong>Error handling:</strong> If <code>stat()</code> fails (file not found, permission denied, etc.), prints <code>stat: <strerror></code> and returns 1.</p>
+
+<p><strong>Usage:</strong> <code>onetool lastmod <path></code></p>
+
+<p><strong>Example:</strong></p>
+<pre>$ onetool lastmod /etc/hosts
+last modification time of /etc/hosts is: Thu Apr 10 14:23:45 2025
+</pre>
+
+<p>Note: unlike the classic Unix <code>stat</code> command, this tool always uses <code>ctime()</code> and supports a single file argument only.</p>
+
+<hr>
+<h2>exec — Execute File</h2>
+<p><strong>Source:</strong> <code>tools/filesystem/exec.c</code> (53 lines)</p>
+<p><strong>Entry:</strong> <code>ex()</code></p>
+<p>Runs a file directly (via <code>execv()</code>) or through a specified interpreter. Replaces the current process — no fork, no return on success.</p>
+
+<h3>Implementation</h3>
+<ol>
+<li><strong>Argument parsing:</strong> Iterates through <code>argv[]</code> looking for <code>-i interpreter</code> followed by the path argument. Rejects extra arguments.</li>
+<li><strong>Direct execution:</strong> If no interpreter given, builds <code>exec_argv = [path, NULL]</code> and calls <code>execv(path, exec_argv)</code>.</li>
+<li><strong>Interpreter execution:</strong> If interpreter given, builds <code>exec_argv = [interpreter, path, NULL]</code> and calls <code>execv(interpreter, exec_argv)</code> — effectively running <code>interpreter path</code>.</li>
+<li><strong>Error handling:</strong> If <code>execv()</code> returns, prints <code>exec failed (<path>): <strerror></code> and returns 1. Common failures: <code>ENOENT</code> (file not found), <code>EACCES</code> (no execute permission), <code>ENOEXEC</code> (bad binary format).</li>
+</ol>
+
+<p><strong>Usage:</strong> <code>onetool exec <path> [-i interpreter]</code></p>
+
+<table>
+<tr><th>Option</th><th>Description</th></tr>
+<tr><td><code>path</code></td><td>Path to the program or script to execute</td></tr>
+<tr><td><code>-i interpreter</code></td><td>Run <code>path</code> through this interpreter (e.g., <code>-i python</code>)</td></tr>
+</table>
+
+<p><strong>Examples:</strong></p>
+<pre>onetool exec ./a.out
+onetool exec script.sh -i /bin/bash
+onetool exec script.py -i python3
+</pre>
+
+<p><strong>Note:</strong> This is NOT a subprocess spawner. It replaces the OneTool process with the target program via <code>execv()</code>. The <code>exec</code> family of functions does not search <code>PATH</code> — full paths are required. For PATH-based lookup, use full paths like <code>/usr/bin/python3</code>.</p>
+
+<hr>
+<h2>fsinfo — Filesystem Information</h2>
+<p><strong>Source:</strong> <code>tools/filesystem/fsinfo.c</code> (81 lines)</p>
+<p><strong>Entry:</strong> <code>fi()</code></p>
+<p>Inspects a filesystem path and prints detailed filesystem and inode information using <code>statvfs()</code> and <code>/proc/mounts</code> parsing.</p>
+
+<h3>Implementation</h3>
+<ol>
+<li><strong>statvfs:</strong> Calls <code>statvfs(path, &vfs)</code> to get filesystem statistics: total/available/free inodes.</li>
+<li><strong>Mount point resolution:</strong> Opens <code>/proc/mounts</code> via <code>setmntent()</code>, resolves the given path to an absolute path via <code>realpath()</code>, then iterates over mount entries to find the longest matching mount point (most specific match). Extracts:
+  <ul>
+    <li><code>mnt_fsname</code> — the block device (e.g., <code>/dev/sda1</code>)</li>
+    <li><code>mnt_type</code> — the filesystem type (e.g., <code>ext4</code>, <code>tmpfs</code>, <code>btrfs</code>)</li>
+  </ul>
+</li>
+<li><strong>Inode calculation:</strong> Computes used inodes = <code>f_files - f_ffree</code>, usage percentage = <code>(used * 100) / total</code> (if total > 0).</li>
+</ol>
+
+<p><strong>Output fields:</strong></p>
+<table>
+<tr><th>Field</th><th>Source</th></tr>
+<tr><td><code>fs name</code></td><td>Filesystem type from <code>/proc/mounts</code> (e.g., ext4, tmpfs)</td></tr>
+<tr><td><code>inodes total</code></td><td><code>statvfs.f_files</code></td></tr>
+<tr><td><code>inodes used</code></td><td><code>f_files - f_ffree</code></td></tr>
+<tr><td><code>inodes available</code></td><td><code>statvfs.f_favail</code></td></tr>
+<tr><td><code>inodes usage</code></td><td>Percentage: <code>(inodes_used * 100) / inodes_total</code></td></tr>
+<tr><td><code>inodes name</code></td><td>Block device from <code>/proc/mounts</code></td></tr>
+</table>
+
+<p><strong>Usage:</strong> <code>onetool fsinfo <path></code></p>
+
+<p><strong>Example:</strong></p>
+<pre>$ onetool fsinfo /
+fs name: ext4
+inodes total: 12345678
+inodes used: 234567
+inodes available: 11000000
+inodes usage: 2%
+inodes name: /dev/nvme0n1p2
+</pre>
+
+<p><strong>Note:</strong> Unlike the old version shown in overview.html (which used <code>stat()</code> for file info and <code>statvfs()</code> for block counts), the current implementation focuses exclusively on inode statistics and mount info from <code>/proc/mounts</code>.</p>
+
+<hr>
+<h2>fsize — File Size</h2>
+<p><strong>Source:</strong> <code>tools/filesystem/fsize.c</code> (99 lines)</p>
+<p><strong>Entry:</strong> <code>fz()</code></p>
+<p>Prints the size of a file in bytes or in human-readable units. Supports multiple file arguments.</p>
+
+<h3>Implementation</h3>
+<ol>
+<li><strong>Human-readable formatting:</strong> The <code>format_human()</code> function uses a 1024-based unit progression: B → KB → MiB → GiB → TiB → PiB. Uses <code>double</code> division and <code>snprintf()</code> with <code>%.1f</code> for fractions.</li>
+<li><strong>File checking:</strong> Uses <code>stat()</code> and checks <code>S_ISREG(st.st_mode)</code> — rejects non-regular files with <code>error: <path> is not regular file</code>.</li>
+<li><strong>Multi-file support:</strong> Accepts multiple file arguments. Each file gets its own line. Continues processing remaining files on error (best-effort).</li>
+</ol>
+
+<p><strong>Output format:</strong></p>
+<ul>
+<li>Raw mode (<code>-h</code> omitted): <code>1234 filename</code></li>
+<li>Human mode (<code>-h</code>): <code>1.2 KiB filename</code></li>
+</ul>
+
+<p><strong>Usage:</strong> <code>onetool fsize [-h] <path> [<path>...]</code></p>
+
+<table>
+<tr><th>Option</th><th>Description</th></tr>
+<tr><td><code>-h</code>, <code>--human</code></td><td>Print size with binary unit suffixes (B, KiB, MiB, GiB, TiB, PiB)</td></tr>
+<tr><td><code>--help</code></td><td>Show help text</td></tr>
+</table>
+
+<p><strong>Examples:</strong></p>
+<pre>$ onetool fsize /etc/hosts
+234 /etc/hosts
+$ onetool fsize -h /etc/hosts /bin/bash
+234 B /etc/hosts
+1.4 MiB /bin/bash
+</pre>
+
+<hr>
+<h2>size — ELF Section Sizes</h2>
+<p><strong>Source:</strong> <code>tools/filesystem/size.c</code> (161 lines) + <code>libs/elf/</code></p>
+<p><strong>Entry:</strong> <code>sz()</code></p>
+<p>Analyzes an ELF binary and prints section sizes. Supports two output formats (Berkeley and SysV). Uses the shared ELF parsing library (<code>ot_elf_parse()</code>) to read section headers.</p>
+
+<h3>Implementation</h3>
+<ol>
+<li><strong>File reading:</strong> Uses a custom <code>read_file()</code> that reads the entire file into a dynamically growing buffer (starts at 16KB, doubles as needed). Handles <code>EINTR</code> during reads.</li>
+<li><strong>ELF parsing:</strong> Delegates to <code>ot_elf_parse()</code> from <code>libs/elf</code> — validates ELF magic, class (64-bit only), endianness (little-endian only), version.</li>
+<li><strong>Section classification (Berkeley mode):</strong> The <code>add_alloc_section()</code> helper iterates all sections with <code>SHF_ALLOC</code> flag and classifies into:
+  <ul>
+    <li><strong>text:</strong> sections without <code>SHF_WRITE</code> and not <code>SHT_NOBITS</code> (code + read-only data combined)</li>
+    <li><strong>data:</strong> sections with <code>SHF_WRITE</code> and not <code>SHT_NOBITS</code> (initialized data)</li>
+    <li><strong>bss:</strong> sections with <code>SHT_NOBITS</code> (zero-initialized data)</li>
+  </ul>
+</li>
+<li><strong>Berkeley output:</strong> Prints a header line once, then for each file: <code>text data bss dec hex filename</code>.</li>
+<li><strong>SysV output:</strong> Prints per-section details: section name, size in decimal, address in hex, and a Total line.</li>
+</ol>
+
+<p><strong>Usage:</strong> <code>onetool size [-A|-B] <path> [<path>...]</code></p>
+
+<table>
+<tr><th>Option</th><th>Format</th><th>Description</th></tr>
+<tr><td><code>-B</code> (default)</td><td><strong>Berkeley summary</strong></td><td>Shows text, data, bss, and total sizes in a compact line per file</td></tr>
+<tr><td><code>-A</code></td><td><strong>SysV detailed</strong></td><td>Shows every section with name, size, and address</td></tr>
+</table>
+
+<p><strong>Examples:</strong></p>
+<pre>$ onetool size /bin/ls
+   text    data     bss     dec     hex filename
+ 123456   7890    1234  132580   205e4 /bin/ls
+
+$ onetool size -A /bin/ls
+/bin/ls  :
+section                           size              addr
+.interp                            28      0x318
+.note.gnu.build-id                 36      0x338
+.note.ABI-tag                      32      0x35c
+.gnu.hash                          48      0x380
+.dynsym                           240      0x3b0
+...
+Total                             94320
+</pre>
+
+<hr>
+<h2>nm — ELF Symbols</h2>
+<p><strong>Source:</strong> <code>tools/filesystem/nm.c</code></p>
+<p><strong>Entry:</strong> <code>nm()</code></p>
+<p>Prints symbols from an ELF symbol table. Mimics classic Unix <code>nm(1)</code> in spirit.</p>
+
+<h3>Implementation</h3>
+<ol>
+<li>Parses the ELF file using <code>ot_elf_parse()</code> from <code>libs/elf</code></li>
+<li>Locates the <code>SHT_SYMTAB</code> section (symbol table)</li>
+<li>Reads each symbol entry (24 bytes each for ELF64): name (via strtab offset), value (8 bytes), size (8 bytes), info (1 byte: bind+type), other (1 byte), shndx (2 bytes)</li>
+<li>Classifies by <code>ELF64_ST_TYPE</code> (STT_FUNC, STT_OBJECT, etc.) and <code>ELF64_ST_BIND</code> (STB_GLOBAL, STB_LOCAL, STB_WEAK)</li>
+<li>Determines symbol visibility based on shndx: <code>SHN_UNDEF</code> = undefined, <code>SHN_ABS</code> = absolute, <code>SHN_COMMON</code> = common</li>
+<li>Output formatting: uppercase letter = global, lowercase = local</li>
+</ol>
+
+<p><strong>Output format:</strong> <code>address type symbol_name</code> where type is one of:</p>
+<ul>
+<li><code>T</code> / <code>t</code> — Text (code) section symbol</li>
+<li><code>D</code> / <code>d</code> — Data section symbol</li>
+<li><code>B</code> / <code>b</code> — BSS symbol</li>
+<li><code>U</code> — Undefined (imported from another object)</li>
+<li><code>?</code> — Unknown/unclassified</li>
+</ul>
+<p>Upper case = global, lower case = local.</p>
+
+<p><strong>Usage:</strong> <code>onetool nm [-a|-g|-u] <path></code></p>
+
+<table>
+<tr><th>Option</th><th>Description</th></tr>
+<tr><td>(none)</td><td>Show all defined symbols</td></tr>
+<tr><td><code>-a</code></td><td>Include empty and debug symbols</td></tr>
+<tr><td><code>-g</code></td><td>External (global) symbols only</td></tr>
+<tr><td><code>-u</code></td><td>Undefined symbols only</td></tr>
+</table>
+
+<p><strong>Example:</strong></p>
+<pre>$ onetool nm -g ./main.o
+0000000000000000 T main
+0000000000000030 T helper_function
+         U printf
+         U malloc
+</pre>
+
+<hr>
+<h2>cat — Print Files</h2>
+<p><strong>Source:</strong> <code>tools/filesystem/cat.c</code> (80 lines)</p>
+<p><strong>Entry:</strong> <code>cat()</code></p>
+<p>Reads files sequentially and writes them to stdout. Supports line numbering and reading from stdin (via <code>-</code> argument or when no files are given).</p>
+
+<h3>Implementation</h3>
+<ol>
+<li><strong>Option parsing:</strong> Supports <code>-n</code>/<code>--number</code> (line numbering) and <code>--help</code>. Unknown options return error.</li>
+<li><strong>File detection:</strong> If argument is <code>"-"</code>, reads from stdin via <code>print_stream(stdin, ...)</code>. Otherwise opens file with <code>fopen(path, "r")</code> — prints <code>error: path: strerror</code> on failure and continues to next file.</li>
+<li><strong>Stream reading (<code>print_stream</code>):</strong> Reads character-by-character with <code>fgetc()</code>. If <code>-n</code> is active and at line start, prints <code>%6d\t</code> with incrementing line number (starting at 1). Tracks line start state via <code>at_line_start</code> flag (becomes true when <code>ch == '\n'</code>).</li>
+<li><strong>Default stdin:</strong> If no file arguments given, reads from stdin (like classic <code>cat</code> without arguments).</li>
+<li><strong>Error handling:</strong> Checks <code>ferror(fp)</code> after the read loop — prints read error if set.</li>
+</ol>
+
+<h3>Usage</h3>
+<pre>onetool cat [options] [file...]
+
+Options:
+  -n, --number   Number output lines
+  --help         Show help
+
+If no file is given, reads from stdin.
+Use "-" to read from stdin explicitly among files.
+</pre>
+
+<h3>Examples</h3>
+<pre>$ onetool cat /etc/hostname
+myhost
+
+$ onetool cat -n /etc/hosts
+     1	127.0.0.1 localhost
+     2	::1       localhost
+
+$ echo "hello" | onetool cat -n
+     1	hello
+
+$ onetool cat - /etc/hosts  # stdin then file
+</pre>
+
+<hr>
+<h2>free — Memory Usage</h2>
+<p><strong>Source:</strong> <code>tools/filesystem/free.c</code> (118 lines)</p>
+<p><strong>Entry:</strong> <code>free()</code></p>
+<p>Displays system memory usage by parsing <code>/proc/meminfo</code>. Shows total, used, free, shared, buff/cache, and available memory for both RAM and swap. Supports multiple output unit formats.</p>
+
+<h3>Implementation</h3>
+
+<h4>Memory Info Parsing — <code>read_meminfo()</code></h4>
+<ol>
+<li>Opens <code>/proc/meminfo</code> with <code>fopen("/proc/meminfo", "r")</code> — returns error if unavailable</li>
+<li>Reads each line with <code>fscanf(fp, "%63[^:]: %" SCNu64 " %15s\n", key, &value, unit)</code> — extracts key name (up to 63 chars before <code>:</code>), numeric value, and unit string ("kB")</li>
+<li>Multiplies all values by 1024 to convert from kilobytes to bytes</li>
+<li>Matches keys: <code>MemTotal</code>, <code>MemFree</code>, <code>MemAvailable</code>, <code>Buffers</code>, <code>Cached</code>, <code>SwapTotal</code>, <code>SwapFree</code></li>
+<li>Returns 1 (error) if <code>info->total == 0</code> (no MemTotal found)</li>
+</ol>
+
+<h4>Computed Fields</h4>
+<ul>
+<li><code>buff_cache = Buffers + Cached</code></li>
+<li><code>used = MemTotal - MemFree - buff_cache</code> (clamped at 0 via ternary)</li>
+<li><code>swap_used = SwapTotal - SwapFree</code></li>
+</ul>
+
+<h4>Unit Conversion</h4>
+<p>Supports five output modes via <code>divisor</code>:</p>
+<table>
+<tr><th>Flag</th><th>Divider</th></tr>
+<tr><td><code>-b</code></td><td>1 (bytes)</td></tr>
+<tr><td><code>-k</code> (default)</td><td>1024 (KiB)</td></tr>
+<tr><td><code>-m</code></td><td>1,048,576 (MiB)</td></tr>
+<tr><td><code>-g</code></td><td>1,073,741,824 (GiB)</td></tr>
+<tr><td><code>-h</code></td><td>Human-readable (auto-selects B/KiB/MiB/GiB/TiB)</td></tr>
+</table>
+
+<h4>Human Formatting (<code>format_value</code>)</h4>
+<p>In human mode: divides by 1024 repeatedly (B → KiB → MiB → GiB → TiB) and formats with <code>%.1f</code> and unit suffix. In raw mode: divides by the chosen divisor and prints integer.</p>
+
+<h3>Output Format</h3>
+<pre>              total        used        free      shared  buff/cache   available
+Mem:         8123456     1234567      3456789           0     2345678      6789012
+Swap:        2097152      123456      1973696           0           0           0
+</pre>
+<p>Each column is 12 characters wide, right-aligned.</p>
+
+<h3>Usage</h3>
+<pre>onetool free [-b|-k|-m|-g|-h] [--help]
+
+Options:
+  -b            bytes
+  -k            KiB (default)
+  -m            MiB
+  -g            GiB
+  -h, --human   human readable
+  --help        show help
+</pre>
+
+<h3>Examples</h3>
+<pre>$ onetool free
+              total        used        free      shared  buff/cache   available
+Mem:         8123456     1234567     3456789           0     2345678     6789012
+Swap:        2097152      123456     1973696           0           0           0
+
+$ onetool free -h
+              total        used        free      shared  buff/cache   available
+Mem:          7.8GiB      1.2GiB      3.3GiB           0      2.2GiB      6.5GiB
+Swap:         2.0GiB      120.6MiB    1.9GiB           0           0           0
+</pre>
+
+<hr>
+<h2>ls — List Directory</h2>
+<p><strong>Source:</strong> <code>tools/filesystem/ls.c</code> (215 lines)</p>
+<p><strong>Entry:</strong> <code>ls()</code></p>
+<p>Lists directory contents. Supports short format (filenames only), long format (<code>-l</code> with permissions, owner, size, date), hidden files (<code>-a</code>), and human-readable sizes (<code>-h</code>). Defaults to current directory if no path given.</p>
+
+<h3>Implementation</h3>
+
+<h4>Option Parsing</h4>
+<ul>
+<li><code>-a</code>/<code>--all</code> — include dotfiles (entries starting with <code>.</code>)</li>
+<li><code>-l</code>/<code>--long</code> — detailed listing with permissions, owner, group, size, mtime</li>
+<li><code>-h</code>/<code>--human</code> — human-readable sizes (only with <code>-l</code>)</li>
+</ul>
+
+<h4>Directory Listing — <code>list_dir()</code></h4>
+<ol>
+<li>Opens the directory with <code>opendir(path)</code> — prints error on failure</li>
+<li>Iterates with <code>readdir(dir)</code> — skips hidden files (<code>d_name[0] == '.'</code>) unless <code>-a</code> is set</li>
+<li>In short mode: prints each filename on its own line via <code>printf("%s\n", d_name)</code></li>
+<li>In long mode: calls <code>print_long_entry()</code> for each file</li>
+</ol>
+
+<h4>Long Format — <code>print_long_stat()</code></h4>
+<p>Formats output line as:</p>
+<pre>drwxr-xr-x  2 root root  4096 Jan 15 10:30 dirname
+-rw-r--r--  1 user group  1234 Jan 15 10:30 filename</pre>
+
+<ol>
+<li><strong>Permissions (<code>mode_string()</code>):</strong> Builds an 11-character string:
+  <ul>
+    <li>File type: <code>d</code> (dir), <code>l</code> (symlink), <code>c</code> (char device), <code>b</code> (block), <code>p</code> (fifo), <code>s</code> (socket), <code>-</code> (regular)</li>
+    <li>Owner: <code>rwx</code> (bit-tested via <code>S_IRUSR</code>, <code>S_IWUSR</code>, <code>S_IXUSR</code>)</li>
+    <li>Group: <code>rwx</code> (via <code>S_IRGRP</code>, <code>S_IWGRP</code>, <code>S_IXGRP</code>)</li>
+    <li>Other: <code>rwx</code> (via <code>S_IROTH</code>, <code>S_IWOTH</code>, <code>S_IXOTH</code>)</li>
+  </ul>
+</li>
+<li><strong>Link count:</strong> <code>st_nlink</code> printed as <code>%3ju</code></li>
+<li><strong>Owner/Group:</strong> <code>getpwuid(st->st_uid)</code> and <code>getgrgid(st->st_gid)</code> — falls back to <code>"?"</code> if lookup fails</li>
+<li><strong>Size:</strong> Raw bytes or human-readable (B/K/M/G/T/P progression with <code>format_size()</code>)</li>
+<li><strong>Timestamp:</strong> <code>localtime_r(&st->st_mtime, &tmv)</code> + <code>strftime(timebuf, "%b %d %H:%M")</code></li>
+</ol>
+
+<h4>Path Handling — <code>list_path()</code></h4>
+<p>Uses <code>lstat()</code> to check the path type:</p>
+<ul>
+<li><strong>Directory:</strong> calls <code>list_dir()</code> to list contents</li>
+<li><strong>Regular file (or other):</strong> prints the single entry directly (short or long format)</li>
+</ul>
+
+<h4>File Path Construction — <code>print_long_entry()</code></h4>
+<p>Constructs full path via <code>snprintf(fullpath, "%s/%s", path, name)</code> (4096-byte buffer, checks truncation), then calls <code>lstat()</code> and <code>print_long_stat()</code>.</p>
+
+<h3>Usage</h3>
+<pre>onetool ls [options] [path...]
+
+Options:
+  -a, --all     show hidden files (dotfiles)
+  -l, --long    long listing (permissions, owner, size, date)
+  -h, --human   human readable sizes (with -l)
+  --help        show help
+
+If no path is given, lists the current directory (".").
+Multiple paths are supported.
+</pre>
+
+<h3>Examples</h3>
+<pre>$ onetool ls
+file1.txt
+file2.txt
+mydir
+
+$ onetool ls -la
+total 0
+drwxr-xr-x  2 user group  4096 Jan 15 10:30 .
+drwxr-xr-x  3 user group  4096 Jan 15 10:30 ..
+-rw-r--r--  1 user group   234 Jan 15 10:30 file1.txt
+-rw-r--r--  1 user group  1234 Jan 15 10:30 file2.txt
+drwxr-xr-x  2 user group  4096 Jan 15 10:30 mydir
+
+$ onetool ls -lh /bin/bash
+-rwxr-xr-x  1 root root  1.4M Jan 15 10:30 /bin/bash
+</pre>
+
+<h3>Limitations</h3>
+<ul>
+<li><strong>No sorting:</strong> Entries are printed in <code>readdir()</code> order (filesystem-dependent, typically hash table order)</li>
+<li><strong>No color:</strong> No type-based coloring (unlike GNU ls with <code>--color</code>)</li>
+<li><strong>Single-column:</strong> Short format prints one entry per line (no column alignment)</li>
+<li><strong>No recursive:</strong> <code>-R</code> is not implemented</li>
+</ul>
+
+</body>
+</html>

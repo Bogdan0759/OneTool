@@ -21,6 +21,12 @@ string FSINFO_SRC = "tools/filesystem/fsinfo.c";
 string FSINFO_OBJ = "tools/filesystem/fsinfo.o";
 string FSIZE_SRC = "tools/filesystem/fsize.c";
 string FSIZE_OBJ = "tools/filesystem/fsize.o";
+string LS_SRC = "tools/filesystem/ls.c";
+string LS_OBJ = "tools/filesystem/ls.o";
+string CAT_SRC = "tools/filesystem/cat.c";
+string CAT_OBJ = "tools/filesystem/cat.o";
+string FREE_SRC = "tools/filesystem/free.c";
+string FREE_OBJ = "tools/filesystem/free.o";
 string SIZE_SRC = "tools/filesystem/size.c";
 string SIZE_OBJ = "tools/filesystem/size.o";
 string NM_SRC = "tools/filesystem/nm.c";
@@ -120,7 +126,7 @@ string USERC_SRC = "tools/system/userc/users.c";
 string USERC_OBJ = "tools/system/userc/users.o";
 string USERC_TUI_SRC = "tools/system/userc/tui.c";
 string USERC_TUI_OBJ = "tools/system/userc/tui.o";
-string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/filesystem/fsize.o tools/filesystem/size.o tools/filesystem/nm.o tools/dev/gapi_supported.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o tools/network/nsetup.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o libs/elf/elf.o libs/memory/memory.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/dev/mlink/cli.o tools/dev/mlink/object.o tools/dev/mlink/elf-reader.o tools/dev/mlink/symtab.o tools/dev/mlink/layout.o tools/dev/mlink/reloc.o tools/dev/mlink/emit.o tools/dev/mlink/bytes.o tools/dev/mlink/log.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o tools/system/configure/size.o tools/system/video/cvm.o tools/system/userc/users.o tools/system/userc/tui.o";
+string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/filesystem/fsize.o tools/filesystem/ls.o tools/filesystem/cat.o tools/filesystem/free.o tools/filesystem/size.o tools/filesystem/nm.o tools/dev/gapi_supported.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o tools/network/nsetup.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o libs/elf/elf.o libs/memory/memory.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/dev/mlink/cli.o tools/dev/mlink/object.o tools/dev/mlink/elf-reader.o tools/dev/mlink/symtab.o tools/dev/mlink/layout.o tools/dev/mlink/reloc.o tools/dev/mlink/emit.o tools/dev/mlink/bytes.o tools/dev/mlink/log.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o tools/system/configure/size.o tools/system/video/cvm.o tools/system/userc/users.o tools/system/userc/tui.o";
 
 task all() {
     build();
@@ -151,6 +157,18 @@ task build() {
     if (@is_outdated(FSIZE_OBJ, FSIZE_SRC)) {
         @echo("[CC] %s", FSIZE_SRC);
         @run("%s %s -Dmain=fz -c %s -o %s", CC, CFLAGS, FSIZE_SRC, FSIZE_OBJ);
+    }
+    if (@is_outdated(LS_OBJ, LS_SRC)) {
+        @echo("[CC] %s", LS_SRC);
+        @run("%s %s -Dmain=ls -c %s -o %s", CC, CFLAGS, LS_SRC, LS_OBJ);
+    }
+    if (@is_outdated(CAT_OBJ, CAT_SRC)) {
+        @echo("[CC] %s", CAT_SRC);
+        @run("%s %s -Dmain=ca -c %s -o %s", CC, CFLAGS, CAT_SRC, CAT_OBJ);
+    }
+    if (@is_outdated(FREE_OBJ, FREE_SRC)) {
+        @echo("[CC] %s", FREE_SRC);
+        @run("%s %s -Dmain=fr -c %s -o %s", CC, CFLAGS, FREE_SRC, FREE_OBJ);
     }
     if (@is_outdated(SIZE_OBJ, SIZE_SRC, ELF_HDR, MEMORY_HDR)) {
         @echo("[CC] %s", SIZE_SRC);
@@ -336,6 +354,9 @@ task build() {
         EXEC_OBJ,
         FSINFO_OBJ,
         FSIZE_OBJ,
+        LS_OBJ,
+        CAT_OBJ,
+        FREE_OBJ,
         SIZE_OBJ,
         NM_OBJ,
         GAPI_OBJ,
@@ -400,6 +421,9 @@ task clean() {
     @run("rm -f %s", EXEC_OBJ);
     @run("rm -f %s", FSINFO_OBJ);
     @run("rm -f %s", FSIZE_OBJ);
+    @run("rm -f %s", LS_OBJ);
+    @run("rm -f %s", CAT_OBJ);
+    @run("rm -f %s", FREE_OBJ);
     @run("rm -f %s", SIZE_OBJ);
     @run("rm -f %s", NM_OBJ);
     @run("rm -f %s", GAPI_OBJ);

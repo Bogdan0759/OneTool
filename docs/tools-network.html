@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OneTool — Network Tools</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;max-width:960px;margin:0 auto;padding:2em 1em;color:#222;background:#fafafa}
+h1,h2,h3{color:#1a1a2e;border-bottom:1px solid #ddd;padding-bottom:.3em}
+code{background:#eef;padding:2px 6px;border-radius:3px;font-size:.9em}
+pre{background:#1a1a2e;color:#f0f0f0;padding:1em;border-radius:6px;overflow-x:auto;font-size:.85em}
+pre code{background:transparent;color:inherit;padding:0}
+table{border-collapse:collapse;width:100%;margin:1em 0}
+th,td{border:1px solid #ccc;padding:8px 12px;text-align:left}
+th{background:#1a1a2e;color:#fff}
+.kwd{color:#7ec8e3}.str{color:#a5d6a7}.cmt{color:#888}.num{color:#ffab91}
+</style>
+</head>
+<body>
+
+<h1>OneTool — Network Tools</h1>
+<p>Three network tools: HTTP downloader (down), ICMP ping, and DHCP client (nsetup). All use raw sockets or the shared network library (<code>libs/net</code>).</p>
+
+<hr>
+<h2>down — HTTP Downloader</h2>
+<p><strong>Source:</strong> <code>tools/network/down/</code> — 6 files</p>
+<table>
+<tr><th>File</th><th>Lines</th><th>Purpose</th></tr>
+<tr><td><code>down.h</code></td><td>40</td><td>Request/response type definitions and function declarations</td></tr>
+<tr><td><code>cli.c</code></td><td>20</td><td>Entry point: parses CLI, opens output file, calls down_run()</td></tr>
+<tr><td><code>core/parse.c</code></td><td>175</td><td>CLI option parsing, URL parsing via libs/net, request init/free</td></tr>
+<tr><td><code>core/send.c</code></td><td>88</td><td>HTTP request execution: connect, send, read response, status output</td></tr>
+<tr><td><code>core/robots.c</code></td><td>28</td><td>Robots.txt compliance check</td></tr>
+<tr><td><code>net/socket.c</code></td><td>—</td><td>Socket-level operations</td></tr>
+</table>
+<p><strong>Entry:</strong> <code>dn()</code> in <code>cli.c</code></p>
+<p>A curl-like HTTP client supporting GET, POST, and HEAD methods with TLS, custom headers, request body, and robots.txt etiquette.</p>
+
+<h3>Architecture</h3>
+<p>The down tool delegates all network operations to the shared library <code>libs/net</code>:</p>
+<ul>
+<li><code>net_parse_http_url()</code> — URL parsing into host/port/path/TLS flag</li>
+<li><code>net_conn_open()</code> — TCP connection with optional TLS upgrade</li>
+<li><code>net_http_send_request()</code> — HTTP/1.1 request construction</li>
+<li><code>net_http_read_response()</code> — Response header parsing + body reading (chunked, content-length, connection-close)</li>
+<li><code>net_robots_is_allowed()</code> — robots.txt fetch and parse</li>
+</ul>
+
+<h3>Request Structure — <code>down_request_t</code></h3>
+<pre><span class="kwd">typedef struct</span> {
+    <span class="kwd">char</span> *url;              <span class="cmt">// Target URL (e.g. "https://example.com/index.html")</span>
+    <span class="kwd">char</span> *method;           <span class="cmt">// HTTP method: GET (default), POST, HEAD</span>
+    <span class="kwd">char</span> *host;             <span class="cmt">// Hostname extracted from URL (e.g. "example.com")</span>
+    <span class="kwd">char</span> *port;             <span class="cmt">// Port extracted from URL ("80" or "443" by default)</span>
+    <span class="kwd">char</span> *path;             <span class="cmt">// URL path + query (e.g. "/index.html?q=1")</span>
+    <span class="kwd">char</span> *body;             <span class="cmt">// Request body for POST requests</span>
+    <span class="kwd">char</span> *output_path;      <span class="cmt">// File path to save response (NULL = stdout)</span>
+    <span class="kwd">char</span> *headers[<span class="num">64</span>];   <span class="cmt">// Custom header strings (array of malloc'd copies)</span>
+    <span class="kwd">int</span> header_count;       <span class="cmt">// Number of custom headers</span>
+    <span class="kwd">int</span> timeout_sec;        <span class="cmt">// Connection timeout in seconds (default 10)</span>
+    <span class="kwd">int</span> verbose;            <span class="cmt">// Print diagnostics to stderr</span>
+    <span class="kwd">int</span> quiet;              <span class="cmt">// Suppress status lines on stderr</span>
+    <span class="kwd">int</span> use_tls;            <span class="cmt">// 1 if HTTPS (TLS) should be used</span>
+    <span class="kwd">int</span> ignore_robots;      <span class="cmt">// Skip robots.txt check</span>
+} down_request_t;
+</pre>
+
+<h3>CLI Parsing — <code>down_parse_cli()</code></h3>
+<p>Located in <code>core/parse.c</code> (175 lines). Implements iterative argument processing:</p>
+<ul>
+<li><strong>Flags parsed:</strong> <code>-v</code> (verbose), <code>-q</code>/<code>--quiet</code>, <code>-o</code> (output file), <code>-X</code> (method), <code>-H</code> (custom header, up to 64), <code>-d</code> (body), <code>--timeout</code> (1-3600 seconds, validated with strtol), <code>--ignore-robots</code>, <code>--help</code></li>
+<li><strong>Method auto-detection:</strong> If no <code>-X</code> is given but <code>-d</code> (body) is provided, method defaults to POST. Otherwise defaults to GET.</li>
+<li><strong>Method normalization:</strong> Converts method string to uppercase via <code>toupper()</code></li>
+<li><strong>URL parsing:</strong> Delegates to <code>down_parse_url()</code> which calls <code>net_parse_http_url()</code>, storing the extracted host, port, path, and TLS flag into the request struct</li>
+<li><strong>Memory management:</strong> Uses internal <code>down_strdup()</code> wrapper. All strings freed by <code>down_request_free()</code></li>
+<li><strong>Error handling:</strong> Prints errors to stderr (unknown option, missing value, too many headers, OOM). Returns 0 on success, 1 on error, 2 for help (don't run).</li>
+</ul>
+
+<h3>Request Execution — <code>down_run()</code></h3>
+<p>Located in <code>core/send.c</code> (88 lines). The HTTP request lifecycle:</p>
+<ol>
+<li><strong>Status header:</strong> If not quiet, prints <code>down: METHOD scheme://host:port/path</code> to stderr</li>
+<li><strong>Robots check:</strong> Calls <code>down_check_robots()</code> which calls <code>net_robots_is_allowed()</code>. If the fetch fails (network error), the check is silently skipped. If robots.txt explicitly disallows the path, prints <code>down: blocked by robots.txt /path</code> and returns error.</li>
+<li><strong>Connect:</strong> Opens TCP connection via <code>net_conn_open()</code> with the configured timeout. If verbose: prints <code>down: connected to host:port (http/https)</code></li>
+<li><strong>Send request:</strong> Calls <code>net_http_send_request()</code> with method, path, host, custom headers array, body, and user-agent <code>"onetool-down/0.2"</code></li>
+<li><strong>Read response:</strong> Calls <code>net_http_read_response()</code> which writes the response body to the output file/stdout, parses status code and content-length</li>
+<li><strong>Status report:</strong> When not quiet, reports HTTP status code + body bytes. If output file was used, reports where the response was saved.</li>
+<li><strong>Cleanup:</strong> Closes the connection and returns 0 on success.</li>
+</ol>
+
+<h3>Robots.txt Checking — <code>down_check_robots()</code></h3>
+<p>Located in <code>core/robots.c</code> (28 lines). Calls <code>net_robots_is_allowed()</code> from <code>libs/net</code> with user-agent <code>"onetool-down"</code>. If the robots.txt fetch itself fails (e.g., DNS resolution fails, connection refused), the check is silently skipped to avoid breaking requests when the server is unreachable for the initial fetch. If the response explicitly disallows the path, the download is aborted with an error message.</p>
+
+<h3>Entry Point — <code>main()</code> in <code>cli.c</code></h3>
+<ol>
+<li>Calls <code>down_parse_cli()</code> — returns 0=run, 1=error, 2=help</li>
+<li>If output path specified: opens file with <code>fopen(path, "wb")</code> — prints error and returns 1 on failure</li>
+<li>Calls <code>down_run()</code> with the request and output FILE*</li>
+<li>If output file was opened, closes it via <code>fclose()</code></li>
+<li>Frees the request struct via <code>down_request_free()</code> — frees all malloc'd string fields and custom headers</li>
+</ol>
+
+<h3>Usage</h3>
+<pre>onetool down [options] <url>
+
+Options:
+  -o file           Output to file instead of stdout
+  -X method         HTTP method (GET, POST, HEAD)
+  -d body           Request body for POST
+  -H header         Add custom header (can repeat, max 64)
+  --timeout sec     Connection timeout (default 10, max 3600)
+  --ignore-robots   Skip robots.txt check
+  -v                Verbose (print diagnostics to stderr)
+  -q, --quiet       Quiet mode (suppress status lines)
+  -h, --help        Show help
+</pre>
+
+<h3>Examples</h3>
+<pre># Simple GET
+onetool down https://example.com
+
+# Save to file
+onetool down -o index.html https://example.com
+
+# POST with body
+onetool down -X POST -d "name=test" https://httpbin.org/post
+
+# Verbose with custom headers
+onetool down -v -H "Authorization: Bearer token" https://api.example.com/data
+
+# HEAD request with timeout
+onetool down -X HEAD --timeout 5 https://example.com
+</pre>
+
+<h3>Status Output</h3>
+<p>When not in quiet mode, the tool prints to stderr:</p>
+<pre>down: GET http://example.com:80/
+down: HTTP 200 OK, 1256 bytes
+</pre>
+<p>Or with <code>-o file</code>:</p>
+<pre>down: HTTP 200 OK, 1256 bytes, saved to index.html
+</pre>
+
+<hr>
+<h2>ping — ICMP Ping</h2>
+<p><strong>Source:</strong> <code>tools/network/ping/cli.c</code> (230 lines, single file)</p>
+<p><strong>Entry:</strong> <code>pg()</code></p>
+<p>A self-contained ICMP echo client (ping) implemented entirely from scratch with raw sockets. Requires root or <code>CAP_NET_RAW</code> for raw socket access.</p>
+
+<h3>Architecture</h3>
+<p>The entire ping tool is a single C file with no external library dependencies beyond standard POSIX headers. It uses:</p>
+<ul>
+<li><code>socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)</code> — raw IPv4 ICMP socket</li>
+<li><code>getaddrinfo()</code> — hostname resolution (IPv4 only)</li>
+<li><code>sendto()</code> / <code>recvfrom()</code> — raw packet I/O</li>
+<li><code>poll()</code> — per-packet timeout with millisecond precision</li>
+<li><code>gettimeofday()</code> — microsecond-precision timestamps for RTT calculation</li>
+</ul>
+
+<h3>Options Structure — <code>ping_opts_t</code></h3>
+<pre><span class="kwd">typedef struct</span> {
+    <span class="kwd">const char</span> *host;       <span class="cmt">// Target hostname or IP</span>
+    <span class="kwd">int</span> count;               <span class="cmt">// Number of echo requests (default 4, max 1000000)</span>
+    <span class="kwd">int</span> timeout_ms;          <span class="cmt">// Per-packet timeout in ms (default 1000, max 600000)</span>
+    <span class="kwd">int</span> payload_size;        <span class="cmt">// Payload size in bytes (default 56, max 1400)</span>
+    <span class="kwd">double</span> interval_sec;     <span class="cmt">// Interval between packets (default 1.0, min 0.01, max 3600)</span>
+    <span class="kwd">int</span> quiet;               <span class="cmt">// Print only final summary</span>
+} ping_opts_t;
+</pre>
+
+<h3>CLI Parsing — <code>parse_opts()</code></h3>
+<p>Parses options from <code>argv[]</code> into <code>ping_opts_t</code>. Uses value helpers with range validation:</p>
+<ul>
+<li><code>parse_int()</code> — uses <code>strtol()</code>, validates range [min_v, max_v], rejects trailing garbage</li>
+<li><code>parse_double()</code> — uses <code>strtod()</code>, validates range [min_v, max_v]</li>
+<li><strong>Flags:</strong> <code>-c</code> (count, 1-1000000), <code>-W</code> (timeout ms, 1-600000), <code>-s</code> (payload size, 0-1400), <code>-i</code> (interval, 0.01-3600.0), <code>-q</code>/<code>--quiet</code>, <code>-h</code>/<code>--help</code></li>
+<li>Defaults: count=4, timeout=1000ms, payload=56, interval=1.0, quiet=0</li>
+</ul>
+
+<h3>ICMP Packet Construction</h3>
+<ol>
+<li><strong>Packet buffer:</strong> 1500-byte buffer (max Ethernet MTU). Total packet size = <code>sizeof(icmphdr) + sizeof(timeval) + payload_size</code></li>
+<li><strong>ICMP header fields:</strong>
+  <ul>
+    <li><code>icmp->type = ICMP_ECHO</code> (8) — echo request</li>
+    <li><code>icmp->code = 0</code></li>
+    <li><code>icmp->un.echo.id = htons(pid & 0xFFFF)</code> — process ID to match replies</li>
+    <li><code>icmp->un.echo.sequence = htons(seq)</code> — sequence number 1..count</li>
+  </ul>
+</li>
+<li><strong>Timestamp embedding:</strong> Immediately after the ICMP header, <code>gettimeofday(&send_tv)</code> is stored — this is used later to compute RTT by comparing with the reception timestamp</li>
+<li><strong>Payload fill:</strong> Remaining bytes are filled with a predictable pattern <code>(i & 0xFF)</code></li>
+<li><strong>Checksum:</strong> Computed via the standard Internet checksum algorithm on the entire packet (header + timestamp + payload) using <code>icmp_checksum()</code></li>
+</ol>
+
+<h3>Send and Receive Loop</h3>
+<p>For each sequence number from 1 to count:</p>
+<ol>
+<li><strong>Build packet</strong> as described above</li>
+<li><strong>Send:</strong> <code>sendto(sock, packet, pkt_len, 0, &dst, sizeof(dst))</code> — increments tx counter. On send error: prints <code>ping: sendto failed: strerror</code> and continues to next sequence</li>
+<li><strong>Poll:</strong> <code>poll(&pfd, 1, timeout_ms)</code> — waits for data on the raw socket:
+  <ul>
+    <li><strong>Timeout (0):</strong> Prints <code>request timeout icmp_seq N</code></li>
+    <li><strong>Error (<0):</strong> Handles EINTR (ignore), otherwise prints poll error</li>
+    <li><strong>Data available (>0):</strong> Calls <code>recvfrom()</code> into a 2048-byte buffer</li>
+  </ul>
+</li>
+<li><strong>Reply parsing:</strong> Validates the received packet is at least <code>sizeof(iphdr) + sizeof(icmphdr)</code> bytes. Parses the IP header to get IHL (IP header length, typically 20 bytes). Extracts the ICMP header from <code>recvbuf + ihl</code>:
+  <ul>
+    <li>Checks <code>ri->type == ICMP_ECHOREPLY</code> (0)</li>
+    <li>Checks <code>ntohs(ri->un.echo.id) == pid_id</code> — matches our process ID to avoid picking up other ping replies</li>
+    <li>Reads embedded timestamp from <code>recvbuf + ihl + sizeof(icmphdr)</code></li>
+    <li>Computes RTT via <code>ms_since(&sent_in_pkt, &recv_tv)</code> — difference in microseconds converted to milliseconds</li>
+    <li>Updates min/max/sum RTT statistics, increments rx counter</li>
+    <li>If not quiet: prints <code>N bytes from IP: icmp_seq=N ttl=N time=XXX.XXX ms</code></li>
+  </ul>
+</li>
+<li><strong>Inter-packet delay:</strong> If not the last packet, calls <code>usleep(interval_sec * 1000000)</code></li>
+</ol>
+
+<h3>Statistics Summary</h3>
+<p>After the loop:</p>
+<ul>
+<li>Prints the target hostname/IP</li>
+<li>If any packets were transmitted: prints <code>N packets transmitted N received X.X% packet loss</code></li>
+<li>If any replies were received: prints <code>rtt min/avg/max = X.XXX/X.XXX/X.XXX ms</code></li>
+<li>Returns 0 if at least one reply was received, 1 otherwise</li>
+</ul>
+
+<h3>ICMP Checksum — <code>icmp_checksum()</code></h3>
+<pre><span class="kwd">static unsigned short</span> icmp_checksum(<span class="kwd">const void</span> *data, <span class="kwd">size_t</span> len) {
+    <span class="kwd">const unsigned short</span> *p = data;
+    <span class="kwd">unsigned int</span> sum = <span class="num">0</span>;
+    <span class="kwd">while</span> (len > <span class="num">1</span>) {
+        sum += *p++;
+        len -= <span class="num">2</span>;
+    }
+    <span class="kwd">if</span> (len == <span class="num">1</span>)
+        sum += *(<span class="kwd">const unsigned char</span> *)p;
+    <span class="kwd">while</span> (sum >> <span class="num">16</span>)
+        sum = (sum & <span class="num">0xFFFF</span>) + (sum >> <span class="num">16</span>);
+    <span class="kwd">return</span> ~sum;
+}
+</pre>
+<p>This is the standard 16-bit one's complement Internet checksum (RFC 1071). Used by ICMP, IP, TCP, and UDP. The algorithm sums 16-bit words, folds carries, and returns the bitwise complement.</p>
+
+<h3>RTT Calculation — <code>ms_since()</code></h3>
+<pre><span class="kwd">static double</span> ms_since(<span class="kwd">const struct timeval</span> *start, <span class="kwd">const struct timeval</span> *end) {
+    <span class="kwd">double</span> sec = (<span class="kwd">double</span>)(end->tv_sec - start->tv_sec);
+    <span class="kwd">double</span> usec = (<span class="kwd">double</span>)(end->tv_usec - start->tv_usec);
+    <span class="kwd">return</span> sec * <span class="num">1000.0</span> + usec / <span class="num">1000.0</span>;
+}
+</pre>
+<p>Computes the difference between two <code>struct timeval</code> timestamps in milliseconds as a double (microsecond precision). This handles the full range of possible RTT values without overflow.</p>
+
+<h3>Error Handling</h3>
+<ul>
+<li><strong>Permission:</strong> If <code>socket()</code> fails with <code>EPERM</code> or <code>EACCES</code>, prints <code>ping: raw socket requires root or CAP_NET_RAW</code> — a helpful message for users who forgot sudo</li>
+<li><strong>DNS resolution:</strong> If <code>getaddrinfo()</code> fails, prints <code>ping: cannot resolve host NAME</code></li>
+<li><strong>Payload overflow:</strong> If computed packet size exceeds 1500 bytes, prints error and exits</li>
+<li><strong>Invalid options:</strong> All option values have min/max bounds checking with descriptive error messages</li>
+</ul>
+
+<h3>Usage</h3>
+<pre>onetool ping <host> [options]
+
+Options:
+  -c count     Number of echo requests to send (default 4, max 1000000)
+  -i seconds   Interval between packets (default 1.0, min 0.01)
+  -W ms        Per-packet timeout in ms (default 1000, max 600000)
+  -s bytes     Payload size in bytes (default 56, max 1400)
+  -q, --quiet  Print only summary at the end
+  -h, --help   Show help
+</pre>
+
+<h3>Example</h3>
+<pre>$ onetool ping 1.1.1.1 -c 3 -q
+PING 1.1.1.1 (1.1.1.1): 56 data bytes
+
+1.1.1.1
+3 packets transmitted 3 received 0.0% packet loss
+rtt min/avg/max = 12.345/13.567/15.890 ms
+</pre>
+
+<p>Verbose output (without -q):</p>
+<pre>$ onetool ping 1.1.1.1 -c 2
+PING 1.1.1.1 (1.1.1.1): 56 data bytes
+64 bytes from 1.1.1.1: icmp_seq=1 ttl=56 time=12.345 ms
+64 bytes from 1.1.1.1: icmp_seq=2 ttl=56 time=13.567 ms
+
+1.1.1.1
+2 packets transmitted 2 received 0.0% packet loss
+rtt min/avg/max = 12.345/12.956/13.567 ms
+</pre>
+
+<hr>
+<h2>nsetup — Network Setup (DHCP)</h2>
+<p><strong>Entry:</strong> <code>ns()</code> in <code>tools/network/nsetup.c</code></p>
+<p>A minimal DHCP client that can bring up a network interface and obtain IPv4 configuration via DHCP. Implements the DHCP protocol from scratch (no external DHCP library).</p>
+
+<h3>Implementation Details</h3>
+<p>The DHCP client implements the full DORA (Discover, Offer, Request, Acknowledge) sequence:</p>
+<ol>
+<li><strong>Discover:</strong> Broadcasts a DHCPDISCOVER packet to find available DHCP servers</li>
+<li><strong>Offer:</strong> Waits for DHCPOFFER from a server containing proposed IP configuration</li>
+<li><strong>Request:</strong> Sends DHCPREQUEST to formally request the offered lease</li>
+<li><strong>Acknowledge:</strong> Waits for DHCPACK confirming the lease</li>
+</ol>
+
+<h3>Packet Format</h3>
+<p>The DHCP packet is defined as a packed C struct matching the RFC 2131 format:</p>
+<pre><span class="kwd">typedef struct</span> __attribute__((packed)) {
+    <span class="kwd">uint8_t</span> op;            <span class="cmt">// Message op code</span>
+    <span class="kwd">uint8_t</span> htype;          <span class="cmt">// Hardware address type</span>
+    <span class="kwd">uint8_t</span> hlen;           <span class="cmt">// Hardware address length</span>
+    <span class="kwd">uint8_t</span> hops;           <span class="cmt">// Hops</span>
+    <span class="kwd">uint32_t</span> xid;           <span class="cmt">// Transaction ID</span>
+    <span class="kwd">uint16_t</span> secs;          <span class="cmt">// Seconds elapsed</span>
+    <span class="kwd">uint16_t</span> flags;         <span class="cmt">// Flags</span>
+    <span class="kwd">uint32_t</span> ciaddr;        <span class="cmt">// Client IP</span>
+    <span class="kwd">uint32_t</span> yiaddr;        <span class="cmt">// Your IP</span>
+    <span class="kwd">uint32_t</span> siaddr;        <span class="cmt">// Server IP</span>
+    <span class="kwd">uint32_t</span> giaddr;        <span class="cmt">// Relay agent IP</span>
+    <span class="kwd">unsigned char</span> chaddr[<span class="num">16</span>]; <span class="cmt">// Client hardware address</span>
+    <span class="kwd">unsigned char</span> sname[<span class="num">64</span>];  <span class="cmt">// Server host name</span>
+    <span class="kwd">unsigned char</span> file[<span class="num">128</span>];   <span class="cmt">// Boot file name</span>
+    <span class="kwd">uint32_t</span> cookie;         <span class="cmt">// Magic cookie (0x63825363)</span>
+    <span class="kwd">unsigned char</span> options[<span class="num">312</span>]; <span class="cmt">// DHCP options</span>
+} dhcp_packet_t;
+</pre>
+
+<h3>DHCP Options Parsed</h3>
+<table>
+<tr><th>Option Code</th><th>Name</th><th>Description</th></tr>
+<tr><td>1</td><td>Subnet Mask</td><td>Network mask for the assigned IP</td></tr>
+<tr><td>3</td><td>Router</td><td>Default gateway(s)</td></tr>
+<tr><td>6</td><td>DNS Server</td><td>DNS nameserver(s)</td></tr>
+<tr><td>12</td><td>Hostname</td><td>Client hostname</td></tr>
+<tr><td>15</td><td>Domain Name</td><td>DNS search domain</td></tr>
+<tr><td>50</td><td>Requested IP</td><td>IP address being requested</td></tr>
+<tr><td>51</td><td>Lease Time</td><td>IP lease duration</td></tr>
+<tr><td>53</td><td>Message Type</td><td>DHCP message type (Discover, Offer, etc.)</td></tr>
+<tr><td>54</td><td>Server Identifier</td><td>DHCP server address</td></tr>
+<tr><td>55</td><td>Parameter Request List</td><td>List of options the client requests</td></tr>
+<tr><td>61</td><td>Client Identifier</td><td>Unique client ID (based on MAC)</td></tr>
+</table>
+
+<h3>Network Configuration Applied</h3>
+<p>After obtaining a DHCP lease, the tool applies:</p>
+<ul>
+<li>Interface brought up (<code>SIOCSIFFLAGS</code> with <code>IFF_UP</code>)</li>
+<li>IP address (<code>SIOCSIFADDR</code>)</li>
+<li>Netmask (<code>SIOCSIFNETMASK</code>)</li>
+<li>Broadcast address (<code>SIOCSIFBRDADDR</code>)</li>
+<li>Subnet route via <code>SIOCADDRT</code></li>
+<li>Default gateway via <code>SIOCADDRT</code> with <code>RTF_GATEWAY</code></li>
+<li><code>/etc/resolv.conf</code> updated with DNS servers and search domain</li>
+</ul>
+
+<h3>Usage</h3>
+<pre>onetool nsetup [interface]
+
+Without arguments, lists available interfaces and prompts selection.
+Requires root.
+</pre>
+
+<h3>Example</h3>
+<pre># onetool nsetup eth0
+waiting for DHCP offer...
+waiting for DHCP ack...
+
+network ready on eth0
+  ip:      192.168.1.100
+  netmask: 255.255.255.0
+  gateway: 192.168.1.1
+  dns:     8.8.8.8, 8.8.4.4
+</pre>
+
+<h3>Interface Discovery</h3>
+<p>The tool uses <code>getifaddrs()</code> to enumerate all network interfaces, reads operstate from <code>/sys/class/net/*/operstate</code>, and shows MAC addresses via <code>SIOCGIFHWADDR</code>. Interfaces with <code>IFF_LOOPBACK</code> flag are excluded from DHCP.</p>
+
+</body>
+</html>

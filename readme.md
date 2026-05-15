@@ -24,6 +24,9 @@ implemented tools:
 - `gapi_supported` - check available graphics API
 - `fsinfo` - filesystem info
 - `fsize` - print file size
+- `ls` - list files
+- `cat` - print files content
+- `free` - show memory usage
 - `yap` - YAP language interpreter
 - `userc` - interactive user control (add/del/edit users)
 - `nsetup` - simple network setup via DHCP
