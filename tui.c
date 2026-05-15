@@ -354,6 +354,11 @@ static void load_embedded_tool_form(onetool_form_t *form, const struct onetool_t
         copy_string(form->title, sizeof(form->title), "Filesystem Info");
         copy_string(form->summary, sizeof(form->summary), "Inspect a path and print its filesystem and inode information.");
         add_text_field(form, "path", "Path", "", "/", "/path/to/dir", "Path to inspect.");
+    } else if (strcmp(tool->name, "fsize") == 0) {
+        copy_string(form->title, sizeof(form->title), "standart file size");
+        copy_string(form->summary, sizeof(form->summary), "print file size");
+        add_text_field(form, "path", "File", "", "/etc/hosts", "/path/to/file", "file");
+        add_toggle_field(form, "human", "readable", "-h", 0, "print with binary units.");
     } else if (strcmp(tool->name, "size") == 0) {
         copy_string(form->title, sizeof(form->title), "ELF Size");
         copy_string(form->summary, sizeof(form->summary), "Show ELF text/data/bss totals or a per-section size table.");
