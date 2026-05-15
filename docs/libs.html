@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OneTool — Libraries Reference</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;max-width:960px;margin:0 auto;padding:2em 1em;color:#222;background:#fafafa}
+h1,h2,h3,h4{color:#1a1a2e;border-bottom:1px solid #ddd;padding-bottom:.3em}
+h4{border:none;color:#333}
+code{background:#eef;padding:2px 6px;border-radius:3px;font-size:.9em}
+pre{background:#1a1a2e;color:#f0f0f0;padding:1em;border-radius:6px;overflow-x:auto;font-size:.85em}
+pre code{background:transparent;color:inherit;padding:0}
+table{border-collapse:collapse;width:100%;margin:1em 0}
+th,td{border:1px solid #ccc;padding:8px 12px;text-align:left}
+th{background:#1a1a2e;color:#fff}
+</style>
+</head>
+<body>
+
+<h1>OneTool — Libraries Reference</h1>
+<p>OneTool ships four internal libraries that provide the building blocks for all tools. Each is implemented entirely from scratch in C (except the TUI library which wraps ncurses). This document covers every function, structure, enum, and implementation detail.</p>
+
+<hr>
+
+<h2>1. TUI Library — <code>libs/TUI/</code></h2>
+<p><strong>Files:</strong> <code>tui.h</code> (83 lines), <code>tui.c</code> (460 lines)</p>
+<p>The TUI library is an ncurses-based abstraction layer providing palette management, styled drawing primitives, input handling, and screen framing. It is used by the main TUI (<code>tui.c</code>), the task manager (<code>taskmng</code>), and the user control tool (<code>userc</code>).</p>
+
+<h3>1.1 Color System</h3>
+<p>8-color palette using ncurses <code>COLOR_*</code> constants:</p>
+<table>
+<tr><th>Constant</th><th>Value</th><th>ncurses Mapping</th></tr>
+<tr><td><code>TUI_COLOR_DEFAULT</code></td><td>-1</td><td>Terminal default (<code>-1</code> with <code>use_default_colors()</code>)</td></tr>
+<tr><td><code>TUI_COLOR_BLACK</code></td><td>0</td><td><code>COLOR_BLACK</code></td></tr>
+<tr><td><code>TUI_COLOR_RED</code></td><td>1</td><td><code>COLOR_RED</code></td></tr>
+<tr><td><code>TUI_COLOR_GREEN</code></td><td>2</td><td><code>COLOR_GREEN</code></td></tr>
+<tr><td><code>TUI_COLOR_YELLOW</code></td><td>3</td><td><code>COLOR_YELLOW</code></td></tr>
+<tr><td><code>TUI_COLOR_BLUE</code></td><td>4</td><td><code>COLOR_BLUE</code></td></tr>
+<tr><td><code>TUI_COLOR_MAGENTA</code></td><td>5</td><td><code>COLOR_MAGENTA</code></td></tr>
+<tr><td><code>TUI_COLOR_CYAN</code></td><td>6</td><td><code>COLOR_CYAN</code></td></tr>
+<tr><td><code>TUI_COLOR_WHITE</code></td><td>7</td><td><code>COLOR_WHITE</code></td></tr>
+</table>
+
+<h3>1.2 Style System</h3>
+<p>Each style maps to a ncurses color pair. 7 styles are defined. The mapping function <code>style_to_pair()</code> converts a style enum to a pair ID:</p>
+<table>
+<tr><th>Constant</th><th>Value</th><th>Pair ID</th><th>Attribute</th><th>Usage</th></tr>
+<tr><td><code>TUI_STYLE_NORMAL</code></td><td>0</td><td>1</td><td>None</td><td>Default text on background</td></tr>
+<tr><td><code>TUI_STYLE_PANEL</code></td><td>1</td><td>2</td><td>None</td><td>Box backgrounds, status bar</td></tr>
+<tr><td><code>TUI_STYLE_ACCENT</code></td><td>2</td><td>3</td><td><code>A_BOLD</code></td><td>Highlighted titles, tool names</td></tr>
+<tr><td><code>TUI_STYLE_MUTED</code></td><td>3</td><td>4</td><td>None</td><td>Secondary info, hints, placeholders</td></tr>
+<tr><td><code>TUI_STYLE_SUCCESS</code></td><td>4</td><td>5</td><td>None</td><td>Success indicators</td></tr>
+<tr><td><code>TUI_STYLE_ERROR</code></td><td>5</td><td>6</td><td>None</td><td>Error messages</td></tr>
+<tr><td><code>TUI_STYLE_SELECTION</code></td><td>6</td><td>7</td><td><code>A_BOLD</code></td><td>Currently selected item (inverted fg/bg)</td></tr>
+</table>
+
+<h3>1.3 Palette Structure</h3>
+<p>The <code>tui_palette_t</code> struct defines 7 color slots that control the entire visual appearance:</p>
+<pre>typedef struct {
+    int background;  // Terminal background color
+    int panel;       // Panel/status bar background color
+    int accent;      // Highlight color for titles, selected tool names
+    int text;        // Primary text color
+    int muted;       // Secondary/hint text color
+    int success;     // Success indicator color
+    int error;       // Error message color
+} tui_palette_t;</pre>
+
+<p><strong>Implementation detail:</strong> When a palette is applied via <code>apply_palette()</code>, the selection style uses the background color as its foreground with the accent color as its background — effectively inverting the accent. <code>init_pair()</code> is called for each of the 7 pair IDs, creating color pairs 1-7 in ncurses.</p>
+
+<h3>1.4 Built-in Themes</h3>
+<p>Five themes are hardcoded in <code>tui.c</code> as an array of <code>onetool_theme_t</code>:</p>
+<table>
+<tr><th>Theme</th><th>background</th><th>panel</th><th>accent</th><th>text</th><th>muted</th><th>success</th><th>error</th></tr>
+<tr><td><strong>ocean</strong> (default)</td><td>BLACK</td><td>BLUE</td><td>CYAN</td><td>WHITE</td><td>CYAN</td><td>GREEN</td><td>RED</td></tr>
+<tr><td><strong>forest</strong></td><td>BLACK</td><td>GREEN</td><td>YELLOW</td><td>WHITE</td><td>CYAN</td><td>GREEN</td><td>RED</td></tr>
+<tr><td><strong>amber</strong></td><td>BLACK</td><td>RED</td><td>YELLOW</td><td>WHITE</td><td>MAGENTA</td><td>GREEN</td><td>RED</td></tr>
+<tr><td><strong>mono</strong></td><td>BLACK</td><td>WHITE</td><td>WHITE</td><td>WHITE</td><td>CYAN</td><td>GREEN</td><td>RED</td></tr>
+<tr><td><strong>custom</strong></td><td colspan="7">Editable live, starts as copy of ocean, index 4</td></tr>
+</table>
+
+<h3>1.5 API Functions — Complete Reference</h3>
+
+<h4><code>int tui_init(void)</code></h4>
+<p>Initializes the ncurses terminal. Implementation steps:</p>
+<ul>
+<li>Calls <code>newterm(NULL, stdout, stdin)</code> to initialize terminal</li>
+<li>Enables <code>cbreak()</code> for character-by-character input</li>
+<li>Disables <code>echo()</code> so typed keys don't show</li>
+<li>Enables <code>keypad(stdscr, TRUE)</code> for arrow/function keys</li>
+<li>Hides cursor via <code>curs_set(0)</code></li>
+<li>Sets escape delay to 25ms via <code>set_escdelay(25)</code> (if ncurses)</li>
+<li>If colors are supported: calls <code>start_color()</code>, <code>use_default_colors()</code>, and <code>apply_palette()</code></li>
+<li>Returns 0 on success, 1 on failure</li>
+</ul>
+
+<h4><code>void tui_shutdown(void)</code></h4>
+<p>Restores terminal to its original state via <code>endwin()</code>. Safe to call multiple times — uses a static <code>tui_ready</code> flag.</p>
+
+<h4><code>void tui_begin_frame(void)</code></h4>
+<p>Calls <code>clear()</code> to erase the screen at the start of each frame.</p>
+
+<h4><code>void tui_end_frame(void)</code></h4>
+<p>Calls <code>refresh()</code> to flush all pending drawing operations to the terminal.</p>
+
+<h4><code>void tui_clear(int style)</code></h4>
+<p>Fills the entire screen with the background character space (' ') using the given style's color pair. Sets the background character via <code>bkgdset()</code> then clears.</p>
+
+<h4><code>void tui_get_size(int *width, int *height)</code></h4>
+<p>Uses <code>getmaxyx(stdscr, max_y, max_x)</code> to retrieve terminal dimensions. Sets width and height to 0 if TUI is not initialized.</p>
+
+<h4><code>int tui_poll_event(tui_event_t *event, int timeout_ms)</code></h4>
+<p>Polls for keyboard input:</p>
+<ul>
+<li>Sets <code>timeout(timeout_ms)</code> for non-blocking input</li>
+<li>Reads a key with <code>getch()</code></li>
+<li>If <code>ERR</code> (timeout), returns 0</li>
+<li>Otherwise translates the raw keycode via <code>translate_key()</code>, sets <code>event->kind</code> and <code>event->key</code>, returns 1</li>
+</ul>
+<p><strong>Key translation:</strong> The <code>translate_key()</code> function maps ncurses <code>KEY_*</code> constants to OneTool's <code>TUI_KEY_*</code> enum. It handles: KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_HOME, KEY_END, KEY_PPAGE, KEY_NPAGE, KEY_DC (delete), KEY_BACKSPACE (and 127 and 8), \n \r KEY_ENTER, \t, ESC (27), KEY_RESIZE.</p>
+
+<h4><code>void tui_set_palette(const tui_palette_t *palette)</code></h4>
+<p>Copies the palette struct into the internal static <code>tui_palette</code>, then calls <code>apply_palette()</code> if colors are available and TUI is initialized. All color pairs are re-initialized with the new colors.</p>
+
+<h4><code>void tui_draw_text(int x, int y, int style, const char *text)</code></h4>
+<p>Draws text at screen position (x, y) using the given style:</p>
+<ul>
+<li>Bounds-checks y against terminal height</li>
+<li>Handles negative x by advancing the text pointer and reducing x to 0</li>
+<li>Clips width to <code>max_x - x</code></li>
+<li>Uses <code>mvaddnstr(y, x, text, width)</code> with the style's attribute</li>
+</ul>
+
+<h4><code>void tui_draw_textf(int x, int y, int style, const char *fmt, ...)</code></h4>
+<p>Formats text with <code>vsnprintf()</code> (1024-byte buffer) then calls <code>tui_draw_text()</code>.</p>
+
+<h4><code>void tui_fill_rect(int x, int y, int width, int height, int style, char fill)</code></h4>
+<p>Fills a rectangular area with a repeating character:</p>
+<ul>
+<li>Clips rectangle to screen bounds via <code>clip_rect_to_screen()</code></li>
+<li>Uses nested loops with <code>mvaddch()</code> for each cell</li>
+</ul>
+
+<h4><code>void tui_draw_box(int x, int y, int width, int height, int style, const char *title)</code></h4>
+<p>Draws a bordered box:</p>
+<ul>
+<li>Corners: <code>ACS_ULCORNER</code>, <code>ACS_URCORNER</code>, <code>ACS_LLCORNER</code>, <code>ACS_LRCORNER</code></li>
+<li>Edges: <code>ACS_HLINE</code> (horizontal), <code>ACS_VLINE</code> (vertical)</li>
+<li>Title: If provided and box is wide enough, draws <code>ACS_RTEE</code> + title + <code>ACS_LTEE</code> on the top border, 2 characters from left</li>
+</ul>
+
+<h4><code>void tui_draw_hline(int x, int y, int width, int style, char ch)</code></h4>
+<p>Draws a horizontal line of repeated characters using <code>mvaddch()</code> in a loop.</p>
+
+<h4><code>void tui_draw_vline(int x, int y, int height, int style, char ch)</code></h4>
+<p>Draws a vertical line of repeated characters using <code>mvaddch()</code> in a vertical loop.</p>
+
+<h4><code>void tui_draw_status_line(int style, const char *text)</code></h4>
+<p>Draws a status bar at the bottom row of the terminal:</p>
+<ul>
+<li>Fills the entire last row with spaces in the given style</li>
+<li>Draws the text clipped to terminal width minus 1 using <code>tui_clip_text()</code></li>
+</ul>
+
+<h4><code>int tui_key_is_printable(int key)</code></h4>
+<p>Returns 1 if key is in range 32-126 (printable ASCII), 0 otherwise.</p>
+
+<h4><code>const char *tui_clip_text(const char *src, char *dst, int dst_size, int width)</code></h4>
+<p>Clips text to fit a given width with ellipsis:</p>
+<ul>
+<li>If src is shorter than width, copies directly</li>
+<li>If width is 1 or 2, returns ".", ".."</li>
+<li>Otherwise copies first <code>width - 3</code> characters then appends "..."</li>
+<li>Returns dst pointer, or "" if src is NULL</li>
+</ul>
+
+<h3>1.6 Event System</h3>
+<pre>enum tui_event_kind {
+    TUI_EVENT_NONE = 0,    // No event
+    TUI_EVENT_KEY = 1,     // Keyboard event
+    TUI_EVENT_RESIZE = 2,  // Terminal resize
+};
+
+enum tui_key {
+    TUI_KEY_NONE = 0,
+    TUI_KEY_UP = 256,      // Arrow up
+    TUI_KEY_DOWN,          // Arrow down
+    TUI_KEY_LEFT,          // Arrow left
+    TUI_KEY_RIGHT,         // Arrow right
+    TUI_KEY_ENTER,         // Enter/return
+    TUI_KEY_ESCAPE,        // Escape
+    TUI_KEY_TAB,           // Tab
+    TUI_KEY_BACKSPACE,     // Backspace
+    TUI_KEY_DELETE,        // Delete
+    TUI_KEY_HOME,          // Home
+    TUI_KEY_END,           // End
+    TUI_KEY_PAGE_UP,       // Page Up
+    TUI_KEY_PAGE_DOWN,     // Page Down
+    TUI_KEY_RESIZE,        // Terminal resize
+};
+
+typedef struct {
+    int kind;  // TUI_EVENT_NONE, TUI_EVENT_KEY, or TUI_EVENT_RESIZE
+    int key;   // The translated key code
+} tui_event_t;</pre>
+
+<hr>
+
+<h2>2. ELF Library — <code>libs/elf/</code></h2>
+<p><strong>Files:</strong> <code>elf.h</code> (52 lines), <code>elf.c</code> (172 lines)</p>
+<p>A lightweight ELF64 parser that reads from memory buffers. Used by <code>size</code>, <code>nm</code>, and <code>mlink</code> tools. Supports little-endian ELF64 only.</p>
+
+<h3>2.1 Core Structures</h3>
+
+<h4><code>ot_elf_section_t</code></h4>
+<p>Represents a single ELF section header entry after parsing:</p>
+<pre>typedef struct {
+    char *name;            // Section name string (allocated, from .shstrtab)
+    uint32_t name_offset;  // Raw index into .shstrtab
+    uint32_t type;         // Section type: SHT_PROGBITS(1), SHT_NOBITS(8),
+                          //   SHT_SYMTAB(2), SHT_STRTAB(3), SHT_RELA(4),
+                          //   SHT_HASH(5), SHT_DYNAMIC(6), etc.
+    uint64_t flags;        // SHF_WRITE(0x1), SHF_ALLOC(0x2), SHF_EXECINSTR(0x4),
+                          //   SHF_MERGE(0x10), SHF_STRINGS(0x20), SHF_TLS(0x400)
+    uint64_t addr;         // Virtual address at runtime (after loading)
+    uint64_t offset;       // File offset
+    uint64_t size;         // Section size in bytes
+    uint32_t link;         // Link to another section (e.g. symtab→strtab index)
+    uint32_t info;         // Extra info (e.g. symtab's last local symbol + 1)
+    uint64_t addralign;    // Alignment requirement (power of 2)
+    uint64_t entsize;      // Entry size for tables (e.g. 24 for symtab, 24 for rela)
+} ot_elf_section_t;</pre>
+
+<h4><code>ot_elf_file_t</code></h4>
+<p>Represents a fully parsed ELF file:</p>
+<pre>typedef struct {
+    const char *name;           // File name (borrowed pointer, not owned)
+    const unsigned char *data;  // Raw file data pointer
+    size_t size;                // File size
+    uint16_t type;              // ET_NONE(0), ET_REL(1), ET_EXEC(2), ET_DYN(3)
+    uint16_t machine;           // EM_X86_64(62), EM_386(3), etc.
+    uint64_t entry;             // Entry point virtual address
+    uint16_t shstrndx;          // Section header string table index
+    ot_elf_section_t *sections; // Parsed section array (allocated)
+    size_t section_count;       // Number of sections
+} ot_elf_file_t;</pre>
+
+<h3>2.2 API Functions — Complete Reference</h3>
+
+<h4><code>void ot_elf_init(ot_elf_file_t *elf)</code></h4>
+<p>Zero-initializes an elf file struct via <code>memset(elf, 0, sizeof(*elf))</code>. Must be called before <code>ot_elf_parse()</code>.</p>
+
+<h4><code>void ot_elf_free(ot_elf_file_t *elf)</code></h4>
+<p>Frees all allocated resources:</p>
+<ul>
+<li>Iterates through all sections and calls <code>free()</code> on each section's <code>name</code></li>
+<li>Frees the sections array</li>
+<li>Zeroes the entire struct</li>
+</ul>
+
+<h4><code>int ot_elf_parse(ot_elf_file_t *elf, const char *name, const unsigned char *data, size_t size, char *err, size_t err_size)</code></h4>
+<p>Parses an ELF file from memory. Returns 0 on success, 1 on error.</p>
+<p><strong>Validation steps:</strong></p>
+<ol>
+<li>Checks that data is at least <code>EI_NIDENT</code> (16) bytes and starts with ELF magic (<code>0x7f 'E' 'L' 'F'</code>)</li>
+<li>Checks data is at least 64 bytes (minimum ELF64 header size)</li>
+<li>Checks <code>EI_CLASS == ELFCLASS64</code> (2) — 32-bit ELF rejected</li>
+<li>Checks <code>EI_DATA == ELFDATA2LSB</code> (1) — big-endian rejected</li>
+<li>Checks <code>EI_VERSION == EV_CURRENT</code> (1)</li>
+</ol>
+<p><strong>Parsing steps:</strong></p>
+<ol>
+<li>Reads section header table offset from offset 40 (8 bytes)</li>
+<li>Reads section header entry size from offset 58 (2 bytes) — must be 64</li>
+<li>Reads section count from offset 60 (2 bytes)</li>
+<li>Reads shstrndx from offset 62 (2 bytes)</li>
+<li>Validates section table fits in file via <code>ot_elf_range_ok()</code></li>
+<li>Validates shstrndx is not <code>SHN_UNDEF</code> (0) and is within section count</li>
+<li>Allocates and parses all section headers (each 64 bytes)</li>
+<li>Reads the section string table, then resolves each section's name</li>
+<li>Sets metadata: type, machine, entry point, shstrndx</li>
+</ol>
+
+<h4><code>int ot_elf_range_ok(size_t file_size, uint64_t off, uint64_t size)</code></h4>
+<p>Validates that <code>off + size</code> fits within <code>file_size</code>:</p>
+<pre>return off <= file_size && size <= file_size - off;</pre>
+<p>This is the standard overflow-safe range check used throughout the ELF parser.</p>
+
+<h4><code>char *ot_elf_strdup_from_strtab(const unsigned char *base, size_t size, uint32_t off)</code></h4>
+<p>Extracts a null-terminated string from a string table at a given offset:</p>
+<ul>
+<li>If offset is out of bounds, returns <code>"<badstr>"</code></li>
+<li>Scans from offset until null byte or end of table</li>
+<li>Allocates and copies the string via <code>ot_xmalloc()</code> + <code>memcpy</code></li>
+<li>If no null byte found before end, returns <code>"<badstr>"</code></li>
+</ul>
+
+<h3>2.3 Byte Accessors</h3>
+<p>All multi-byte values in ELF files are little-endian. These accessors perform manual byte-wise reading/writing to avoid endianness dependencies on the host system:</p>
+
+<table>
+<tr><th>Function</th><th>Implementation</th></tr>
+<tr><td><code>ot_elf_get16(p)</code></td><td><code>p[0] | (p[1] << 8)</code></td></tr>
+<tr><td><code>ot_elf_get32(p)</code></td><td><code>p[0] | (p[1]<<8) | (p[2]<<16) | (p[3]<<24)</code></td></tr>
+<tr><td><code>ot_elf_get64(p)</code></td><td><code>get32(p) | ((uint64_t)get32(p+4) << 32)</code></td></tr>
+<tr><td><code>ot_elf_put16(p, v)</code></td><td>Write two bytes LSB first</td></tr>
+<tr><td><code>ot_elf_put32(p, v)</code></td><td>Write four bytes LSB first</td></tr>
+<tr><td><code>ot_elf_put64(p, v)</code></td><td>Write 8 bytes via put32(p, low) + put32(p+4, high)</td></tr>
+</table>
+
+<hr>
+
+<h2>3. Network Library — <code>libs/net/</code></h2>
+<p><strong>Files:</strong> <code>net.h</code> (59 lines), <code>url.c</code> (96 lines), <code>transport.c</code>, <code>http.c</code> (347 lines), <code>robots.c</code></p>
+<p>Three-layer networking stack: URL parsing, TCP/TLS transport, and HTTP client. The HTTP response parser was partially AI-generated.</p>
+
+<h3>3.1 URL Parser — <code>url.c</code></h3>
+
+<h4><code>net_url_t</code></h4>
+<pre>typedef struct {
+    char *host;    // Hostname (e.g. "example.com")
+    char *port;    // Port string (e.g. "80" or "443")
+    char *path;    // Path + query string (e.g. "/index.html?q=1")
+    int use_tls;   // 1 for https://, 0 for http://
+} net_url_t;</pre>
+
+<h4><code>int net_parse_http_url(const char *url, net_url_t *out)</code></h4>
+<p>Parses an HTTP/HTTPS URL. Returns 0 on success, 1 on error.</p>
+<p><strong>Parsing algorithm:</strong></p>
+<ol>
+<li>Checks for <code>"http://"</code> prefix (7 chars) → no TLS</li>
+<li>Checks for <code>"https://"</code> prefix (8 chars) → TLS</li>
+<li>If no scheme prefix, defaults to HTTP</li>
+<li>Scans forward from host start to find '/' (path separator) or end of string</li>
+<li>Within host part, scans for ':' to detect explicit port</li>
+<li>If port found: splits host and port segments, allocates both</li>
+<li>If no port: allocates host, sets default port (443 for TLS, 80 otherwise)</li>
+<li>Sets path: defaults to "/" if empty, copies path_start otherwise</li>
+<li>All strings allocated with <code>malloc()</code></li>
+</ol>
+
+<h4><code>void net_free_url(net_url_t *url)</code></h4>
+<p>Frees all allocated string fields (host, port, path) and zeroes the struct.</p>
+
+<h3>3.2 Transport Layer — <code>transport.c</code></h3>
+
+<h4><code>net_conn_t</code></h4>
+<pre>typedef struct {
+    int fd;             // TCP socket file descriptor
+    void *ssl_ctx;      // SSL context (opaque handle, NULL if no TLS)
+    void *ssl;          // SSL connection object (opaque handle, NULL if no TLS)
+    int use_tls;        // 1 if TLS is active
+} net_conn_t;</pre>
+
+<h4><code>int net_conn_open(net_conn_t *conn, const char *host, const char *port, int timeout_sec, int use_tls, const char *tls_server_name, int noisy)</code></h4>
+<p>Opens a TCP connection to the specified host:port with optional TLS upgrade:</p>
+<ul>
+<li>Resolves hostname via <code>getaddrinfo()</code></li>
+<li>Creates a socket with <code>socket(AF_INET, SOCK_STREAM, 0)</code></li>
+<li>Sets socket non-blocking for connect with timeout</li>
+<li>Uses <code>poll()</code> to wait for connection with configurable timeout</li>
+<li>If TLS: wraps the fd with OpenSSL (or equivalent), performs handshake</li>
+<li>Returns 0 on success, non-zero on failure</li>
+</ul>
+
+<h4><code>void net_conn_close(net_conn_t *conn)</code></h4>
+<p>Closes the connection:</p>
+<ul>
+<li>If TLS active: performs SSL shutdown via <code>SSL_shutdown()</code>, frees SSL and SSL_CTX</li>
+<li>Closes the socket fd via <code>close()</code></li>
+</ul>
+
+<h4><code>ssize_t net_conn_read(net_conn_t *conn, void *buf, size_t len)</code></h4>
+<p>Reads data from the connection. If TLS active, uses <code>SSL_read()</code>, otherwise <code>read()</code>.</p>
+
+<h4><code>ssize_t net_conn_write(net_conn_t *conn, const void *buf, size_t len)</code></h4>
+<p>Writes data to the connection. If TLS active, uses <code>SSL_write()</code>, otherwise <code>write()</code>.</p>
+
+<h3>3.3 HTTP Layer — <code>http.c</code></h3>
+
+<h4><code>net_http_response_t</code></h4>
+<pre>typedef struct {
+    int status_code;            // HTTP status code (200, 404, 500...)
+    int chunked;                // 1 if Transfer-Encoding: chunked
+    long long content_length;   // Content-Length header value (-1 if absent)
+    long long body_bytes;       // Total body bytes actually written
+} net_http_response_t;</pre>
+
+<h4>Internal Stream Type</h4>
+<pre>typedef struct {
+    net_conn_t *conn;           // Network connection
+    const unsigned char *prefill;   // Already-read data buffer
+    size_t prefill_len;             // Amount of prefill data available
+    size_t prefill_pos;             // Current read position in prefill
+} stream_t;</pre>
+<p>The <code>stream_t</code> type implements a buffered read layer over the connection. Initial HTTP response data that was read while searching for the header terminator is stored in <code>prefill</code> so it can be consumed before reading more data from the socket.</p>
+
+<h4><code>int net_http_send_request(net_conn_t *conn, const char *method, const char *path, const char *host, const char *headers[], int header_count, const char *body, const char *user_agent)</code></h4>
+<p>Builds and sends an HTTP/1.1 request. Returns 0 on success, 1 on failure.</p>
+<p><strong>Request construction:</strong></p>
+<pre>METHOD path HTTP/1.1\r\n
+Host: host\r\n
+User-Agent: user_agent\r\n
+Accept: */*\r\n
+Connection: close\r\n
+[custom headers...]\r\n
+Content-Length: body_len\r\n
+\r\n
+body
+</pre>
+<p>The request is formatted into a 16KB static buffer using <code>snprintf()</code>. Custom headers are appended verbatim. Content-Length is included only if a body is provided. The request is sent via <code>send_all()</code> which handles partial writes and <code>EINTR</code>.</p>
+
+<h4><code>int net_http_read_response(net_conn_t *conn, FILE *out, int verbose, net_http_response_t *resp)</code></h4>
+<p>Reads and parses an HTTP response body. Returns 0 on success, 1 on failure.</p>
+<p><strong>Implementation details:</strong></p>
+<ol>
+<li><strong>Header accumulation:</strong> Reads data from socket in 8KB chunks into a dynamically growing buffer (initial 16KB, doubles as needed). Searches for <code>"\r\n\r\n"</code> (end of headers).</li>
+<li><strong>Header parsing:</strong> Duplicates the header portion, tokenizes by <code>"\r\n"</code> with <code>strtok()</code>. Extracts status code from the first line. Scans for <code>Content-Length</code> and <code>Transfer-Encoding: chunked</code> headers.</li>
+<li><strong>Body reading — chunked:</strong> Calls <code>read_chunked()</code> which loops: reads a hex chunk size line, reads that many bytes, writes them to output, reads trailing CRLF. Continues until a zero-length chunk, then consumes trailing headers.</li>
+<li><strong>Body reading — content-length:</strong> First writes any prefilled data, then reads exactly <code>content_length - prefilled</code> more bytes in a loop.</li>
+<li><strong>Body reading — connection close:</strong> (no content-length, no chunked) Reads until connection returns 0 bytes.</li>
+<li>Always flushes output via <code>fflush(out)</code>.</li>
+</ol>
+
+<h4>Helper: <code>static int send_all(net_conn_t *conn, const void *buf, size_t len)</code></h4>
+<p>Writes all <code>len</code> bytes to the connection, handling partial writes and <code>EINTR</code>. Returns 0 on success.</p>
+
+<h4>Helper: <code>static int stream_read_exact(stream_t *s, unsigned char *dst, size_t len)</code></h4>
+<p>Reads exactly <code>len</code> bytes from the stream. Uses prefill buffer first, then reads from connection. Returns 0 on success.</p>
+
+<h4>Helper: <code>static int stream_read_line(stream_t *s, char *line, size_t cap)</code></h4>
+<p>Reads one byte at a time until <code>'\n'</code> is found, then null-terminates. Returns 0 on success.</p>
+
+<h3>3.4 Robots.txt Checker — <code>robots.c</code></h3>
+
+<h4><code>int net_robots_is_allowed(const char *host, const char *port, int use_tls, int timeout_sec, const char *path, const char *user_agent, int verbose, int *allowed)</code></h4>
+<p>Fetches and parses <code>/robots.txt</code> from the target server, then checks if the given path is allowed for the given user agent.</p>
+<p><strong>Algorithm:</strong></p>
+<ol>
+<li>Opens an HTTP connection to the server</li>
+<li>Sends a GET request for <code>/robots.txt</code></li>
+<li>Reads the response body (non-chunked, connection-close mode)</li>
+<li>Parses line by line: <code>User-agent:</code>, <code>Disallow:</code>, <code>Allow:</code> directives</li>
+<li>Finds the matching user-agent section (first exact match, then wildcard <code>*</code>)</li>
+<li>Checks if the requested path matches any Disallow rule (prefix match)</li>
+<li>Sets <code>*allowed</code> to 0 (disallowed) or 1 (allowed)</li>
+<li>Returns 0 on success (fetch and parse worked), non-zero on fetch failure</li>
+</ol>
+
+<hr>
+
+<h2>4. Memory Library — <code>libs/memory/</code></h2>
+<p><strong>Files:</strong> <code>memory.h</code> (13 lines), <code>memory.c</code> (67 lines)</p>
+<p>Checked allocation wrappers that abort on failure. Every heap allocation in OneTool goes through these to guarantee OOM safety without cluttering code with NULL checks.</p>
+
+<h3>4.1 Core Concepts</h3>
+<ul>
+<li><strong>Non-zero size:</strong> All functions convert size 0 to 1 (<code>nonzero_size()</code>) to avoid implementation-defined malloc(0) behavior</li>
+<li><strong>Overflow protection:</strong> <code>checked_mul()</code> prevents integer overflow in multiplication (used by calloc and reallocarray)</li>
+<li><strong>Failure behavior:</strong> Prints "onetool: out of memory" to stderr and calls <code>exit(2)</code></li>
+</ul>
+
+<h3>4.2 API Functions</h3>
+
+<h4><code>void *ot_xmalloc(size_t size)</code></h4>
+<p>Wraps <code>malloc()</code>. If size is 0, allocates 1 byte. Aborts if NULL returned and size was non-zero.</p>
+
+<h4><code>void *ot_xcalloc(size_t count, size_t size)</code></h4>
+<p>Wraps <code>calloc()</code>. First computes <code>total = count * size</code> with overflow check (<code>checked_mul()</code>). Then allocates with <code>calloc(1, total)</code>, converting 0 to 1. Aborts if NULL.</p>
+
+<h4><code>void *ot_xrealloc(void *ptr, size_t size)</code></h4>
+<p>Wraps <code>realloc()</code>. Converts size 0 to 1. Aborts if NULL returned.</p>
+
+<h4><code>void *ot_xreallocarray(void *ptr, size_t count, size_t size)</code></h4>
+<p>Computes <code>total = count * size</code> with overflow check, then calls <code>ot_xrealloc(ptr, total)</code>.</p>
+
+<h4><code>char *ot_xstrdup(const char *s)</code></h4>
+<p>Wraps <code>strdup()</code>: computes length via <code>strlen()</code>, allocates <code>len + 1</code> via <code>ot_xmalloc()</code>, copies with <code>memcpy()</code>.</p>
+
+<h4><code>char *ot_xstrndup(const char *s, size_t len)</code></h4>
+<p>Wraps <code>strndup()</code>: allocates <code>len + 1</code> via <code>ot_xmalloc()</code>, copies <code>len</code> bytes, null-terminates.</p>
+
+<h3>4.3 Private Helpers</h3>
+<pre>static void oom(void) {
+    fprintf(stderr, "onetool: out of memory\n");
+    exit(2);
+}
+
+static size_t nonzero_size(size_t size) {
+    return size == 0 ? 1 : size;
+}
+
+static size_t checked_mul(size_t count, size_t size) {
+    if (count != 0 && size > SIZE_MAX / count) {
+        oom();  // Overflow detected
+    }
+    return count * size;
+}</pre>
+
+</body>
+</html>

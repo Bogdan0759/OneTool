@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OneTool — MOFL Language Subsystem</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;max-width:960px;margin:0 auto;padding:2em 1em;color:#222;background:#fafafa}
+h1,h2,h3{color:#1a1a2e;border-bottom:1px solid #ddd;padding-bottom:.3em}
+code{background:#eef;padding:2px 6px;border-radius:3px;font-size:.9em}
+pre{background:#1a1a2e;color:#f0f0f0;padding:1em;border-radius:6px;overflow-x:auto;font-size:.85em}
+pre code{background:transparent;color:inherit;padding:0}
+table{border-collapse:collapse;width:100%;margin:1em 0}
+th,td{border:1px solid #ccc;padding:8px 12px;text-align:left}
+th{background:#1a1a2e;color:#fff}
+</style>
+</head>
+<body>
+
+<h1>OneTool — MOFL Language Subsystem</h1>
+<p>The MOFL subsystem (licensed under BSD 2-Clause) contains two language implementations: <strong>YAP</strong> and <strong>Brainfuck</strong>. These are registered via the extra tools manifest and built as part of OneTool.</p>
+
+<hr>
+<h2>YAP Language</h2>
+<p><strong>Source:</strong> <code>mofl/languages/yap/yap.c</code> (1132 lines)</p>
+<p><strong>Entry:</strong> Registered as extra tool <code>yap</code></p>
+<p>YAP (Yet Another Programming language) is a scripting language interpreter bundled with OneTool. It supports variables, math operations, control flow, external library calls, and subroutines.</p>
+
+<h3>Features</h3>
+<ul>
+<li>Variables (declared before use)</li>
+<li>Integer and string types</li>
+<li>Arithmetic: ADD, SUB, MUL, DIV</li>
+<li>Conditional blocks: IF/ENDIF</li>
+<li>Comparison operators: B (bigger), S (smaller), E (equal)</li>
+<li>Subroutine calls via GOTO/RETURN</li>
+<li>External dynamic library calling (Linux .so, Windows .dll)</li>
+<li>Print output: raw values, strings, numbers</li>
+<li>User input: READINT</li>
+<li>System variables: OPRES (math results), RETVAL (return values)</li>
+</ul>
+
+<h3>Language Syntax</h3>
+
+<h4>Comments</h4>
+<pre>; this is a comment
+; everything after semicolon is ignored</pre>
+
+<h4>Variables</h4>
+<pre>DECLARE VAR name
+SET name "John"
+PRINT name</pre>
+
+<h4>Print Options</h4>
+<pre>PRINT NFORMAT hello    ; print raw value (no variable lookup)
+PRINT "hello"          ; print string literal
+PRINT 123              ; print number</pre>
+
+<h4>User Input</h4>
+<pre>READINT number
+PRINT number           ; prints the read number
+; READINT stores the value into the variable
+; and also updates OPRES with the same integer</pre>
+
+<h4>Math Operations</h4>
+<pre>ADD 2, 3
+PRINT OPRES            ; prints 5
+
+SUB 10 4
+SET result OPRES       ; result = 6
+
+MUL result 2
+PRINT OPRES            ; prints 12
+
+DIV 20 5
+PRINT OPRES            ; prints 4</pre>
+
+<p>All math results are stored in the system variable <code>OPRES</code>. Return values from subroutines are stored in <code>RETVAL</code>.</p>
+
+<h4>If Blocks</h4>
+<pre>IF name E "John"
+  PRINT "user is John"
+ENDIF
+
+IF 10 B 3
+  PRINT "ten is bigger"
+ENDIF
+
+IF NFORMAT name E "name"
+  PRINT "compare raw token without variable lookup"
+ENDIF</pre>
+
+<p>Supported comparison operators:</p>
+<table>
+<tr><th>Operator</th><th>Meaning</th></tr>
+<tr><td><code>B</code></td><td>Bigger (greater than)</td></tr>
+<tr><td><code>S</code></td><td>Smaller (less than)</td></tr>
+<tr><td><code>E</code></td><td>Equal</td></tr>
+</table>
+
+<p>Operators can also be written at the end:</p>
+<pre>IF 10 3 B
+PRINT "same meaning as IF 10 B 3"
+ENDIF</pre>
+
+<h4>Subroutines (GOTO/RETURN)</h4>
+<pre>; Line numbers are addresses (starting from 1)
+; Each line is an address you can jump to
+; After GOTO finishes (see RETURN), execution continues
+; on the line after GOTO
+
+1:  PRINT "start"
+2:  GOTO 5
+3:  PRINT "skipped"         ; this is skipped
+4:  RETURN "done"           ; return to GOTO LINE + 1
+5:  PRINT "subroutine"
+6:  RETURN "back"           ; jump back to line 3
+7:  PRINT RETVAL            ; prints "back"</pre>
+
+<h4>External Library Calls</h4>
+<pre>; Linux
+CALL "/full/path/libexample.so" add_numbers INT2 2 3
+PRINT OPRES
+
+; Windows
+CALL "C:\full\path\example.dll" "hello" STR1 "world"
+PRINT RETVAL</pre>
+
+<p>Supported call signatures:</p>
+<table>
+<tr><th>Signature</th><th>C Function</th></tr>
+<tr><td><code>INT0</code></td><td><code>int func(void)</code></td></tr>
+<tr><td><code>INT1</code></td><td><code>int func(int)</code></td></tr>
+<tr><td><code>INT2</code></td><td><code>int func(int, int)</code></td></tr>
+<tr><td><code>INTSTR1</code></td><td><code>int func(const char*)</code></td></tr>
+<tr><td><code>STR0</code></td><td><code>const char* func(void)</code></td></tr>
+<tr><td><code>STR1</code></td><td><code>const char* func(const char*)</code></td></tr>
+</table>
+
+<h3>Interpreter Internals</h3>
+<p>The interpreter has a lexer (<code>struct lexer</code>) that tokenizes source lines, a line parser, and an execution engine. Key internal structures:</p>
+<ul>
+<li><strong>Lexer:</strong> Splits input text into token lists</li>
+<li><strong>Parsed lines:</strong> Each line <code>struct parsed_line</code> holds up to <code>MAXTOKENS</code> (28) tokens</li>
+<li><strong>Execution:</strong> Interprets line by line with support for jump table (GOTO targets)</li>
+<li><strong>System variables:</strong> <code>OPRES</code> stores math/results, <code>RETVAL</code> stores subroutine return values</li>
+</ul>
+
+<h3>YAP Fork Variant</h3>
+<p>There is also a modified fork of YAP at <code>mofl/languages/yap/fork/yap.c</code> with its own set of examples demonstrating loops, math, subroutines, arrays, floats, and system strings.</p>
+
+<h4>YAP Fork Examples</h4>
+<table>
+<tr><th>File</th><th>Topics</th></tr>
+<tr><td><code>01_loops_math.yap</code></td><td>Loop constructs and arithmetic</td></tr>
+<tr><td><code>02_subroutines.yap</code></td><td>GOTO/RETURN patterns</td></tr>
+<tr><td><code>03_arrays.yap</code></td><td>Array operations</td></tr>
+<tr><td><code>04_floats.yap</code></td><td>Floating point support</td></tr>
+<tr><td><code>05_system_strings.yap</code></td><td>System string operations</td></tr>
+</table>
+
+<hr>
+<h2>Brainfuck Language</h2>
+<p><strong>Source:</strong> <code>mofl/languages/brainfuck/</code></p>
+<p>Brainfuck is implemented in three ways within the project:</p>
+
+<h3>Compiler — <code>compiler/compbf.c</code></h3>
+<p>An optimizing Brainfuck compiler that translates Brainfuck source code into native machine code (or intermediate representation).</p>
+
+<h3>Interpreters</h3>
+<table>
+<tr><th>File</th><th>Language</th><th>Description</th></tr>
+<tr><td><code>interpreter/asbf.s</code></td><td>x86-64 Assembly</td><td>A hand-optimized Brainfuck interpreter in assembly language</td></tr>
+<tr><td><code>interpreter/pybf.py</code></td><td>Python</td><td>A Python-based Brainfuck interpreter for reference and testing</td></tr>
+</table>
+
+<h3>Brainfuck Example</h3>
+<p>The <code>examples/mandelbrot.bf</code> file contains a Mandelbrot set renderer written in Brainfuck — a classic demonstration of the language's computational completeness.</p>
+
+<h3>Brainfuck Language Reference</h3>
+<p>Brainfuck operates on an array of memory cells (typically 30,000 bytes), a data pointer, and uses 8 commands:</p>
+<table>
+<tr><th>Command</th><th>Meaning</th></tr>
+<tr><td><code>></code></td><td>Increment the data pointer (move right)</td></tr>
+<tr><td><code><</code></td><td>Decrement the data pointer (move left)</td></tr>
+<tr><td><code>+</code></td><td>Increment the byte at the data pointer</td></tr>
+<tr><td><code>-</code></td><td>Decrement the byte at the data pointer</td></tr>
+<tr><td><code>.</code></td><td>Output the byte at the data pointer</td></tr>
+<tr><td><code>,</code></td><td>Input a byte and store it at the data pointer</td></tr>
+<tr><td><code>[</code></td><td>Jump forward to matching <code>]</code> if byte at pointer is zero</td></tr>
+<tr><td><code>]</code></td><td>Jump back to matching <code>[</code> if byte at pointer is non-zero</td></tr>
+</table>
+
+</body>
+</html>

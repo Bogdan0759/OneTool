@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OneTool — System Tools</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;max-width:960px;margin:0 auto;padding:2em 1em;color:#222;background:#fafafa}
+h1,h2,h3{color:#1a1a2e;border-bottom:1px solid #ddd;padding-bottom:.3em}
+code{background:#eef;padding:2px 6px;border-radius:3px;font-size:.9em}
+pre{background:#1a1a2e;color:#f0f0f0;padding:1em;border-radius:6px;overflow-x:auto;font-size:.85em}
+table{border-collapse:collapse;width:100%;margin:1em 0}
+th,td{border:1px solid #ccc;padding:8px 12px;text-align:left}
+th{background:#1a1a2e;color:#fff}
+</style>
+</head>
+<body>
+
+<h1>OneTool — System Tools</h1>
+
+<hr>
+<h2>taskmng — Task Manager (TUI)</h2>
+<p><strong>Entry:</strong> <code>tm()</code> in <code>tools/system/taskmng/</code></p>
+<p>An interactive terminal-based process manager similar to <code>top</code>/<code>htop</code>. Displays real-time process list with CPU and memory usage, and supports process control operations.</p>
+
+<h3>Architecture</h3>
+<p>The task manager is split across several files:</p>
+<table>
+<tr><th>File</th><th>Purpose</th></tr>
+<tr><td><code>taskmng.h</code></td><td>Core type definitions (processes, snapshots, views)</td></tr>
+<tr><td><code>info.c</code></td><td>System info collection (CPU, memory, uptime, hostname, kernel)</td></tr>
+<tr><td><code>list.c</code></td><td>Process enumeration and refresh logic</td></tr>
+<tr><td><code>process.c</code></td><td>Signal sending, process control</td></tr>
+<tr><td><code>tui.c</code></td><td>TUI rendering and keyboard handling</td></tr>
+</table>
+
+<h3>Core Types</h3>
+
+<h4><code>taskmng_snapshot_t</code></h4>
+<p>A point-in-time capture of system state:</p>
+<ul>
+<li>Hostname, kernel version, uptime</li>
+<li>Load average (1, 5, 15 min)</li>
+<li>Per-core and total CPU usage percentages</li>
+<li>Total, available RAM and swap</li>
+<li>GPU usage text (read from <code>/sys</code> or nvidia-smi output)</li>
+<li>Array of up to <code>TASKMNG_MAX_PROCESSES</code> (512) processes</li>
+<li>Process count and running count</li>
+</ul>
+
+<h4><code>taskmng_process_t</code></h4>
+<p>Individual process information:</p>
+<table>
+<tr><th>Field</th><th>Source</th><th>Description</th></tr>
+<tr><td><code>pid</code></td><td>/proc/[pid]/stat</td><td>Process ID</td></tr>
+<tr><td><code>ppid</code></td><td>/proc/[pid]/stat</td><td>Parent process ID</td></tr>
+<tr><td><code>uid</code></td><td>/proc/[pid]/status</td><td>User ID</td></tr>
+<tr><td><code>user</code></td><td>UID→name mapping</td><td>User name</td></tr>
+<tr><td><code>state</code></td><td>/proc/[pid]/stat</td><td>Process state (R, S, D, Z, T)</td></tr>
+<tr><td><code>priority</code></td><td>/proc/[pid]/stat</td><td>Process priority</td></tr>
+<tr><td><code>nice_value</code></td><td>/proc/[pid]/stat</td><td>Nice value</td></tr>
+<tr><td><code>virt_kb</code></td><td>/proc/[pid]/statm</td><td>Virtual memory size in KB</td></tr>
+<tr><td><code>rss_kb</code></td><td>/proc/[pid]/statm</td><td>Resident set size in KB</td></tr>
+<tr><td><code>cpu_percent</code></td><td>Calculated</td><td>CPU usage since last refresh</td></tr>
+<tr><td><code>mem_percent</code></td><td>Calculated</td><td>RSS / total RAM</td></tr>
+<tr><td><code>command</code></td><td>/proc/[pid]/comm + cmdline</td><td>Process command line</td></tr>
+</table>
+
+<h4><code>taskmng_view_t</code></h4>
+<p>UI state for the process list:</p>
+<ul>
+<li><code>selected</code> — Currently focused process index in visible list</li>
+<li><code>scroll</code> — Scroll position</li>
+<li><code>frozen_pid</code> — PID of frozen process for monitoring</li>
+<li><code>filter_text</code>, <code>filter_input</code> — Process filter</li>
+<li><code>filter_editing</code> — Whether filter prompt is active</li>
+</ul>
+
+<h3>CPU Tracking</h3>
+<p>The <code>taskmng_runtime_t</code> structure tracks CPU samples across refreshes to compute accurate delta-based CPU usage percentages. It samples <code>/proc/stat</code> for aggregate and per-core ticks, then computes the delta between consecutive reads.</p>
+
+<h3>Keyboard Controls</h3>
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td><code>W</code>/<code>w</code></td><td>Scroll up process list</td></tr>
+<tr><td><code>S</code>/<code>s</code></td><td>Scroll down process list</td></tr>
+<tr><td><code>k</code></td><td>Send SIGKILL to selected process</td></tr>
+<tr><td><code>t</code></td><td>Send SIGTERM to selected process</td></tr>
+<tr><td><code>f</code></td><td>Toggle freeze on selected process</td></tr>
+<tr><td><code>g</code></td><td>Rescan /proc for new processes</td></tr>
+<tr><td><code>h</code></td><td>Open filter prompt</td></tr>
+</table>
+
+<h3>Collected System Info</h3>
+<p>The tool reads from multiple <code>/proc</code> sources:</p>
+<ul>
+<li><code>/proc/stat</code> — CPU ticks</li>
+<li><code>/proc/meminfo</code> — Memory and swap</li>
+<li><code>/proc/loadavg</code> — Load averages</li>
+<li><code>/proc/uptime</code> — System uptime</li>
+<li><code>/proc/version</code> — Kernel version string</li>
+<li><code>/proc/[pid]/stat</code> — Per-process stats</li>
+<li><code>/proc/[pid]/status</code> — Per-process user/state</li>
+<li><code>/proc/[pid]/statm</code> — Memory usage</li>
+<li><code>/proc/[pid]/cmdline</code> — Command line</li>
+</ul>
+
+<hr>
+<h2>userc — User Control (TUI)</h2>
+<p><strong>Source:</strong> <code>tools/system/userc/</code> — 4 files</p>
+<table>
+<tr><th>File</th><th>Lines</th><th>Purpose</th></tr>
+<tr><td><code>userc.h</code></td><td>45</td><td>Type definitions: user, list, view; function declarations</td></tr>
+<tr><td><code>users.c</code></td><td>56</td><td>User data loading from <code>/etc/passwd</code>, add/delete via system commands</td></tr>
+<tr><td><code>tui.c</code></td><td>197</td><td>TUI rendering, keyboard handling, form UI for add/edit</td></tr>
+</table>
+<p><strong>Entry:</strong> <code>uc()</code> in <code>tui.c</code></p>
+<p>An interactive terminal user management tool for adding, deleting, and editing system user accounts. Runs as a full-screen TUI application using the shared ncurses-based TUI library. Requires root privileges for user modification operations.</p>
+
+<h3>Architecture — Three Modes</h3>
+<p>The tool operates in four distinct modes controlled by <code>userc_view_t.mode</code>:</p>
+
+<table>
+<tr><th>Mode</th><th>Value</th><th>Description</th></tr>
+<tr><td>List</td><td>0</td><td>Default: browse existing users in a scrollable table</td></tr>
+<tr><td>Add</td><td>1</td><td>Fill in fields for a new user account</td></tr>
+<tr><td>Edit</td><td>2</td><td>Modify an existing user's properties (pre-filled from selected user)</td></tr>
+<tr><td>Delete</td><td>3</td><td>Confirmation dialog before deleting a user</td></tr>
+</table>
+
+<h3>Core Types — Complete Reference</h3>
+
+<h4><code>userc_user_t</code> — User Record</h4>
+<pre><span class="kwd">typedef struct</span> {
+    <span class="kwd">char</span> name[<span class="num">64</span>];       <span class="cmt">// Username (from /etc/passwd field 1)</span>
+    <span class="kwd">int</span> uid;               <span class="cmt">// User ID (field 3)</span>
+    <span class="kwd">int</span> gid;               <span class="cmt">// Primary group ID (field 4)</span>
+    <span class="kwd">char</span> home[<span class="num">128</span>];       <span class="cmt">// Home directory (field 6)</span>
+    <span class="kwd">char</span> shell[<span class="num">64</span>];       <span class="cmt">// Login shell (field 7)</span>
+    <span class="kwd">char</span> comment[<span class="num">128</span>];    <span class="cmt">// GECOS comment (field 5)</span>
+} userc_user_t;
+</pre>
+
+<h4><code>userc_list_t</code> — User List</h4>
+<pre><span class="kwd">typedef struct</span> {
+    userc_user_t users[<span class="num">USERC_MAX_USERS</span>];   <span class="cmt">// Fixed-size array (256)</span>
+    <span class="kwd">int</span> count;                              <span class="cmt">// Number of loaded users</span>
+} userc_list_t;</pre>
+<p>Uses a fixed-size array rather than dynamic allocation — safe for the checked allocation conventions used elsewhere in the project.</p>
+
+<h4><code>userc_view_t</code> — UI State</h4>
+<pre><span class="kwd">typedef struct</span> {
+    <span class="kwd">int</span> selected;              <span class="cmt">// Index of currently highlighted user</span>
+    <span class="kwd">int</span> scroll;                <span class="cmt">// Scroll offset in the list</span>
+    <span class="kwd">int</span> mode;                  <span class="cmt">// 0=list, 1=adding, 2=editing, 3=deleting</span>
+    <span class="kwd">char</span> status[<span class="num">128</span>];         <span class="cmt">// Status bar message</span>
+    <span class="kwd">char</span> name_buf[<span class="num">64</span>];       <span class="cmt">// Form: username input</span>
+    <span class="kwd">char</span> uid_buf[<span class="num">16</span>];        <span class="cmt">// Form: UID input</span>
+    <span class="kwd">char</span> gid_buf[<span class="num">16</span>];        <span class="cmt">// Form: GID input</span>
+    <span class="kwd">char</span> home_buf[<span class="num">128</span>];       <span class="cmt">// Form: home directory input</span>
+    <span class="kwd">char</span> shell_buf[<span class="num">64</span>];       <span class="cmt">// Form: login shell input</span>
+    <span class="kwd">int</span> field_idx;             <span class="cmt">// Currently focused form field (0-4)</span>
+} userc_view_t;
+</pre>
+
+<h3>User Data Loading — <code>userc_load_users()</code></h3>
+<p>Located in <code>users.c</code>. Parses <code>/etc/passwd</code> line by line:</p>
+<ol>
+<li>Opens <code>/etc/passwd</code> with <code>fopen()</code>, reads each line with <code>fgets()</code> (max 512 bytes per line)</li>
+<li>Uses <code>strsep()</code> with <code>:</code> delimiter to extract the 7 standard POSIX passwd fields:</li>
+<li>Skips the password field (field 2, historically the hashed password, now typically <code>x</code> when using shadow passwords)</li>
+<li>UID and GID fields are converted from strings to integers via <code>atoi()</code></li>
+<li>Strips trailing newline from the shell field</li>
+<li>Stops early if <code>USERC_MAX_USERS</code> (256) is reached</li>
+<li>Returns 0 on success, -1 if <code>/etc/passwd</code> cannot be opened</li>
+</ol>
+
+<h3>User Operations — <code>users.c</code></h3>
+
+<h4>Adding Users — <code>userc_add_user()</code></h4>
+<p>Constructs a <code>useradd</code> system command via <code>snprintf()</code> into a 512-byte buffer:</p>
+<pre>useradd [-u UID] [-g GID] [-d HOME] [-s SHELL] USERNAME</pre>
+<p>Each option flag+value pair is emitted only if the corresponding field is non-empty. Executed via <code>system(cmd)</code> — relies on the system's <code>useradd</code> binary being present in <code>PATH</code>.</p>
+
+<h4>Deleting Users — <code>userc_del_user()</code></h4>
+<p>Constructs and executes:</p>
+<pre>userdel -r USERNAME</pre>
+<p>The <code>-r</code> flag removes the user's home directory and mail spool. Uses <code>system(cmd)</code>.</p>
+
+<h3>TUI Rendering — <code>userc_draw_panel()</code></h3>
+<p>Located in <code>tui.c</code>. Renders different content depending on <code>view->mode</code>:</p>
+
+<h4>List Mode (mode 0)</h4>
+<ul>
+<li><strong>Header:</strong> Column titles "USER", "UID", "GID", "HOME", "SHELL" in accent style</li>
+<li><strong>Scroll logic:</strong> Adjusts <code>view->scroll</code> so the selected item is always visible. Computes visible rows as <code>height - 4</code> (reserving space for header, status line, and borders)</li>
+<li><strong>Rows:</strong> Each user is rendered as <code><name> <uid> <gid> <home> <shell></code> with field widths 16, 5, 5, 20, 16</li>
+<li><strong>Selection highlighting:</strong> Selected row uses <code>TUI_STYLE_SELECTION</code> (inverted colors), others use <code>TUI_STYLE_NORMAL</code></li>
+<li><strong>Clip protection:</strong> All text is clipped to available width via <code>clip_and_draw()</code> helper using <code>tui_clip_text()</code></li>
+<li><strong>Footer:</strong> <code>A: Add | D: Delete | E: Edit | Q: Quit | W/S: Navigate list</code> in muted style</li>
+</ul>
+
+<h4>Add/Edit Mode (mode 1/2)</h4>
+<ul>
+<li><strong>Title:</strong> "ADD NEW USER" (mode 1) or "EDIT USER" (mode 2) in accent style</li>
+<li><strong>Five form fields</strong> displayed vertically with 2-line spacing:</li>
+  <ul>
+    <li><code>Username:</code> — text input (max 63 chars)</li>
+    <li><code>UID:</code> — numeric text input (max 15 chars)</li>
+    <li><code>GID:</code> — numeric text input (max 15 chars)</li>
+    <li><code>Home:</code> — path text input (max 127 chars)</li>
+    <li><code>Shell:</code> — path text input (max 63 chars)</li>
+  </ul>
+<li>Each field has a label on the left (12-char offset) and the current value on the right</li>
+<li>Currently focused field (<code>view->field_idx</code>) uses <code>TUI_STYLE_SELECTION</code>, empty fields display <code>(empty)</code></li>
+<li>Footer: <code>Enter: Next/Submit | Esc: Cancel | Backspace: Delete char</code></li>
+</ul>
+
+<h4>Delete Confirmation (mode 3)</h4>
+<ul>
+<li>Shows <code>"DELETE USER?"</code> in error style</li>
+<li>Displays the username being deleted</li>
+<li>Presents two buttons: <code>[ YES ]</code> (highlighted) and <code>[ NO ]</code> (normal)</li>
+<li>Footer: <code>Enter: Confirm | Esc/N: Cancel</code></li>
+</ul>
+
+<h3>Keyboard Handling — <code>userc_handle_key()</code></h3>
+<p>Returns 1 if the key was consumed, 0 if it should be passed to the parent handler.</p>
+
+<h4>List Mode (mode 0) Keys</h4>
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td><code>W</code> / <code>w</code> / Up arrow</td><td>Move selection up (decrement <code>selected</code>, clamped at 0)</td></tr>
+<tr><td><code>S</code> / <code>s</code> / Down arrow</td><td>Move selection down (increment <code>selected</code>, clamped at <code>count-1</code>)</td></tr>
+<tr><td><code>A</code> / <code>a</code></td><td>Enter Add mode (mode 1). Clears all form buffers via <code>memset()</code></td></tr>
+<tr><td><code>D</code> / <code>d</code></td><td>Enter Delete confirmation mode (mode 3) — only if user list is non-empty</td></tr>
+<tr><td><code>E</code> / <code>e</code></td><td>Enter Edit mode (mode 2). Pre-fills form fields from the selected user's data (name, uid, gid, home, shell). UID and GID are converted to strings via <code>snprintf()</code></td></tr>
+</table>
+
+<h4>Add/Edit Mode (mode 1/2) Keys</h4>
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td>Esc</td><td>Cancel: return to List mode without saving</td></tr>
+<tr><td>Enter</td><td>Advance to next field (0→1→2→3→4). On field 4 (Shell): submit the form. In Add mode, calls <code>userc_add_user()</code> then reloads the list. In Edit mode, sets a "submitted (mock)" status</td></tr>
+<tr><td>Backspace / 127</td><td>Delete the last character from the current field's buffer</td></tr>
+<tr><td>Printable chars (32-126)</td><td>Append character to current field buffer, respecting per-field max lengths (63/15/15/127/63)</td></tr>
+</table>
+
+<h4>Delete Mode (mode 3) Keys</h4>
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td>Enter / Y / y</td><td>Confirm deletion: calls <code>userc_del_user()</code> with the selected user's name, reloads the list, adjusts selection if needed</td></tr>
+<tr><td>Esc / N / n</td><td>Cancel: return to List mode</td></tr>
+</table>
+
+<h3>Status Messages</h3>
+<p>The tool displays status messages in the bottom status bar:</p>
+<ul>
+<li><code>"User Control: A add, D delete, E edit, Q quit."</code> — default prompt on startup</li>
+<li><code>"User added successfully."</code> — after successful <code>useradd</code> (exit code 0)</li>
+<li><code>"Failed to add user."</code> — after failed <code>useradd</code> (non-zero exit)</li>
+<li><code>"User deleted."</code> — after successful <code>userdel</code></li>
+<li><code>"Failed to delete user."</code> — after failed <code>userdel</code></li>
+<li><code>"User edit submitted (mock)."</code> — edit mode is currently a placeholder (no <code>usermod</code> call yet)</li>
+</ul>
+
+<h3>Main Loop — <code>uc()</code></h3>
+<ol>
+<li>Initializes <code>userc_list_t</code> and <code>userc_view_t</code> (zeroed), loads users from <code>/etc/passwd</code></li>
+<li>Initializes TUI via <code>tui_init()</code> — returns 1 on failure</li>
+<li>Frame loop (350ms poll interval via <code>tui_poll_event</code>):</li>
+  <ol>
+  <li>Gets terminal dimensions</li>
+  <li>Clears and draws a bordered panel titled "User Control"</li>
+  <li>Renders the current mode's UI via <code>userc_draw_panel()</code></li>
+  <li>Draws the status bar at the bottom</li>
+  <li>Flushes via <code>tui_end_frame()</code></li>
+  <li>Polls for keyboard input</li>
+  <li>Passes to <code>userc_handle_key()</code> — if not consumed, checks for Quit (Q/q/Esc in list mode)</li>
+  </ol>
+<li>On quit: shuts down TUI via <code>tui_shutdown()</code>, returns 0</li>
+</ol>
+
+<h3>Limitations</h3>
+<ul>
+<li><strong>Root required:</strong> <code>useradd</code> and <code>userdel</code> need superuser privileges</li>
+<li><strong>Edit mode:</strong> Currently only sets a status message — <code>usermod</code> is not called (TODO)</li>
+<li><strong>Password management:</strong> Not implemented — no <code>passwd</code> interaction</li>
+<li><strong>Group management:</strong> GID field is set but no group creation/deletion UI</li>
+<li><strong>Error granularity:</strong> Uses <code>system()</code> exit code only, no stderr capture</li>
+<li><strong>No confirmation on unsaved changes:</strong> Esc in add/edit mode discards without prompt</li>
+</ul>
+
+<hr>
+<h2>configure — System Environment Configuration</h2>
+<p><strong>Entry:</strong> <code>cf()</code> in <code>tools/system/configure/main.c</code></p>
+<p>Sets up a basic Linux environment by mounting essential virtual filesystems and creating necessary device nodes. Useful in minimal/container environments where <code>/proc</code>, <code>/sys</code>, and <code>/dev</code> are not yet populated.</p>
+
+<h3>Multi-file Structure</h3>
+<table>
+<tr><th>File</th><th>Purpose</th></tr>
+<tr><td><code>main.c</code></td><td>Entry point, orchestrates mounting</td></tr>
+<tr><td><code>mount.c</code></td><td>Filesystem mount operations</td></tr>
+<tr><td><code>create.c</code></td><td>Device node creation</td></tr>
+<tr><td><code>helpers.c</code></td><td>Utility functions</td></tr>
+<tr><td><code>size.c</code></td><td>Size calculations</td></tr>
+<tr><td><code>other.c</code></td><td>Miscellaneous setup tasks</td></tr>
+</table>
+
+<h3>Operations</h3>
+<ul>
+<li>Mounts <code>/proc</code> (proc filesystem)</li>
+<li>Mounts <code>/sys</code> (sysfs)</li>
+<li>Mounts <code>/dev</code> (devtmpfs)</li>
+<li>Mounts <code>/tmp</code> (tmpfs)</li>
+<li>Creates basic device nodes if needed</li>
+</ul>
+
+<p>The TUI initialization also calls configure as a fallback: if <code>tui_init()</code> (which needs <code>/dev/tty</code>) fails, it runs configure first, then retries TUI initialization.</p>
+
+<hr>
+<h2>cvm — Current Video Mode</h2>
+<p><strong>Source:</strong> <code>tools/system/video/cvm.c</code> (61 lines)</p>
+<p><strong>Entry:</strong> <code>cv()</code></p>
+<p>Displays the current video mode and screen resolution by querying the Linux framebuffer device (<code>/dev/fb0</code>) via <code>ioctl()</code> and <code>/sys/class/graphics/fb0/modes</code>.</p>
+
+<h3>Implementation</h3>
+<p>The tool is a single C function <code>print_fb_info()</code> plus <code>main()</code>:</p>
+
+<ol>
+<li><strong>Framebuffer detection:</strong> Attempts to open <code>/dev/fb0</code> with <code>open("/dev/fb0", O_RDONLY)</code>. If the device doesn't exist or can't be opened (e.g., no framebuffer driver, running in a VM without fbdev, or in text mode), prints <code>"video mode: vga text mode (no framebuffer detected)"</code> and returns.</li>
+
+<li><strong>ioctl queries:</strong> Uses two Linux framebuffer ioctls on the opened fd:
+  <ul>
+    <li><code>FBIOGET_VSCREENINFO</code> — fills <code>struct fb_var_screeninfo</code> with variable screen parameters:
+      <ul>
+        <li><code>xres</code>, <code>yres</code> — current visible resolution (e.g. 1920×1080)</li>
+        <li><code>xres_virtual</code>, <code>yres_virtual</code> — virtual buffer size (may be larger than visible for panning)</li>
+        <li><code>bits_per_pixel</code> — color depth (e.g. 32 for ARGB8888)</li>
+      </ul>
+    </li>
+    <li><code>FBIOGET_FSCREENINFO</code> — fills <code>struct fb_fix_screeninfo</code> with fixed parameters:
+      <ul>
+        <li><code>id</code> — driver name string (e.g. <code>"efifb"</code>, <code>"vesafb"</code>, <code>"simpledrm"</code>, <code>"bochs-drm"</code>)</li>
+      </ul>
+    </li>
+  </ul>
+</li>
+
+<li><strong>Sysfs max resolution:</strong> Opens <code>/sys/class/graphics/fb0/modes</code> and reads all lines. Each line is a mode descriptor in the format <code>"WxHp-bpp@refresh"</code> (e.g. <code>"1920x1080p-32"</code>). The tool iterates through all lines and stores the <strong>last</strong> one (which is typically the highest/available mode in the sysfs list). This provides information about what resolutions the framebuffer driver can support, beyond the current setting.</li>
+
+<li><strong>Cleanup:</strong> Closes the framebuffer fd and returns.</li>
+</ol>
+
+<h3>Output Format</h3>
+<pre>cvm output:
+-------------------------------
+video mode: efifb
+current resolution: 1920x1080 (32 bpp)
+virtual resolution: 1920x1080
+available/max modes (sysfs): 1920x1080p-32
+</pre>
+
+<p><strong>Fields explained:</strong></p>
+<table>
+<tr><th>Field</th><th>Source</th><th>Example</th></tr>
+<tr><td><code>video mode</code></td><td><code>fb_fix_screeninfo.id</code> — framebuffer driver name</td><td><code>efifb</code>, <code>vesafb</code>, <code>simpledrm</code></td></tr>
+<tr><td><code>current resolution</code></td><td><code>xres × yres</code> with <code>bits_per_pixel</code></td><td><code>1920x1080 (32 bpp)</code></td></tr>
+<tr><td><code>virtual resolution</code></td><td><code>xres_virtual × yres_virtual</code></td><td><code>1920x1080</code> (equal when no panning)</td></tr>
+<tr><td><code>available/max modes</code></td><td>Last line from <code>/sys/class/graphics/fb0/modes</code></td><td><code>1920x1080p-32</code></td></tr>
+</table>
+
+<h3>Usage</h3>
+<pre>onetool cvm</pre>
+<p>Takes no arguments — simply probes the framebuffer subsystem and prints diagnostics.</p>
+
+<h3>Notes</h3>
+<ul>
+<li><strong>No framebuffer:</strong> On systems without <code>/dev/fb0</code> (e.g., modern systems using KMS/drm only, or SSH sessions), the tool reports <code>"vga text mode (no framebuffer detected)"</code>. This is not an error — it's expected behavior on headless systems or when the framebuffer driver isn't loaded.</li>
+<li><strong>Driver names:</strong> Common values for <code>finfo.id</code> include <code>"efifb"</code> (UEFI GOP framebuffer), <code>"vesafb"</code> (VESA BIOS framebuffer), <code>"simpledrm"</code> (simpledrm driver), and <code>"bochs-drm"</code> (QEMU/Bochs virtual GPU).</li>
+<li><strong>KMS note:</strong> This tool uses the legacy fbdev interface, not KMS (kernel modesetting). Modern Linux graphics are moving toward KMS/drm, but fbdev is still widely available via the <code>simpledrm</code> or compatibility layers.</li>
+<li><strong>Sysfs modes:</strong> The <code>/sys/class/graphics/fb0/modes</code> file may not exist on all systems — in that case, only the current resolution from ioctl is shown.</li>
+</ul>
+
+</body>
+</html>

@@ -359,6 +359,28 @@ static void load_embedded_tool_form(onetool_form_t *form, const struct onetool_t
         copy_string(form->summary, sizeof(form->summary), "print file size");
         add_text_field(form, "path", "File", "", "/etc/hosts", "/path/to/file", "file");
         add_toggle_field(form, "human", "readable", "-h", 0, "print with binary units.");
+    } else if (strcmp(tool->name, "ls") == 0) {
+        copy_string(form->title, sizeof(form->title), "list files");
+        copy_string(form->summary, sizeof(form->summary), "list files in a directory or show a single path.");
+        add_text_field(form, "path", "path", "", ".", "/path/to/dir", "path to folder");
+        add_toggle_field(form, "all", "all files", "-a", 0, "show hidden entries");
+        add_toggle_field(form, "long", "long format", "-l", 0, "show permissions: owner, size and time");
+        add_toggle_field(form, "human", "human readable sizes", "-h", 0, "human readable sizes with long format");
+    } else if (strcmp(tool->name, "cat") == 0) {
+        copy_string(form->title, sizeof(form->title), "Cat");
+        copy_string(form->summary, sizeof(form->summary), "print file to stdout.");
+        add_text_field(form, "path", "File", "", "/etc/hosts", "/path/to/file", "use - for stdin.");
+        add_toggle_field(form, "number", "Line numbers", "-n", 0, "number output lines");
+    } else if (strcmp(tool->name, "free") == 0) {
+        copy_string(form->title, sizeof(form->title), "Memory Usage");
+        copy_string(form->summary, sizeof(form->summary), "show ram and swap usage from /proc/meminfo.");
+        field = add_choice_field(form, "unit", "Units", "", "-k", "output unit");
+        add_choice_option(field, "-k", "KiB");
+        add_choice_option(field, "-m", "MiB");
+        add_choice_option(field, "-g", "GiB");
+        add_choice_option(field, "-b", "bytes");
+        add_choice_option(field, "-h", "human");
+        sync_choice_field(field);
     } else if (strcmp(tool->name, "size") == 0) {
         copy_string(form->title, sizeof(form->title), "ELF Size");
         copy_string(form->summary, sizeof(form->summary), "Show ELF text/data/bss totals or a per-section size table.");

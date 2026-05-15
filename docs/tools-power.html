@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OneTool — Power Management Tools</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;max-width:960px;margin:0 auto;padding:2em 1em;color:#222;background:#fafafa}
+h1,h2,h3{color:#1a1a2e;border-bottom:1px solid #ddd;padding-bottom:.3em}
+code{background:#eef;padding:2px 6px;border-radius:3px;font-size:.9em}
+pre{background:#1a1a2e;color:#f0f0f0;padding:1em;border-radius:6px;overflow-x:auto;font-size:.85em}
+pre code{background:transparent;color:inherit;padding:0}
+table{border-collapse:collapse;width:100%;margin:1em 0}
+th,td{border:1px solid #ccc;padding:8px 12px;text-align:left}
+th{background:#1a1a2e;color:#fff}
+</style>
+</head>
+<body>
+
+<h1>OneTool — Power Management Tools</h1>
+<p>The power management subsystem consists of two minimal tools for system reboot and shutdown. Both are implemented in a single C file each (~50 lines) and use the <code>reboot()</code> Linux syscall directly — no <code>systemctl</code>, <code>shutdown</code>, or external process spawning.</p>
+
+<hr>
+<h2>reboot — Reboot System</h2>
+<p><strong>Source:</strong> <code>tools/power/reboot.c</code> (46 lines)</p>
+<p><strong>Entry:</strong> <code>rb()</code></p>
+<p>Reboots the system immediately or after a configurable delay. Uses the <code>reboot()</code> system call with <code>LINUX_REBOOT_CMD_RESTART</code>.</p>
+
+<h3>Implementation Details</h3>
+<ol>
+<li><strong>Argument parsing:</strong> Accepts an optional <code>-t seconds</code> flag. The value is parsed with <code>strtol()</code> — includes validation for: no characters consumed (<code>end == argv[2]</code>), trailing garbage (<code>*end != '\0'</code>), negative values, and values exceeding <code>INT32_MAX</code> (2,147,483,647 seconds ≈ 68 years).</li>
+<li><strong>Delay:</strong> If a delay was specified, calls <code>sleep(delay)</code> before proceeding.</li>
+<li><strong>sync():</strong> Calls <code>sync()</code> to flush filesystem buffers before triggering the reboot — critical for data integrity.</li>
+<li><strong>Syscall:</strong> Calls <code>reboot(LINUX_REBOOT_CMD_RESTART)</code> which sends the magic shutdown sequence <code>0xfee1dead</code> + <code>672274793</code> to the kernel via the <code>__NR_reboot</code> syscall. On error, prints the errno string via <code>strerror(errno)</code> and returns 1.</li>
+</ol>
+
+<p><strong>Error handling:</strong> Prints <code>invalid timer value: <input></code> for bad formats, <code>timer value is too large</code> for overflow, and <code>reboot failed: <strerror></code> if the syscall fails (typically due to missing <code>CAP_SYS_BOOT</code> capability).</p>
+
+<h3>Usage</h3>
+<pre>onetool reboot [-t seconds]</pre>
+
+<table>
+<tr><th>Option</th><th>Description</th></tr>
+<tr><td><code>-t seconds</code></td><td>Wait the specified number of seconds before rebooting</td></tr>
+</table>
+
+<h3>Examples</h3>
+<pre># Reboot immediately
+onetool reboot
+
+# Reboot after 5 seconds
+onetool reboot -t 5
+</pre>
+
+<p><strong>Note:</strong> Requires <code>CAP_SYS_BOOT</code> (typically root). The delay is a simple <code>sleep()</code> — it blocks the process before the reboot syscall.</p>
+
+<hr>
+<h2>shutdown — Power Off System</h2>
+<p><strong>Source:</strong> <code>tools/power/shutdown.c</code> (46 lines)</p>
+<p><strong>Entry:</strong> <code>sd()</code></p>
+<p>Powers off the system immediately or after a configurable delay. Uses the <code>reboot()</code> system call with <code>LINUX_REBOOT_CMD_POWER_OFF</code>.</p>
+
+<h3>Implementation Details</h3>
+<p>Structurally identical to <code>reboot.c</code> except:</p>
+<ul>
+<li><strong>Syscall:</strong> Uses <code>LINUX_REBOOT_CMD_POWER_OFF</code> instead of <code>LINUX_REBOOT_CMD_RESTART</code>. This triggers kernel shutdown sequence that ACPI power-off on supported hardware.</li>
+<li><strong>Error message:</strong> Prints <code>shutdown failed: <strerror></code> instead of <code>reboot failed</code>.</li>
+<li><strong>Argument parsing:</strong> Same <code>strtol</code>-based parsing with full validation — identical to reboot.</li>
+</ul>
+
+<h3>Usage</h3>
+<pre>onetool shutdown [-t seconds]</pre>
+
+<table>
+<tr><th>Option</th><th>Description</th></tr>
+<tr><td><code>-t seconds</code></td><td>Wait the specified number of seconds before shutting down</td></tr>
+</table>
+
+<h3>Examples</h3>
+<pre># Shut down immediately
+onetool shutdown
+
+# Shut down after 10 seconds
+onetool shutdown -t 10
+</pre>
+
+<p><strong>Note:</strong> Requires <code>CAP_SYS_BOOT</code> (typically root). On systems without ACPI or virtual machines without proper power-off support, the kernel may hang after printing "Power down."</p>
+
+<h3>Common Syscall Behaviour</h3>
+<p>Both tools use the same underlying <code>reboot()</code> libc wrapper, which invokes the <code>__NR_reboot</code> syscall (169 on x86-64). The kernel requires the caller to have <code>CAP_SYS_BOOT</code> in the user namespace. The magic arguments to the syscall are:</p>
+<table>
+<tr><th>Parameter</th><th>Value</th></tr>
+<tr><td>magic1</td><td><code>0xfee1dead</code></td></tr>
+<tr><td>magic2</td><td><code>672274793</code> (<code>LINUX_REBOOT_MAGIC2</code>)</td></tr>
+<tr><td>cmd</td><td><code>LINUX_REBOOT_CMD_RESTART</code> (reboot) or <code>LINUX_REBOOT_CMD_POWER_OFF</code> (shutdown)</td></tr>
+</table>
+
+</body>
+</html>

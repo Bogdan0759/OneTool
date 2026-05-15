@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OneTool — Overview</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;max-width:960px;margin:0 auto;padding:2em 1em;color:#222;background:#fafafa}
+h1,h2,h3{color:#1a1a2e;border-bottom:1px solid #ddd;padding-bottom:.3em}
+code{background:#eef;padding:2px 6px;border-radius:3px;font-size:.9em}
+pre{background:#1a1a2e;color:#f0f0f0;padding:1em;border-radius:6px;overflow-x:auto;font-size:.85em}
+pre code{background:transparent;color:inherit;padding:0}
+table{border-collapse:collapse;width:100%;margin:1em 0}
+th,td{border:1px solid #ccc;padding:8px 12px;text-align:left}
+th{background:#1a1a2e;color:#fff}
+.kwd{color:#7ec8e3}.str{color:#a5d6a7}.cmt{color:#888}.num{color:#ffab91}
+</style>
+</head>
+<body>
+
+<h1>OneTool — Project Overview</h1>
+<p><strong>Version:</strong> 1.3.2</p>
+<p><strong>License:</strong> MPL-2.0 (core), BSD-2-Clause (mofl/)</p>
+<p><strong>Language:</strong> C (C11), with YAP and brainfuck language implementations</p>
+
+<h2>What is OneTool?</h2>
+<p>OneTool is a single static Linux ELF binary that bundles dozens of system tools into one executable. Instead of maintaining separate binaries for every utility (like the classic Unix toolbox), OneTool compiles everything into <code>onetool</code> — a single CLI entry point.</p>
+
+<p>The core design principle: <strong>one executable, one CLI entry point, many capabilities implemented from scratch inside the project.</strong></p>
+
+<h2>Project Structure</h2>
+
+<pre>
+onetool/
+├── main.c                     # Entry point & tool dispatcher
+├── tui.c                      # Terminal UI (tool forms, settings, themes)
+├── config/
+│   ├── tool_registry.h        # Tool registry types & API
+│   └── extra_tools.manifest   # Manifest for adding custom tools
+├── libs/                      # Shared libraries
+│   ├── TUI/                   # ncurses-based terminal UI library
+│   ├── elf/                   # ELF file parser
+│   ├── memory/                # Checked allocation helpers
+│   └── net/                   # Networking stack (HTTP, URL, transport)
+├── tools/                     # Built-in tool implementations
+│   ├── dev/                   # Developer tools (mlink, lmake, lpack)
+│   ├── filesystem/            # Filesystem utilities
+│   ├── network/               # Networking tools (down, ping, nsetup)
+│   ├── power/                 # Power management tools
+│   └── system/                # System tools (taskmng, userc, video)
+├── mofl/                      # MOFL language subsystem
+│   └── languages/
+│       ├── brainfuck/         # Brainfuck compiler & interpreter
+│       └── yap/               # YAP language interpreter
+
+</pre>
+
+<h2>Architecture</h2>
+
+<h3>Tool Registry</h3>
+<p>The <code>tool_registry.h</code> header defines the plugin-style API used by every tool:</p>
+
+<pre><span class="kwd">typedef</span> <span class="kwd">int</span> (*onetool_entry_fn)(<span class="kwd">int</span> argc, <span class="kwd">char</span> *argv[]);
+
+<span class="kwd">enum</span> onetool_argv0_mode {
+    <span class="str">ONETOOL_ARGV0_TOOL_NAME</span> = <span class="num">0</span>,   <span class="cmt">// argv[0] = tool name</span>
+    <span class="str">ONETOOL_ARGV0_BINARY_PATH</span> = <span class="num">1</span>, <span class="cmt">// argv[0] = binary path</span>
+};
+
+<span class="kwd">struct</span> onetool_tool {
+    <span class="kwd">const char</span> *name;          <span class="cmt">// Tool name (e.g. "ping")</span>
+    onetool_entry_fn entry;      <span class="cmt">// Entry function</span>
+    <span class="kwd">const char</span> *description;    <span class="cmt">// Human-readable description</span>
+    <span class="kwd">enum</span> onetool_argv0_mode argv0_mode;
+};
+</pre>
+
+<h3>Dispatcher Flow</h3>
+<ol>
+<li><code>main()</code> receives <code>argc/argv</code></li>
+<li>If the first argument is <code>"tui"</code>, it launches the TUI</li>
+<li>Otherwise it parses global flags like <code>-to fd/path</code> for output redirection</li>
+<li>It calls <code>onetool_find_tool(name)</code> which does a linear search over built-in and extra tools</li>
+<li>Found tool executes via <code>onetool_run_tool()</code> which sets <code>argv[0]</code> based on <code>argv0_mode</code> and calls the entry point</li>
+<li>Unknown tool names print help and return error</li>
+</ol>
+
+<h3>Extensibility</h3>
+<p>Tools can be added at build time without editing <code>main.c</code> by adding a line to <code>config/extra_tools.manifest</code>:</p>
+<pre>name|source|description|argv0_mode|extra_cflags
+yap|mofl/languages/yap/yap.c|YAP language interpreter|tool|
+</pre>
+<p>The build system renames <code>main()</code> to a unique symbol automatically, compiles the source, and registers it into the tool table.</p>
+
+<h3>Global Options</h3>
+<table>
+<tr><th>Option</th><th>Description</th></tr>
+<tr><td><code>-to fd</code></td><td>Redirect stdout+stderr to a file descriptor</td></tr>
+<tr><td><code>-to path</code></td><td>Redirect stdout+stderr to a file at the given path</td></tr>
+<tr><td><code>tui</code></td><td>Launch the interactive TUI</td></tr>
+<tr><td><code>--help</code>, <code>-h</code></td><td>Show help and tool list</td></tr>
+<tr><td><code>list</code></td><td>Same as --help</td></tr>
+</table>
+
+<h2>Version Counting</h2>
+<p>The version string follows the format <code>x.r.f</code>:</p>
+<ul>
+<li><strong>x</strong> — bumped when <code>r > 9</code></li>
+<li><strong>r</strong> — global update or new tool</li>
+<li><strong>f</strong> — small update or bug fix</li>
+</ul>
+
+<h2>Build System</h2>
+<p>Requirements: <code>clang</code>, <code>make</code>. A custom build tool called <code>lmake</code> (implemented in Zig) is also bundled. Building produces the <code>onetool</code> static binary.</p>
+
+<h3>Build Steps</h3>
+<ol>
+<li>Compile shared libraries: <code>libs/TUI/</code> (ncurses wrapper), <code>libs/elf/</code> (ELF64 parser), <code>libs/memory/</code> (checked allocators), <code>libs/net/</code> (HTTP, URL, TCP/TLS transport)</li>
+<li>Compile all built-in tools from <code>tools/</code> — each tool's <code>main()</code> becomes a named entry point</li>
+<li>Run <code>tools/dev/build_extra_tools.sh</code> — reads <code>config/extra_tools.manifest</code>, compiles each extra tool with <code>-Dmain=<unique_name></code> flag, automatically registering them</li>
+<li>Link everything into a single static ELF64 x86-64 executable</li>
+</ol>
+<p>The result is a monolithic binary with no external runtime dependencies beyond Linux syscalls and libc.</p>
+
+<h2>Complete Tool List</h2>
+<table>
+<tr><th>Category</th><th>Tool</th><th>Entry</th><th>Description</th></tr>
+<tr><td rowspan="9"><strong>Filesystem</strong></td><td>lastmod</td><td><code>lm</code></td><td>Print file modification time</td></tr>
+<tr><td>exec</td><td><code>ex</code></td><td>Execute file via execv()</td></tr>
+<tr><td>fsinfo</td><td><code>fi</code></td><td>Filesystem inode statistics</td></tr>
+<tr><td>fsize</td><td><code>fz</code></td><td>File size in bytes/human format</td></tr>
+<tr><td>size</td><td><code>sz</code></td><td>ELF section sizes (Berkeley/SysV)</td></tr>
+<tr><td>nm</td><td><code>nm</code></td><td>ELF symbol table listing</td></tr>
+<tr><td>cat</td><td><code>cat</code></td><td>Print file contents</td></tr>
+<tr><td>free</td><td><code>free</code></td><td>Show memory usage from /proc/meminfo</td></tr>
+<tr><td>ls</td><td><code>ls</code></td><td>List directory contents</td></tr>
+<tr><td rowspan="3"><strong>Network</strong></td><td>down</td><td><code>dn</code></td><td>HTTP downloader (GET/POST/HEAD)</td></tr>
+<tr><td>ping</td><td><code>pg</code></td><td>ICMP echo client</td></tr>
+<tr><td>nsetup</td><td><code>ns</code></td><td>DHCP client for network setup</td></tr>
+<tr><td rowspan="2"><strong>Power</strong></td><td>reboot</td><td><code>rb</code></td><td>System reboot</td></tr>
+<tr><td>shutdown</td><td><code>sd</code></td><td>System power-off</td></tr>
+<tr><td rowspan="5"><strong>System</strong></td><td>taskmng</td><td><code>tm</code></td><td>Interactive process manager (TUI)</td></tr>
+<tr><td>userc</td><td><code>uc</code></td><td>User account management (TUI)</td></tr>
+<tr><td>configure</td><td><code>cf</code></td><td>Mount /proc /sys /dev /tmp</td></tr>
+<tr><td>cvm</td><td><code>cv</code></td><td>Current video mode</td></tr>
+<tr><td>lmake</td><td><code>lk</code></td><td>Bundled Zig build tool</td></tr>
+<tr><td rowspan="4"><strong>Development</strong></td><td>mlink</td><td><code>ml</code></td><td>ELF64 x86-64 static linker</td></tr>
+<tr><td>lpack</td><td><code>lp</code></td><td>Lua script packager</td></tr>
+<tr><td>gapi_supported</td><td><code>ga</code></td><td>Graphics API detection</td></tr>
+<tr><td>yap</td><td><code>yap</code></td><td>YAP language interpreter (extra tool)</td></tr>
+</table>
+
+<h2>Code Size Overview</h2>
+<table>
+<tr><th>Component</th><th>Size (lines of code)</th></tr>
+<tr><td>main.c (dispatcher + TUI)</td><td>~1336</td></tr>
+<tr><td>libs/TUI/</td><td>~543</td></tr>
+<tr><td>libs/elf/</td><td>~224</td></tr>
+<tr><td>libs/memory/</td><td>~80</td></tr>
+<tr><td>libs/net/</td><td>~500+</td></tr>
+<tr><td>tools/ (all built-in)</td><td>~3000+</td></tr>
+<tr><td>mlink (linker, 10 files)</td><td>~2010</td></tr>
+<tr><td>mofl/ (YAP interpreter)</td><td>~1132</td></tr>
+</table>
+
+<h2>Memory Management</h2>
+<p>The project uses checked allocation wrappers from <code>libs/memory</code>:</p>
+<ul>
+<li><code>ot_xmalloc()</code> — malloc with NULL check</li>
+<li><code>ot_xcalloc()</code> — calloc with NULL check</li>
+<li><code>ot_xrealloc()</code> — realloc with NULL check</li>
+<li><code>ot_xreallocarray()</code> — reallocarray with overflow check</li>
+<li><code>ot_xstrdup()</code> — strdup with NULL check</li>
+<li><code>ot_xstrndup()</code> — strndup with NULL check</li>
+</ul>
+<p>All functions abort (exit) on allocation failure — safe for system tools.</p>
+
+</body>
+</html>

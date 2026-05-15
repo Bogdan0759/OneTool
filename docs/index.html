@@ -1,0 +1,2903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OneTool — Documentation</title>
+</head>
+<body>
+
+
+<h1>OneTool — Project Overview</h1>
+<p><strong>Version:</strong> 1.3.2</p>
+<p><strong>License:</strong> MPL-2.0 (core), BSD-2-Clause (mofl/)</p>
+<p><strong>Language:</strong> C (C11), with YAP and brainfuck language implementations</p>
+
+<h2>What is OneTool?</h2>
+<p>OneTool is a single static Linux ELF binary that bundles dozens of system tools into one executable. Instead of maintaining separate binaries for every utility (like the classic Unix toolbox), OneTool compiles everything into <code>onetool</code> — a single CLI entry point.</p>
+
+<p>The core design principle: <strong>one executable, one CLI entry point, many capabilities implemented from scratch inside the project.</strong></p>
+
+<h2>Project Structure</h2>
+
+<pre>
+onetool/
+├── main.c                     # Entry point & tool dispatcher
+├── tui.c                      # Terminal UI (tool forms, settings, themes)
+├── config/
+│   ├── tool_registry.h        # Tool registry types & API
+│   └── extra_tools.manifest   # Manifest for adding custom tools
+├── libs/                      # Shared libraries
+│   ├── TUI/                   # ncurses-based terminal UI library
+│   ├── elf/                   # ELF file parser
+│   ├── memory/                # Checked allocation helpers
+│   └── net/                   # Networking stack (HTTP, URL, transport)
+├── tools/                     # Built-in tool implementations
+│   ├── dev/                   # Developer tools (mlink, lmake, lpack)
+│   ├── filesystem/            # Filesystem utilities
+│   ├── network/               # Networking tools (down, ping, nsetup)
+│   ├── power/                 # Power management tools
+│   └── system/                # System tools (taskmng, userc, video)
+├── mofl/                      # MOFL language subsystem
+│   └── languages/
+│       ├── brainfuck/         # Brainfuck compiler & interpreter
+│       └── yap/               # YAP language interpreter
+
+</pre>
+
+<h2>Architecture</h2>
+
+<h3>Tool Registry</h3>
+<p>The <code>tool_registry.h</code> header defines the plugin-style API used by every tool:</p>
+
+<pre><span class="kwd">typedef</span> <span class="kwd">int</span> (*onetool_entry_fn)(<span class="kwd">int</span> argc, <span class="kwd">char</span> *argv[]);
+
+<span class="kwd">enum</span> onetool_argv0_mode {
+    <span class="str">ONETOOL_ARGV0_TOOL_NAME</span> = <span class="num">0</span>,   <span class="cmt">// argv[0] = tool name</span>
+    <span class="str">ONETOOL_ARGV0_BINARY_PATH</span> = <span class="num">1</span>, <span class="cmt">// argv[0] = binary path</span>
+};
+
+<span class="kwd">struct</span> onetool_tool {
+    <span class="kwd">const char</span> *name;          <span class="cmt">// Tool name (e.g. "ping")</span>
+    onetool_entry_fn entry;      <span class="cmt">// Entry function</span>
+    <span class="kwd">const char</span> *description;    <span class="cmt">// Human-readable description</span>
+    <span class="kwd">enum</span> onetool_argv0_mode argv0_mode;
+};
+</pre>
+
+<h3>Dispatcher Flow</h3>
+<ol>
+<li><code>main()</code> receives <code>argc/argv</code></li>
+<li>If the first argument is <code>"tui"</code>, it launches the TUI</li>
+<li>Otherwise it parses global flags like <code>-to fd/path</code> for output redirection</li>
+<li>It calls <code>onetool_find_tool(name)</code> which does a linear search over built-in and extra tools</li>
+<li>Found tool executes via <code>onetool_run_tool()</code> which sets <code>argv[0]</code> based on <code>argv0_mode</code> and calls the entry point</li>
+<li>Unknown tool names print help and return error</li>
+</ol>
+
+<h3>Extensibility</h3>
+<p>Tools can be added at build time without editing <code>main.c</code> by adding a line to <code>config/extra_tools.manifest</code>:</p>
+<pre>name|source|description|argv0_mode|extra_cflags
+yap|mofl/languages/yap/yap.c|YAP language interpreter|tool|
+</pre>
+<p>The build system renames <code>main()</code> to a unique symbol automatically, compiles the source, and registers it into the tool table.</p>
+
+<h3>Global Options</h3>
+<table>
+<tr><th>Option</th><th>Description</th></tr>
+<tr><td><code>-to fd</code></td><td>Redirect stdout+stderr to a file descriptor</td></tr>
+<tr><td><code>-to path</code></td><td>Redirect stdout+stderr to a file at the given path</td></tr>
+<tr><td><code>tui</code></td><td>Launch the interactive TUI</td></tr>
+<tr><td><code>--help</code>, <code>-h</code></td><td>Show help and tool list</td></tr>
+<tr><td><code>list</code></td><td>Same as --help</td></tr>
+</table>
+
+<h2>Version Counting</h2>
+<p>The version string follows the format <code>x.r.f</code>:</p>
+<ul>
+<li><strong>x</strong> — bumped when <code>r > 9</code></li>
+<li><strong>r</strong> — global update or new tool</li>
+<li><strong>f</strong> — small update or bug fix</li>
+</ul>
+
+<h2>Build System</h2>
+<p>Requirements: <code>clang</code>, <code>make</code>. A custom build tool called <code>lmake</code> (implemented in Zig) is also bundled. Building produces the <code>onetool</code> static binary.</p>
+
+<h3>Build Steps</h3>
+<ol>
+<li>Compile shared libraries: <code>libs/TUI/</code> (ncurses wrapper), <code>libs/elf/</code> (ELF64 parser), <code>libs/memory/</code> (checked allocators), <code>libs/net/</code> (HTTP, URL, TCP/TLS transport)</li>
+<li>Compile all built-in tools from <code>tools/</code> — each tool's <code>main()</code> becomes a named entry point</li>
+<li>Run <code>tools/dev/build_extra_tools.sh</code> — reads <code>config/extra_tools.manifest</code>, compiles each extra tool with <code>-Dmain=<unique_name></code> flag, automatically registering them</li>
+<li>Link everything into a single static ELF64 x86-64 executable</li>
+</ol>
+<p>The result is a monolithic binary with no external runtime dependencies beyond Linux syscalls and libc.</p>
+
+<h2>Complete Tool List</h2>
+<table>
+<tr><th>Category</th><th>Tool</th><th>Entry</th><th>Description</th></tr>
+<tr><td rowspan="9"><strong>Filesystem</strong></td><td>lastmod</td><td><code>lm</code></td><td>Print file modification time</td></tr>
+<tr><td>exec</td><td><code>ex</code></td><td>Execute file via execv()</td></tr>
+<tr><td>fsinfo</td><td><code>fi</code></td><td>Filesystem inode statistics</td></tr>
+<tr><td>fsize</td><td><code>fz</code></td><td>File size in bytes/human format</td></tr>
+<tr><td>size</td><td><code>sz</code></td><td>ELF section sizes (Berkeley/SysV)</td></tr>
+<tr><td>nm</td><td><code>nm</code></td><td>ELF symbol table listing</td></tr>
+<tr><td>cat</td><td><code>cat</code></td><td>Print file contents</td></tr>
+<tr><td>free</td><td><code>free</code></td><td>Show memory usage from /proc/meminfo</td></tr>
+<tr><td>ls</td><td><code>ls</code></td><td>List directory contents</td></tr>
+<tr><td rowspan="3"><strong>Network</strong></td><td>down</td><td><code>dn</code></td><td>HTTP downloader (GET/POST/HEAD)</td></tr>
+<tr><td>ping</td><td><code>pg</code></td><td>ICMP echo client</td></tr>
+<tr><td>nsetup</td><td><code>ns</code></td><td>DHCP client for network setup</td></tr>
+<tr><td rowspan="2"><strong>Power</strong></td><td>reboot</td><td><code>rb</code></td><td>System reboot</td></tr>
+<tr><td>shutdown</td><td><code>sd</code></td><td>System power-off</td></tr>
+<tr><td rowspan="5"><strong>System</strong></td><td>taskmng</td><td><code>tm</code></td><td>Interactive process manager (TUI)</td></tr>
+<tr><td>userc</td><td><code>uc</code></td><td>User account management (TUI)</td></tr>
+<tr><td>configure</td><td><code>cf</code></td><td>Mount /proc /sys /dev /tmp</td></tr>
+<tr><td>cvm</td><td><code>cv</code></td><td>Current video mode</td></tr>
+<tr><td>lmake</td><td><code>lk</code></td><td>Bundled Zig build tool</td></tr>
+<tr><td rowspan="4"><strong>Development</strong></td><td>mlink</td><td><code>ml</code></td><td>ELF64 x86-64 static linker</td></tr>
+<tr><td>lpack</td><td><code>lp</code></td><td>Lua script packager</td></tr>
+<tr><td>gapi_supported</td><td><code>ga</code></td><td>Graphics API detection</td></tr>
+<tr><td>yap</td><td><code>yap</code></td><td>YAP language interpreter (extra tool)</td></tr>
+</table>
+
+<h2>Code Size Overview</h2>
+<table>
+<tr><th>Component</th><th>Size (lines of code)</th></tr>
+<tr><td>main.c (dispatcher + TUI)</td><td>~1336</td></tr>
+<tr><td>libs/TUI/</td><td>~543</td></tr>
+<tr><td>libs/elf/</td><td>~224</td></tr>
+<tr><td>libs/memory/</td><td>~80</td></tr>
+<tr><td>libs/net/</td><td>~500+</td></tr>
+<tr><td>tools/ (all built-in)</td><td>~3000+</td></tr>
+<tr><td>mlink (linker, 10 files)</td><td>~2010</td></tr>
+<tr><td>mofl/ (YAP interpreter)</td><td>~1132</td></tr>
+</table>
+
+<h2>Memory Management</h2>
+<p>The project uses checked allocation wrappers from <code>libs/memory</code>:</p>
+<ul>
+<li><code>ot_xmalloc()</code> — malloc with NULL check</li>
+<li><code>ot_xcalloc()</code> — calloc with NULL check</li>
+<li><code>ot_xrealloc()</code> — realloc with NULL check</li>
+<li><code>ot_xreallocarray()</code> — reallocarray with overflow check</li>
+<li><code>ot_xstrdup()</code> — strdup with NULL check</li>
+<li><code>ot_xstrndup()</code> — strndup with NULL check</li>
+</ul>
+<p>All functions abort (exit) on allocation failure — safe for system tools.</p>
+
+
+
+
+<h1>OneTool — Libraries Reference</h1>
+<p>OneTool ships four internal libraries that provide the building blocks for all tools. Each is implemented entirely from scratch in C (except the TUI library which wraps ncurses). This document covers every function, structure, enum, and implementation detail.</p>
+
+<hr>
+
+<h2>1. TUI Library — <code>libs/TUI/</code></h2>
+<p><strong>Files:</strong> <code>tui.h</code> (83 lines), <code>tui.c</code> (460 lines)</p>
+<p>The TUI library is an ncurses-based abstraction layer providing palette management, styled drawing primitives, input handling, and screen framing. It is used by the main TUI (<code>tui.c</code>), the task manager (<code>taskmng</code>), and the user control tool (<code>userc</code>).</p>
+
+<h3>1.1 Color System</h3>
+<p>8-color palette using ncurses <code>COLOR_*</code> constants:</p>
+<table>
+<tr><th>Constant</th><th>Value</th><th>ncurses Mapping</th></tr>
+<tr><td><code>TUI_COLOR_DEFAULT</code></td><td>-1</td><td>Terminal default (<code>-1</code> with <code>use_default_colors()</code>)</td></tr>
+<tr><td><code>TUI_COLOR_BLACK</code></td><td>0</td><td><code>COLOR_BLACK</code></td></tr>
+<tr><td><code>TUI_COLOR_RED</code></td><td>1</td><td><code>COLOR_RED</code></td></tr>
+<tr><td><code>TUI_COLOR_GREEN</code></td><td>2</td><td><code>COLOR_GREEN</code></td></tr>
+<tr><td><code>TUI_COLOR_YELLOW</code></td><td>3</td><td><code>COLOR_YELLOW</code></td></tr>
+<tr><td><code>TUI_COLOR_BLUE</code></td><td>4</td><td><code>COLOR_BLUE</code></td></tr>
+<tr><td><code>TUI_COLOR_MAGENTA</code></td><td>5</td><td><code>COLOR_MAGENTA</code></td></tr>
+<tr><td><code>TUI_COLOR_CYAN</code></td><td>6</td><td><code>COLOR_CYAN</code></td></tr>
+<tr><td><code>TUI_COLOR_WHITE</code></td><td>7</td><td><code>COLOR_WHITE</code></td></tr>
+</table>
+
+<h3>1.2 Style System</h3>
+<p>Each style maps to a ncurses color pair. 7 styles are defined. The mapping function <code>style_to_pair()</code> converts a style enum to a pair ID:</p>
+<table>
+<tr><th>Constant</th><th>Value</th><th>Pair ID</th><th>Attribute</th><th>Usage</th></tr>
+<tr><td><code>TUI_STYLE_NORMAL</code></td><td>0</td><td>1</td><td>None</td><td>Default text on background</td></tr>
+<tr><td><code>TUI_STYLE_PANEL</code></td><td>1</td><td>2</td><td>None</td><td>Box backgrounds, status bar</td></tr>
+<tr><td><code>TUI_STYLE_ACCENT</code></td><td>2</td><td>3</td><td><code>A_BOLD</code></td><td>Highlighted titles, tool names</td></tr>
+<tr><td><code>TUI_STYLE_MUTED</code></td><td>3</td><td>4</td><td>None</td><td>Secondary info, hints, placeholders</td></tr>
+<tr><td><code>TUI_STYLE_SUCCESS</code></td><td>4</td><td>5</td><td>None</td><td>Success indicators</td></tr>
+<tr><td><code>TUI_STYLE_ERROR</code></td><td>5</td><td>6</td><td>None</td><td>Error messages</td></tr>
+<tr><td><code>TUI_STYLE_SELECTION</code></td><td>6</td><td>7</td><td><code>A_BOLD</code></td><td>Currently selected item (inverted fg/bg)</td></tr>
+</table>
+
+<h3>1.3 Palette Structure</h3>
+<p>The <code>tui_palette_t</code> struct defines 7 color slots that control the entire visual appearance:</p>
+<pre>typedef struct {
+    int background;  // Terminal background color
+    int panel;       // Panel/status bar background color
+    int accent;      // Highlight color for titles, selected tool names
+    int text;        // Primary text color
+    int muted;       // Secondary/hint text color
+    int success;     // Success indicator color
+    int error;       // Error message color
+} tui_palette_t;</pre>
+
+<p><strong>Implementation detail:</strong> When a palette is applied via <code>apply_palette()</code>, the selection style uses the background color as its foreground with the accent color as its background — effectively inverting the accent. <code>init_pair()</code> is called for each of the 7 pair IDs, creating color pairs 1-7 in ncurses.</p>
+
+<h3>1.4 Built-in Themes</h3>
+<p>Five themes are hardcoded in <code>tui.c</code> as an array of <code>onetool_theme_t</code>:</p>
+<table>
+<tr><th>Theme</th><th>background</th><th>panel</th><th>accent</th><th>text</th><th>muted</th><th>success</th><th>error</th></tr>
+<tr><td><strong>ocean</strong> (default)</td><td>BLACK</td><td>BLUE</td><td>CYAN</td><td>WHITE</td><td>CYAN</td><td>GREEN</td><td>RED</td></tr>
+<tr><td><strong>forest</strong></td><td>BLACK</td><td>GREEN</td><td>YELLOW</td><td>WHITE</td><td>CYAN</td><td>GREEN</td><td>RED</td></tr>
+<tr><td><strong>amber</strong></td><td>BLACK</td><td>RED</td><td>YELLOW</td><td>WHITE</td><td>MAGENTA</td><td>GREEN</td><td>RED</td></tr>
+<tr><td><strong>mono</strong></td><td>BLACK</td><td>WHITE</td><td>WHITE</td><td>WHITE</td><td>CYAN</td><td>GREEN</td><td>RED</td></tr>
+<tr><td><strong>custom</strong></td><td colspan="7">Editable live, starts as copy of ocean, index 4</td></tr>
+</table>
+
+<h3>1.5 API Functions — Complete Reference</h3>
+
+<h4><code>int tui_init(void)</code></h4>
+<p>Initializes the ncurses terminal. Implementation steps:</p>
+<ul>
+<li>Calls <code>newterm(NULL, stdout, stdin)</code> to initialize terminal</li>
+<li>Enables <code>cbreak()</code> for character-by-character input</li>
+<li>Disables <code>echo()</code> so typed keys don't show</li>
+<li>Enables <code>keypad(stdscr, TRUE)</code> for arrow/function keys</li>
+<li>Hides cursor via <code>curs_set(0)</code></li>
+<li>Sets escape delay to 25ms via <code>set_escdelay(25)</code> (if ncurses)</li>
+<li>If colors are supported: calls <code>start_color()</code>, <code>use_default_colors()</code>, and <code>apply_palette()</code></li>
+<li>Returns 0 on success, 1 on failure</li>
+</ul>
+
+<h4><code>void tui_shutdown(void)</code></h4>
+<p>Restores terminal to its original state via <code>endwin()</code>. Safe to call multiple times — uses a static <code>tui_ready</code> flag.</p>
+
+<h4><code>void tui_begin_frame(void)</code></h4>
+<p>Calls <code>clear()</code> to erase the screen at the start of each frame.</p>
+
+<h4><code>void tui_end_frame(void)</code></h4>
+<p>Calls <code>refresh()</code> to flush all pending drawing operations to the terminal.</p>
+
+<h4><code>void tui_clear(int style)</code></h4>
+<p>Fills the entire screen with the background character space (' ') using the given style's color pair. Sets the background character via <code>bkgdset()</code> then clears.</p>
+
+<h4><code>void tui_get_size(int *width, int *height)</code></h4>
+<p>Uses <code>getmaxyx(stdscr, max_y, max_x)</code> to retrieve terminal dimensions. Sets width and height to 0 if TUI is not initialized.</p>
+
+<h4><code>int tui_poll_event(tui_event_t *event, int timeout_ms)</code></h4>
+<p>Polls for keyboard input:</p>
+<ul>
+<li>Sets <code>timeout(timeout_ms)</code> for non-blocking input</li>
+<li>Reads a key with <code>getch()</code></li>
+<li>If <code>ERR</code> (timeout), returns 0</li>
+<li>Otherwise translates the raw keycode via <code>translate_key()</code>, sets <code>event->kind</code> and <code>event->key</code>, returns 1</li>
+</ul>
+<p><strong>Key translation:</strong> The <code>translate_key()</code> function maps ncurses <code>KEY_*</code> constants to OneTool's <code>TUI_KEY_*</code> enum. It handles: KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_HOME, KEY_END, KEY_PPAGE, KEY_NPAGE, KEY_DC (delete), KEY_BACKSPACE (and 127 and 8), \n \r KEY_ENTER, \t, ESC (27), KEY_RESIZE.</p>
+
+<h4><code>void tui_set_palette(const tui_palette_t *palette)</code></h4>
+<p>Copies the palette struct into the internal static <code>tui_palette</code>, then calls <code>apply_palette()</code> if colors are available and TUI is initialized. All color pairs are re-initialized with the new colors.</p>
+
+<h4><code>void tui_draw_text(int x, int y, int style, const char *text)</code></h4>
+<p>Draws text at screen position (x, y) using the given style:</p>
+<ul>
+<li>Bounds-checks y against terminal height</li>
+<li>Handles negative x by advancing the text pointer and reducing x to 0</li>
+<li>Clips width to <code>max_x - x</code></li>
+<li>Uses <code>mvaddnstr(y, x, text, width)</code> with the style's attribute</li>
+</ul>
+
+<h4><code>void tui_draw_textf(int x, int y, int style, const char *fmt, ...)</code></h4>
+<p>Formats text with <code>vsnprintf()</code> (1024-byte buffer) then calls <code>tui_draw_text()</code>.</p>
+
+<h4><code>void tui_fill_rect(int x, int y, int width, int height, int style, char fill)</code></h4>
+<p>Fills a rectangular area with a repeating character:</p>
+<ul>
+<li>Clips rectangle to screen bounds via <code>clip_rect_to_screen()</code></li>
+<li>Uses nested loops with <code>mvaddch()</code> for each cell</li>
+</ul>
+
+<h4><code>void tui_draw_box(int x, int y, int width, int height, int style, const char *title)</code></h4>
+<p>Draws a bordered box:</p>
+<ul>
+<li>Corners: <code>ACS_ULCORNER</code>, <code>ACS_URCORNER</code>, <code>ACS_LLCORNER</code>, <code>ACS_LRCORNER</code></li>
+<li>Edges: <code>ACS_HLINE</code> (horizontal), <code>ACS_VLINE</code> (vertical)</li>
+<li>Title: If provided and box is wide enough, draws <code>ACS_RTEE</code> + title + <code>ACS_LTEE</code> on the top border, 2 characters from left</li>
+</ul>
+
+<h4><code>void tui_draw_hline(int x, int y, int width, int style, char ch)</code></h4>
+<p>Draws a horizontal line of repeated characters using <code>mvaddch()</code> in a loop.</p>
+
+<h4><code>void tui_draw_vline(int x, int y, int height, int style, char ch)</code></h4>
+<p>Draws a vertical line of repeated characters using <code>mvaddch()</code> in a vertical loop.</p>
+
+<h4><code>void tui_draw_status_line(int style, const char *text)</code></h4>
+<p>Draws a status bar at the bottom row of the terminal:</p>
+<ul>
+<li>Fills the entire last row with spaces in the given style</li>
+<li>Draws the text clipped to terminal width minus 1 using <code>tui_clip_text()</code></li>
+</ul>
+
+<h4><code>int tui_key_is_printable(int key)</code></h4>
+<p>Returns 1 if key is in range 32-126 (printable ASCII), 0 otherwise.</p>
+
+<h4><code>const char *tui_clip_text(const char *src, char *dst, int dst_size, int width)</code></h4>
+<p>Clips text to fit a given width with ellipsis:</p>
+<ul>
+<li>If src is shorter than width, copies directly</li>
+<li>If width is 1 or 2, returns ".", ".."</li>
+<li>Otherwise copies first <code>width - 3</code> characters then appends "..."</li>
+<li>Returns dst pointer, or "" if src is NULL</li>
+</ul>
+
+<h3>1.6 Event System</h3>
+<pre>enum tui_event_kind {
+    TUI_EVENT_NONE = 0,    // No event
+    TUI_EVENT_KEY = 1,     // Keyboard event
+    TUI_EVENT_RESIZE = 2,  // Terminal resize
+};
+
+enum tui_key {
+    TUI_KEY_NONE = 0,
+    TUI_KEY_UP = 256,      // Arrow up
+    TUI_KEY_DOWN,          // Arrow down
+    TUI_KEY_LEFT,          // Arrow left
+    TUI_KEY_RIGHT,         // Arrow right
+    TUI_KEY_ENTER,         // Enter/return
+    TUI_KEY_ESCAPE,        // Escape
+    TUI_KEY_TAB,           // Tab
+    TUI_KEY_BACKSPACE,     // Backspace
+    TUI_KEY_DELETE,        // Delete
+    TUI_KEY_HOME,          // Home
+    TUI_KEY_END,           // End
+    TUI_KEY_PAGE_UP,       // Page Up
+    TUI_KEY_PAGE_DOWN,     // Page Down
+    TUI_KEY_RESIZE,        // Terminal resize
+};
+
+typedef struct {
+    int kind;  // TUI_EVENT_NONE, TUI_EVENT_KEY, or TUI_EVENT_RESIZE
+    int key;   // The translated key code
+} tui_event_t;</pre>
+
+<hr>
+
+<h2>2. ELF Library — <code>libs/elf/</code></h2>
+<p><strong>Files:</strong> <code>elf.h</code> (52 lines), <code>elf.c</code> (172 lines)</p>
+<p>A lightweight ELF64 parser that reads from memory buffers. Used by <code>size</code>, <code>nm</code>, and <code>mlink</code> tools. Supports little-endian ELF64 only.</p>
+
+<h3>2.1 Core Structures</h3>
+
+<h4><code>ot_elf_section_t</code></h4>
+<p>Represents a single ELF section header entry after parsing:</p>
+<pre>typedef struct {
+    char *name;            // Section name string (allocated, from .shstrtab)
+    uint32_t name_offset;  // Raw index into .shstrtab
+    uint32_t type;         // Section type: SHT_PROGBITS(1), SHT_NOBITS(8),
+                          //   SHT_SYMTAB(2), SHT_STRTAB(3), SHT_RELA(4),
+                          //   SHT_HASH(5), SHT_DYNAMIC(6), etc.
+    uint64_t flags;        // SHF_WRITE(0x1), SHF_ALLOC(0x2), SHF_EXECINSTR(0x4),
+                          //   SHF_MERGE(0x10), SHF_STRINGS(0x20), SHF_TLS(0x400)
+    uint64_t addr;         // Virtual address at runtime (after loading)
+    uint64_t offset;       // File offset
+    uint64_t size;         // Section size in bytes
+    uint32_t link;         // Link to another section (e.g. symtab→strtab index)
+    uint32_t info;         // Extra info (e.g. symtab's last local symbol + 1)
+    uint64_t addralign;    // Alignment requirement (power of 2)
+    uint64_t entsize;      // Entry size for tables (e.g. 24 for symtab, 24 for rela)
+} ot_elf_section_t;</pre>
+
+<h4><code>ot_elf_file_t</code></h4>
+<p>Represents a fully parsed ELF file:</p>
+<pre>typedef struct {
+    const char *name;           // File name (borrowed pointer, not owned)
+    const unsigned char *data;  // Raw file data pointer
+    size_t size;                // File size
+    uint16_t type;              // ET_NONE(0), ET_REL(1), ET_EXEC(2), ET_DYN(3)
+    uint16_t machine;           // EM_X86_64(62), EM_386(3), etc.
+    uint64_t entry;             // Entry point virtual address
+    uint16_t shstrndx;          // Section header string table index
+    ot_elf_section_t *sections; // Parsed section array (allocated)
+    size_t section_count;       // Number of sections
+} ot_elf_file_t;</pre>
+
+<h3>2.2 API Functions — Complete Reference</h3>
+
+<h4><code>void ot_elf_init(ot_elf_file_t *elf)</code></h4>
+<p>Zero-initializes an elf file struct via <code>memset(elf, 0, sizeof(*elf))</code>. Must be called before <code>ot_elf_parse()</code>.</p>
+
+<h4><code>void ot_elf_free(ot_elf_file_t *elf)</code></h4>
+<p>Frees all allocated resources:</p>
+<ul>
+<li>Iterates through all sections and calls <code>free()</code> on each section's <code>name</code></li>
+<li>Frees the sections array</li>
+<li>Zeroes the entire struct</li>
+</ul>
+
+<h4><code>int ot_elf_parse(ot_elf_file_t *elf, const char *name, const unsigned char *data, size_t size, char *err, size_t err_size)</code></h4>
+<p>Parses an ELF file from memory. Returns 0 on success, 1 on error.</p>
+<p><strong>Validation steps:</strong></p>
+<ol>
+<li>Checks that data is at least <code>EI_NIDENT</code> (16) bytes and starts with ELF magic (<code>0x7f 'E' 'L' 'F'</code>)</li>
+<li>Checks data is at least 64 bytes (minimum ELF64 header size)</li>
+<li>Checks <code>EI_CLASS == ELFCLASS64</code> (2) — 32-bit ELF rejected</li>
+<li>Checks <code>EI_DATA == ELFDATA2LSB</code> (1) — big-endian rejected</li>
+<li>Checks <code>EI_VERSION == EV_CURRENT</code> (1)</li>
+</ol>
+<p><strong>Parsing steps:</strong></p>
+<ol>
+<li>Reads section header table offset from offset 40 (8 bytes)</li>
+<li>Reads section header entry size from offset 58 (2 bytes) — must be 64</li>
+<li>Reads section count from offset 60 (2 bytes)</li>
+<li>Reads shstrndx from offset 62 (2 bytes)</li>
+<li>Validates section table fits in file via <code>ot_elf_range_ok()</code></li>
+<li>Validates shstrndx is not <code>SHN_UNDEF</code> (0) and is within section count</li>
+<li>Allocates and parses all section headers (each 64 bytes)</li>
+<li>Reads the section string table, then resolves each section's name</li>
+<li>Sets metadata: type, machine, entry point, shstrndx</li>
+</ol>
+
+<h4><code>int ot_elf_range_ok(size_t file_size, uint64_t off, uint64_t size)</code></h4>
+<p>Validates that <code>off + size</code> fits within <code>file_size</code>:</p>
+<pre>return off <= file_size && size <= file_size - off;</pre>
+<p>This is the standard overflow-safe range check used throughout the ELF parser.</p>
+
+<h4><code>char *ot_elf_strdup_from_strtab(const unsigned char *base, size_t size, uint32_t off)</code></h4>
+<p>Extracts a null-terminated string from a string table at a given offset:</p>
+<ul>
+<li>If offset is out of bounds, returns <code>"<badstr>"</code></li>
+<li>Scans from offset until null byte or end of table</li>
+<li>Allocates and copies the string via <code>ot_xmalloc()</code> + <code>memcpy</code></li>
+<li>If no null byte found before end, returns <code>"<badstr>"</code></li>
+</ul>
+
+<h3>2.3 Byte Accessors</h3>
+<p>All multi-byte values in ELF files are little-endian. These accessors perform manual byte-wise reading/writing to avoid endianness dependencies on the host system:</p>
+
+<table>
+<tr><th>Function</th><th>Implementation</th></tr>
+<tr><td><code>ot_elf_get16(p)</code></td><td><code>p[0] | (p[1] << 8)</code></td></tr>
+<tr><td><code>ot_elf_get32(p)</code></td><td><code>p[0] | (p[1]<<8) | (p[2]<<16) | (p[3]<<24)</code></td></tr>
+<tr><td><code>ot_elf_get64(p)</code></td><td><code>get32(p) | ((uint64_t)get32(p+4) << 32)</code></td></tr>
+<tr><td><code>ot_elf_put16(p, v)</code></td><td>Write two bytes LSB first</td></tr>
+<tr><td><code>ot_elf_put32(p, v)</code></td><td>Write four bytes LSB first</td></tr>
+<tr><td><code>ot_elf_put64(p, v)</code></td><td>Write 8 bytes via put32(p, low) + put32(p+4, high)</td></tr>
+</table>
+
+<hr>
+
+<h2>3. Network Library — <code>libs/net/</code></h2>
+<p><strong>Files:</strong> <code>net.h</code> (59 lines), <code>url.c</code> (96 lines), <code>transport.c</code>, <code>http.c</code> (347 lines), <code>robots.c</code></p>
+<p>Three-layer networking stack: URL parsing, TCP/TLS transport, and HTTP client. The HTTP response parser was partially AI-generated.</p>
+
+<h3>3.1 URL Parser — <code>url.c</code></h3>
+
+<h4><code>net_url_t</code></h4>
+<pre>typedef struct {
+    char *host;    // Hostname (e.g. "example.com")
+    char *port;    // Port string (e.g. "80" or "443")
+    char *path;    // Path + query string (e.g. "/index.html?q=1")
+    int use_tls;   // 1 for https://, 0 for http://
+} net_url_t;</pre>
+
+<h4><code>int net_parse_http_url(const char *url, net_url_t *out)</code></h4>
+<p>Parses an HTTP/HTTPS URL. Returns 0 on success, 1 on error.</p>
+<p><strong>Parsing algorithm:</strong></p>
+<ol>
+<li>Checks for <code>"http://"</code> prefix (7 chars) → no TLS</li>
+<li>Checks for <code>"https://"</code> prefix (8 chars) → TLS</li>
+<li>If no scheme prefix, defaults to HTTP</li>
+<li>Scans forward from host start to find '/' (path separator) or end of string</li>
+<li>Within host part, scans for ':' to detect explicit port</li>
+<li>If port found: splits host and port segments, allocates both</li>
+<li>If no port: allocates host, sets default port (443 for TLS, 80 otherwise)</li>
+<li>Sets path: defaults to "/" if empty, copies path_start otherwise</li>
+<li>All strings allocated with <code>malloc()</code></li>
+</ol>
+
+<h4><code>void net_free_url(net_url_t *url)</code></h4>
+<p>Frees all allocated string fields (host, port, path) and zeroes the struct.</p>
+
+<h3>3.2 Transport Layer — <code>transport.c</code></h3>
+
+<h4><code>net_conn_t</code></h4>
+<pre>typedef struct {
+    int fd;             // TCP socket file descriptor
+    void *ssl_ctx;      // SSL context (opaque handle, NULL if no TLS)
+    void *ssl;          // SSL connection object (opaque handle, NULL if no TLS)
+    int use_tls;        // 1 if TLS is active
+} net_conn_t;</pre>
+
+<h4><code>int net_conn_open(net_conn_t *conn, const char *host, const char *port, int timeout_sec, int use_tls, const char *tls_server_name, int noisy)</code></h4>
+<p>Opens a TCP connection to the specified host:port with optional TLS upgrade:</p>
+<ul>
+<li>Resolves hostname via <code>getaddrinfo()</code></li>
+<li>Creates a socket with <code>socket(AF_INET, SOCK_STREAM, 0)</code></li>
+<li>Sets socket non-blocking for connect with timeout</li>
+<li>Uses <code>poll()</code> to wait for connection with configurable timeout</li>
+<li>If TLS: wraps the fd with OpenSSL (or equivalent), performs handshake</li>
+<li>Returns 0 on success, non-zero on failure</li>
+</ul>
+
+<h4><code>void net_conn_close(net_conn_t *conn)</code></h4>
+<p>Closes the connection:</p>
+<ul>
+<li>If TLS active: performs SSL shutdown via <code>SSL_shutdown()</code>, frees SSL and SSL_CTX</li>
+<li>Closes the socket fd via <code>close()</code></li>
+</ul>
+
+<h4><code>ssize_t net_conn_read(net_conn_t *conn, void *buf, size_t len)</code></h4>
+<p>Reads data from the connection. If TLS active, uses <code>SSL_read()</code>, otherwise <code>read()</code>.</p>
+
+<h4><code>ssize_t net_conn_write(net_conn_t *conn, const void *buf, size_t len)</code></h4>
+<p>Writes data to the connection. If TLS active, uses <code>SSL_write()</code>, otherwise <code>write()</code>.</p>
+
+<h3>3.3 HTTP Layer — <code>http.c</code></h3>
+
+<h4><code>net_http_response_t</code></h4>
+<pre>typedef struct {
+    int status_code;            // HTTP status code (200, 404, 500...)
+    int chunked;                // 1 if Transfer-Encoding: chunked
+    long long content_length;   // Content-Length header value (-1 if absent)
+    long long body_bytes;       // Total body bytes actually written
+} net_http_response_t;</pre>
+
+<h4>Internal Stream Type</h4>
+<pre>typedef struct {
+    net_conn_t *conn;           // Network connection
+    const unsigned char *prefill;   // Already-read data buffer
+    size_t prefill_len;             // Amount of prefill data available
+    size_t prefill_pos;             // Current read position in prefill
+} stream_t;</pre>
+<p>The <code>stream_t</code> type implements a buffered read layer over the connection. Initial HTTP response data that was read while searching for the header terminator is stored in <code>prefill</code> so it can be consumed before reading more data from the socket.</p>
+
+<h4><code>int net_http_send_request(net_conn_t *conn, const char *method, const char *path, const char *host, const char *headers[], int header_count, const char *body, const char *user_agent)</code></h4>
+<p>Builds and sends an HTTP/1.1 request. Returns 0 on success, 1 on failure.</p>
+<p><strong>Request construction:</strong></p>
+<pre>METHOD path HTTP/1.1\r\n
+Host: host\r\n
+User-Agent: user_agent\r\n
+Accept: */*\r\n
+Connection: close\r\n
+[custom headers...]\r\n
+Content-Length: body_len\r\n
+\r\n
+body
+</pre>
+<p>The request is formatted into a 16KB static buffer using <code>snprintf()</code>. Custom headers are appended verbatim. Content-Length is included only if a body is provided. The request is sent via <code>send_all()</code> which handles partial writes and <code>EINTR</code>.</p>
+
+<h4><code>int net_http_read_response(net_conn_t *conn, FILE *out, int verbose, net_http_response_t *resp)</code></h4>
+<p>Reads and parses an HTTP response body. Returns 0 on success, 1 on failure.</p>
+<p><strong>Implementation details:</strong></p>
+<ol>
+<li><strong>Header accumulation:</strong> Reads data from socket in 8KB chunks into a dynamically growing buffer (initial 16KB, doubles as needed). Searches for <code>"\r\n\r\n"</code> (end of headers).</li>
+<li><strong>Header parsing:</strong> Duplicates the header portion, tokenizes by <code>"\r\n"</code> with <code>strtok()</code>. Extracts status code from the first line. Scans for <code>Content-Length</code> and <code>Transfer-Encoding: chunked</code> headers.</li>
+<li><strong>Body reading — chunked:</strong> Calls <code>read_chunked()</code> which loops: reads a hex chunk size line, reads that many bytes, writes them to output, reads trailing CRLF. Continues until a zero-length chunk, then consumes trailing headers.</li>
+<li><strong>Body reading — content-length:</strong> First writes any prefilled data, then reads exactly <code>content_length - prefilled</code> more bytes in a loop.</li>
+<li><strong>Body reading — connection close:</strong> (no content-length, no chunked) Reads until connection returns 0 bytes.</li>
+<li>Always flushes output via <code>fflush(out)</code>.</li>
+</ol>
+
+<h4>Helper: <code>static int send_all(net_conn_t *conn, const void *buf, size_t len)</code></h4>
+<p>Writes all <code>len</code> bytes to the connection, handling partial writes and <code>EINTR</code>. Returns 0 on success.</p>
+
+<h4>Helper: <code>static int stream_read_exact(stream_t *s, unsigned char *dst, size_t len)</code></h4>
+<p>Reads exactly <code>len</code> bytes from the stream. Uses prefill buffer first, then reads from connection. Returns 0 on success.</p>
+
+<h4>Helper: <code>static int stream_read_line(stream_t *s, char *line, size_t cap)</code></h4>
+<p>Reads one byte at a time until <code>'\n'</code> is found, then null-terminates. Returns 0 on success.</p>
+
+<h3>3.4 Robots.txt Checker — <code>robots.c</code></h3>
+
+<h4><code>int net_robots_is_allowed(const char *host, const char *port, int use_tls, int timeout_sec, const char *path, const char *user_agent, int verbose, int *allowed)</code></h4>
+<p>Fetches and parses <code>/robots.txt</code> from the target server, then checks if the given path is allowed for the given user agent.</p>
+<p><strong>Algorithm:</strong></p>
+<ol>
+<li>Opens an HTTP connection to the server</li>
+<li>Sends a GET request for <code>/robots.txt</code></li>
+<li>Reads the response body (non-chunked, connection-close mode)</li>
+<li>Parses line by line: <code>User-agent:</code>, <code>Disallow:</code>, <code>Allow:</code> directives</li>
+<li>Finds the matching user-agent section (first exact match, then wildcard <code>*</code>)</li>
+<li>Checks if the requested path matches any Disallow rule (prefix match)</li>
+<li>Sets <code>*allowed</code> to 0 (disallowed) or 1 (allowed)</li>
+<li>Returns 0 on success (fetch and parse worked), non-zero on fetch failure</li>
+</ol>
+
+<hr>
+
+<h2>4. Memory Library — <code>libs/memory/</code></h2>
+<p><strong>Files:</strong> <code>memory.h</code> (13 lines), <code>memory.c</code> (67 lines)</p>
+<p>Checked allocation wrappers that abort on failure. Every heap allocation in OneTool goes through these to guarantee OOM safety without cluttering code with NULL checks.</p>
+
+<h3>4.1 Core Concepts</h3>
+<ul>
+<li><strong>Non-zero size:</strong> All functions convert size 0 to 1 (<code>nonzero_size()</code>) to avoid implementation-defined malloc(0) behavior</li>
+<li><strong>Overflow protection:</strong> <code>checked_mul()</code> prevents integer overflow in multiplication (used by calloc and reallocarray)</li>
+<li><strong>Failure behavior:</strong> Prints "onetool: out of memory" to stderr and calls <code>exit(2)</code></li>
+</ul>
+
+<h3>4.2 API Functions</h3>
+
+<h4><code>void *ot_xmalloc(size_t size)</code></h4>
+<p>Wraps <code>malloc()</code>. If size is 0, allocates 1 byte. Aborts if NULL returned and size was non-zero.</p>
+
+<h4><code>void *ot_xcalloc(size_t count, size_t size)</code></h4>
+<p>Wraps <code>calloc()</code>. First computes <code>total = count * size</code> with overflow check (<code>checked_mul()</code>). Then allocates with <code>calloc(1, total)</code>, converting 0 to 1. Aborts if NULL.</p>
+
+<h4><code>void *ot_xrealloc(void *ptr, size_t size)</code></h4>
+<p>Wraps <code>realloc()</code>. Converts size 0 to 1. Aborts if NULL returned.</p>
+
+<h4><code>void *ot_xreallocarray(void *ptr, size_t count, size_t size)</code></h4>
+<p>Computes <code>total = count * size</code> with overflow check, then calls <code>ot_xrealloc(ptr, total)</code>.</p>
+
+<h4><code>char *ot_xstrdup(const char *s)</code></h4>
+<p>Wraps <code>strdup()</code>: computes length via <code>strlen()</code>, allocates <code>len + 1</code> via <code>ot_xmalloc()</code>, copies with <code>memcpy()</code>.</p>
+
+<h4><code>char *ot_xstrndup(const char *s, size_t len)</code></h4>
+<p>Wraps <code>strndup()</code>: allocates <code>len + 1</code> via <code>ot_xmalloc()</code>, copies <code>len</code> bytes, null-terminates.</p>
+
+<h3>4.3 Private Helpers</h3>
+<pre>static void oom(void) {
+    fprintf(stderr, "onetool: out of memory\n");
+    exit(2);
+}
+
+static size_t nonzero_size(size_t size) {
+    return size == 0 ? 1 : size;
+}
+
+static size_t checked_mul(size_t count, size_t size) {
+    if (count != 0 && size > SIZE_MAX / count) {
+        oom();  // Overflow detected
+    }
+    return count * size;
+}</pre>
+
+
+
+
+<h1>OneTool — Filesystem Tools</h1>
+<p>Six tools for inspecting files and filesystems. All are single-file C programs (except <code>size</code> which uses the shared ELF library).</p>
+
+<hr>
+<h2>lastmod — Last Modification Time</h2>
+<p><strong>Source:</strong> <code>tools/filesystem/lastmod.c</code> (30 lines)</p>
+<p><strong>Entry:</strong> <code>lm()</code></p>
+<p>Prints the last modification time (mtime) of a file in human-readable format.</p>
+
+<h3>Implementation</h3>
+<ol>
+<li>Calls <code>stat(input_file, &file_stat)</code> on the provided path</li>
+<li>Reads <code>st_mtime</code> (a <code>time_t</code>) from the stat result</li>
+<li>Formats with <code>ctime(&last_mod_time)</code> — produces output like <code>last modification time of /etc/hosts is: Thu Apr 15 12:00:00 2025</code></li>
+</ol>
+<p><strong>Error handling:</strong> If <code>stat()</code> fails (file not found, permission denied, etc.), prints <code>stat: <strerror></code> and returns 1.</p>
+
+<p><strong>Usage:</strong> <code>onetool lastmod <path></code></p>
+
+<p><strong>Example:</strong></p>
+<pre>$ onetool lastmod /etc/hosts
+last modification time of /etc/hosts is: Thu Apr 10 14:23:45 2025
+</pre>
+
+<p>Note: unlike the classic Unix <code>stat</code> command, this tool always uses <code>ctime()</code> and supports a single file argument only.</p>
+
+<hr>
+<h2>exec — Execute File</h2>
+<p><strong>Source:</strong> <code>tools/filesystem/exec.c</code> (53 lines)</p>
+<p><strong>Entry:</strong> <code>ex()</code></p>
+<p>Runs a file directly (via <code>execv()</code>) or through a specified interpreter. Replaces the current process — no fork, no return on success.</p>
+
+<h3>Implementation</h3>
+<ol>
+<li><strong>Argument parsing:</strong> Iterates through <code>argv[]</code> looking for <code>-i interpreter</code> followed by the path argument. Rejects extra arguments.</li>
+<li><strong>Direct execution:</strong> If no interpreter given, builds <code>exec_argv = [path, NULL]</code> and calls <code>execv(path, exec_argv)</code>.</li>
+<li><strong>Interpreter execution:</strong> If interpreter given, builds <code>exec_argv = [interpreter, path, NULL]</code> and calls <code>execv(interpreter, exec_argv)</code> — effectively running <code>interpreter path</code>.</li>
+<li><strong>Error handling:</strong> If <code>execv()</code> returns, prints <code>exec failed (<path>): <strerror></code> and returns 1. Common failures: <code>ENOENT</code> (file not found), <code>EACCES</code> (no execute permission), <code>ENOEXEC</code> (bad binary format).</li>
+</ol>
+
+<p><strong>Usage:</strong> <code>onetool exec <path> [-i interpreter]</code></p>
+
+<table>
+<tr><th>Option</th><th>Description</th></tr>
+<tr><td><code>path</code></td><td>Path to the program or script to execute</td></tr>
+<tr><td><code>-i interpreter</code></td><td>Run <code>path</code> through this interpreter (e.g., <code>-i python</code>)</td></tr>
+</table>
+
+<p><strong>Examples:</strong></p>
+<pre>onetool exec ./a.out
+onetool exec script.sh -i /bin/bash
+onetool exec script.py -i python3
+</pre>
+
+<p><strong>Note:</strong> This is NOT a subprocess spawner. It replaces the OneTool process with the target program via <code>execv()</code>. The <code>exec</code> family of functions does not search <code>PATH</code> — full paths are required. For PATH-based lookup, use full paths like <code>/usr/bin/python3</code>.</p>
+
+<hr>
+<h2>fsinfo — Filesystem Information</h2>
+<p><strong>Source:</strong> <code>tools/filesystem/fsinfo.c</code> (81 lines)</p>
+<p><strong>Entry:</strong> <code>fi()</code></p>
+<p>Inspects a filesystem path and prints detailed filesystem and inode information using <code>statvfs()</code> and <code>/proc/mounts</code> parsing.</p>
+
+<h3>Implementation</h3>
+<ol>
+<li><strong>statvfs:</strong> Calls <code>statvfs(path, &vfs)</code> to get filesystem statistics: total/available/free inodes.</li>
+<li><strong>Mount point resolution:</strong> Opens <code>/proc/mounts</code> via <code>setmntent()</code>, resolves the given path to an absolute path via <code>realpath()</code>, then iterates over mount entries to find the longest matching mount point (most specific match). Extracts:
+  <ul>
+    <li><code>mnt_fsname</code> — the block device (e.g., <code>/dev/sda1</code>)</li>
+    <li><code>mnt_type</code> — the filesystem type (e.g., <code>ext4</code>, <code>tmpfs</code>, <code>btrfs</code>)</li>
+  </ul>
+</li>
+<li><strong>Inode calculation:</strong> Computes used inodes = <code>f_files - f_ffree</code>, usage percentage = <code>(used * 100) / total</code> (if total > 0).</li>
+</ol>
+
+<p><strong>Output fields:</strong></p>
+<table>
+<tr><th>Field</th><th>Source</th></tr>
+<tr><td><code>fs name</code></td><td>Filesystem type from <code>/proc/mounts</code> (e.g., ext4, tmpfs)</td></tr>
+<tr><td><code>inodes total</code></td><td><code>statvfs.f_files</code></td></tr>
+<tr><td><code>inodes used</code></td><td><code>f_files - f_ffree</code></td></tr>
+<tr><td><code>inodes available</code></td><td><code>statvfs.f_favail</code></td></tr>
+<tr><td><code>inodes usage</code></td><td>Percentage: <code>(inodes_used * 100) / inodes_total</code></td></tr>
+<tr><td><code>inodes name</code></td><td>Block device from <code>/proc/mounts</code></td></tr>
+</table>
+
+<p><strong>Usage:</strong> <code>onetool fsinfo <path></code></p>
+
+<p><strong>Example:</strong></p>
+<pre>$ onetool fsinfo /
+fs name: ext4
+inodes total: 12345678
+inodes used: 234567
+inodes available: 11000000
+inodes usage: 2%
+inodes name: /dev/nvme0n1p2
+</pre>
+
+<p><strong>Note:</strong> Unlike the old version shown in overview.html (which used <code>stat()</code> for file info and <code>statvfs()</code> for block counts), the current implementation focuses exclusively on inode statistics and mount info from <code>/proc/mounts</code>.</p>
+
+<hr>
+<h2>fsize — File Size</h2>
+<p><strong>Source:</strong> <code>tools/filesystem/fsize.c</code> (99 lines)</p>
+<p><strong>Entry:</strong> <code>fz()</code></p>
+<p>Prints the size of a file in bytes or in human-readable units. Supports multiple file arguments.</p>
+
+<h3>Implementation</h3>
+<ol>
+<li><strong>Human-readable formatting:</strong> The <code>format_human()</code> function uses a 1024-based unit progression: B → KB → MiB → GiB → TiB → PiB. Uses <code>double</code> division and <code>snprintf()</code> with <code>%.1f</code> for fractions.</li>
+<li><strong>File checking:</strong> Uses <code>stat()</code> and checks <code>S_ISREG(st.st_mode)</code> — rejects non-regular files with <code>error: <path> is not regular file</code>.</li>
+<li><strong>Multi-file support:</strong> Accepts multiple file arguments. Each file gets its own line. Continues processing remaining files on error (best-effort).</li>
+</ol>
+
+<p><strong>Output format:</strong></p>
+<ul>
+<li>Raw mode (<code>-h</code> omitted): <code>1234 filename</code></li>
+<li>Human mode (<code>-h</code>): <code>1.2 KiB filename</code></li>
+</ul>
+
+<p><strong>Usage:</strong> <code>onetool fsize [-h] <path> [<path>...]</code></p>
+
+<table>
+<tr><th>Option</th><th>Description</th></tr>
+<tr><td><code>-h</code>, <code>--human</code></td><td>Print size with binary unit suffixes (B, KiB, MiB, GiB, TiB, PiB)</td></tr>
+<tr><td><code>--help</code></td><td>Show help text</td></tr>
+</table>
+
+<p><strong>Examples:</strong></p>
+<pre>$ onetool fsize /etc/hosts
+234 /etc/hosts
+$ onetool fsize -h /etc/hosts /bin/bash
+234 B /etc/hosts
+1.4 MiB /bin/bash
+</pre>
+
+<hr>
+<h2>size — ELF Section Sizes</h2>
+<p><strong>Source:</strong> <code>tools/filesystem/size.c</code> (161 lines) + <code>libs/elf/</code></p>
+<p><strong>Entry:</strong> <code>sz()</code></p>
+<p>Analyzes an ELF binary and prints section sizes. Supports two output formats (Berkeley and SysV). Uses the shared ELF parsing library (<code>ot_elf_parse()</code>) to read section headers.</p>
+
+<h3>Implementation</h3>
+<ol>
+<li><strong>File reading:</strong> Uses a custom <code>read_file()</code> that reads the entire file into a dynamically growing buffer (starts at 16KB, doubles as needed). Handles <code>EINTR</code> during reads.</li>
+<li><strong>ELF parsing:</strong> Delegates to <code>ot_elf_parse()</code> from <code>libs/elf</code> — validates ELF magic, class (64-bit only), endianness (little-endian only), version.</li>
+<li><strong>Section classification (Berkeley mode):</strong> The <code>add_alloc_section()</code> helper iterates all sections with <code>SHF_ALLOC</code> flag and classifies into:
+  <ul>
+    <li><strong>text:</strong> sections without <code>SHF_WRITE</code> and not <code>SHT_NOBITS</code> (code + read-only data combined)</li>
+    <li><strong>data:</strong> sections with <code>SHF_WRITE</code> and not <code>SHT_NOBITS</code> (initialized data)</li>
+    <li><strong>bss:</strong> sections with <code>SHT_NOBITS</code> (zero-initialized data)</li>
+  </ul>
+</li>
+<li><strong>Berkeley output:</strong> Prints a header line once, then for each file: <code>text data bss dec hex filename</code>.</li>
+<li><strong>SysV output:</strong> Prints per-section details: section name, size in decimal, address in hex, and a Total line.</li>
+</ol>
+
+<p><strong>Usage:</strong> <code>onetool size [-A|-B] <path> [<path>...]</code></p>
+
+<table>
+<tr><th>Option</th><th>Format</th><th>Description</th></tr>
+<tr><td><code>-B</code> (default)</td><td><strong>Berkeley summary</strong></td><td>Shows text, data, bss, and total sizes in a compact line per file</td></tr>
+<tr><td><code>-A</code></td><td><strong>SysV detailed</strong></td><td>Shows every section with name, size, and address</td></tr>
+</table>
+
+<p><strong>Examples:</strong></p>
+<pre>$ onetool size /bin/ls
+   text    data     bss     dec     hex filename
+ 123456   7890    1234  132580   205e4 /bin/ls
+
+$ onetool size -A /bin/ls
+/bin/ls  :
+section                           size              addr
+.interp                            28      0x318
+.note.gnu.build-id                 36      0x338
+.note.ABI-tag                      32      0x35c
+.gnu.hash                          48      0x380
+.dynsym                           240      0x3b0
+...
+Total                             94320
+</pre>
+
+<hr>
+<h2>nm — ELF Symbols</h2>
+<p><strong>Source:</strong> <code>tools/filesystem/nm.c</code></p>
+<p><strong>Entry:</strong> <code>nm()</code></p>
+<p>Prints symbols from an ELF symbol table. Mimics classic Unix <code>nm(1)</code> in spirit.</p>
+
+<h3>Implementation</h3>
+<ol>
+<li>Parses the ELF file using <code>ot_elf_parse()</code> from <code>libs/elf</code></li>
+<li>Locates the <code>SHT_SYMTAB</code> section (symbol table)</li>
+<li>Reads each symbol entry (24 bytes each for ELF64): name (via strtab offset), value (8 bytes), size (8 bytes), info (1 byte: bind+type), other (1 byte), shndx (2 bytes)</li>
+<li>Classifies by <code>ELF64_ST_TYPE</code> (STT_FUNC, STT_OBJECT, etc.) and <code>ELF64_ST_BIND</code> (STB_GLOBAL, STB_LOCAL, STB_WEAK)</li>
+<li>Determines symbol visibility based on shndx: <code>SHN_UNDEF</code> = undefined, <code>SHN_ABS</code> = absolute, <code>SHN_COMMON</code> = common</li>
+<li>Output formatting: uppercase letter = global, lowercase = local</li>
+</ol>
+
+<p><strong>Output format:</strong> <code>address type symbol_name</code> where type is one of:</p>
+<ul>
+<li><code>T</code> / <code>t</code> — Text (code) section symbol</li>
+<li><code>D</code> / <code>d</code> — Data section symbol</li>
+<li><code>B</code> / <code>b</code> — BSS symbol</li>
+<li><code>U</code> — Undefined (imported from another object)</li>
+<li><code>?</code> — Unknown/unclassified</li>
+</ul>
+<p>Upper case = global, lower case = local.</p>
+
+<p><strong>Usage:</strong> <code>onetool nm [-a|-g|-u] <path></code></p>
+
+<table>
+<tr><th>Option</th><th>Description</th></tr>
+<tr><td>(none)</td><td>Show all defined symbols</td></tr>
+<tr><td><code>-a</code></td><td>Include empty and debug symbols</td></tr>
+<tr><td><code>-g</code></td><td>External (global) symbols only</td></tr>
+<tr><td><code>-u</code></td><td>Undefined symbols only</td></tr>
+</table>
+
+<p><strong>Example:</strong></p>
+<pre>$ onetool nm -g ./main.o
+0000000000000000 T main
+0000000000000030 T helper_function
+         U printf
+         U malloc
+</pre>
+
+<hr>
+<h2>cat — Print Files</h2>
+<p><strong>Source:</strong> <code>tools/filesystem/cat.c</code> (80 lines)</p>
+<p><strong>Entry:</strong> <code>cat()</code></p>
+<p>Reads files sequentially and writes them to stdout. Supports line numbering and reading from stdin (via <code>-</code> argument or when no files are given).</p>
+
+<h3>Implementation</h3>
+<ol>
+<li><strong>Option parsing:</strong> Supports <code>-n</code>/<code>--number</code> (line numbering) and <code>--help</code>. Unknown options return error.</li>
+<li><strong>File detection:</strong> If argument is <code>"-"</code>, reads from stdin via <code>print_stream(stdin, ...)</code>. Otherwise opens file with <code>fopen(path, "r")</code> — prints <code>error: path: strerror</code> on failure and continues to next file.</li>
+<li><strong>Stream reading (<code>print_stream</code>):</strong> Reads character-by-character with <code>fgetc()</code>. If <code>-n</code> is active and at line start, prints <code>%6d\t</code> with incrementing line number (starting at 1). Tracks line start state via <code>at_line_start</code> flag (becomes true when <code>ch == '\n'</code>).</li>
+<li><strong>Default stdin:</strong> If no file arguments given, reads from stdin (like classic <code>cat</code> without arguments).</li>
+<li><strong>Error handling:</strong> Checks <code>ferror(fp)</code> after the read loop — prints read error if set.</li>
+</ol>
+
+<h3>Usage</h3>
+<pre>onetool cat [options] [file...]
+
+Options:
+  -n, --number   Number output lines
+  --help         Show help
+
+If no file is given, reads from stdin.
+Use "-" to read from stdin explicitly among files.
+</pre>
+
+<h3>Examples</h3>
+<pre>$ onetool cat /etc/hostname
+myhost
+
+$ onetool cat -n /etc/hosts
+     1	127.0.0.1 localhost
+     2	::1       localhost
+
+$ echo "hello" | onetool cat -n
+     1	hello
+
+$ onetool cat - /etc/hosts  # stdin then file
+</pre>
+
+<hr>
+<h2>free — Memory Usage</h2>
+<p><strong>Source:</strong> <code>tools/filesystem/free.c</code> (118 lines)</p>
+<p><strong>Entry:</strong> <code>free()</code></p>
+<p>Displays system memory usage by parsing <code>/proc/meminfo</code>. Shows total, used, free, shared, buff/cache, and available memory for both RAM and swap. Supports multiple output unit formats.</p>
+
+<h3>Implementation</h3>
+
+<h4>Memory Info Parsing — <code>read_meminfo()</code></h4>
+<ol>
+<li>Opens <code>/proc/meminfo</code> with <code>fopen("/proc/meminfo", "r")</code> — returns error if unavailable</li>
+<li>Reads each line with <code>fscanf(fp, "%63[^:]: %" SCNu64 " %15s\n", key, &value, unit)</code> — extracts key name (up to 63 chars before <code>:</code>), numeric value, and unit string ("kB")</li>
+<li>Multiplies all values by 1024 to convert from kilobytes to bytes</li>
+<li>Matches keys: <code>MemTotal</code>, <code>MemFree</code>, <code>MemAvailable</code>, <code>Buffers</code>, <code>Cached</code>, <code>SwapTotal</code>, <code>SwapFree</code></li>
+<li>Returns 1 (error) if <code>info->total == 0</code> (no MemTotal found)</li>
+</ol>
+
+<h4>Computed Fields</h4>
+<ul>
+<li><code>buff_cache = Buffers + Cached</code></li>
+<li><code>used = MemTotal - MemFree - buff_cache</code> (clamped at 0 via ternary)</li>
+<li><code>swap_used = SwapTotal - SwapFree</code></li>
+</ul>
+
+<h4>Unit Conversion</h4>
+<p>Supports five output modes via <code>divisor</code>:</p>
+<table>
+<tr><th>Flag</th><th>Divider</th></tr>
+<tr><td><code>-b</code></td><td>1 (bytes)</td></tr>
+<tr><td><code>-k</code> (default)</td><td>1024 (KiB)</td></tr>
+<tr><td><code>-m</code></td><td>1,048,576 (MiB)</td></tr>
+<tr><td><code>-g</code></td><td>1,073,741,824 (GiB)</td></tr>
+<tr><td><code>-h</code></td><td>Human-readable (auto-selects B/KiB/MiB/GiB/TiB)</td></tr>
+</table>
+
+<h4>Human Formatting (<code>format_value</code>)</h4>
+<p>In human mode: divides by 1024 repeatedly (B → KiB → MiB → GiB → TiB) and formats with <code>%.1f</code> and unit suffix. In raw mode: divides by the chosen divisor and prints integer.</p>
+
+<h3>Output Format</h3>
+<pre>              total        used        free      shared  buff/cache   available
+Mem:         8123456     1234567      3456789           0     2345678      6789012
+Swap:        2097152      123456      1973696           0           0           0
+</pre>
+<p>Each column is 12 characters wide, right-aligned.</p>
+
+<h3>Usage</h3>
+<pre>onetool free [-b|-k|-m|-g|-h] [--help]
+
+Options:
+  -b            bytes
+  -k            KiB (default)
+  -m            MiB
+  -g            GiB
+  -h, --human   human readable
+  --help        show help
+</pre>
+
+<h3>Examples</h3>
+<pre>$ onetool free
+              total        used        free      shared  buff/cache   available
+Mem:         8123456     1234567     3456789           0     2345678     6789012
+Swap:        2097152      123456     1973696           0           0           0
+
+$ onetool free -h
+              total        used        free      shared  buff/cache   available
+Mem:          7.8GiB      1.2GiB      3.3GiB           0      2.2GiB      6.5GiB
+Swap:         2.0GiB      120.6MiB    1.9GiB           0           0           0
+</pre>
+
+<hr>
+<h2>ls — List Directory</h2>
+<p><strong>Source:</strong> <code>tools/filesystem/ls.c</code> (215 lines)</p>
+<p><strong>Entry:</strong> <code>ls()</code></p>
+<p>Lists directory contents. Supports short format (filenames only), long format (<code>-l</code> with permissions, owner, size, date), hidden files (<code>-a</code>), and human-readable sizes (<code>-h</code>). Defaults to current directory if no path given.</p>
+
+<h3>Implementation</h3>
+
+<h4>Option Parsing</h4>
+<ul>
+<li><code>-a</code>/<code>--all</code> — include dotfiles (entries starting with <code>.</code>)</li>
+<li><code>-l</code>/<code>--long</code> — detailed listing with permissions, owner, group, size, mtime</li>
+<li><code>-h</code>/<code>--human</code> — human-readable sizes (only with <code>-l</code>)</li>
+</ul>
+
+<h4>Directory Listing — <code>list_dir()</code></h4>
+<ol>
+<li>Opens the directory with <code>opendir(path)</code> — prints error on failure</li>
+<li>Iterates with <code>readdir(dir)</code> — skips hidden files (<code>d_name[0] == '.'</code>) unless <code>-a</code> is set</li>
+<li>In short mode: prints each filename on its own line via <code>printf("%s\n", d_name)</code></li>
+<li>In long mode: calls <code>print_long_entry()</code> for each file</li>
+</ol>
+
+<h4>Long Format — <code>print_long_stat()</code></h4>
+<p>Formats output line as:</p>
+<pre>drwxr-xr-x  2 root root  4096 Jan 15 10:30 dirname
+-rw-r--r--  1 user group  1234 Jan 15 10:30 filename</pre>
+
+<ol>
+<li><strong>Permissions (<code>mode_string()</code>):</strong> Builds an 11-character string:
+  <ul>
+    <li>File type: <code>d</code> (dir), <code>l</code> (symlink), <code>c</code> (char device), <code>b</code> (block), <code>p</code> (fifo), <code>s</code> (socket), <code>-</code> (regular)</li>
+    <li>Owner: <code>rwx</code> (bit-tested via <code>S_IRUSR</code>, <code>S_IWUSR</code>, <code>S_IXUSR</code>)</li>
+    <li>Group: <code>rwx</code> (via <code>S_IRGRP</code>, <code>S_IWGRP</code>, <code>S_IXGRP</code>)</li>
+    <li>Other: <code>rwx</code> (via <code>S_IROTH</code>, <code>S_IWOTH</code>, <code>S_IXOTH</code>)</li>
+  </ul>
+</li>
+<li><strong>Link count:</strong> <code>st_nlink</code> printed as <code>%3ju</code></li>
+<li><strong>Owner/Group:</strong> <code>getpwuid(st->st_uid)</code> and <code>getgrgid(st->st_gid)</code> — falls back to <code>"?"</code> if lookup fails</li>
+<li><strong>Size:</strong> Raw bytes or human-readable (B/K/M/G/T/P progression with <code>format_size()</code>)</li>
+<li><strong>Timestamp:</strong> <code>localtime_r(&st->st_mtime, &tmv)</code> + <code>strftime(timebuf, "%b %d %H:%M")</code></li>
+</ol>
+
+<h4>Path Handling — <code>list_path()</code></h4>
+<p>Uses <code>lstat()</code> to check the path type:</p>
+<ul>
+<li><strong>Directory:</strong> calls <code>list_dir()</code> to list contents</li>
+<li><strong>Regular file (or other):</strong> prints the single entry directly (short or long format)</li>
+</ul>
+
+<h4>File Path Construction — <code>print_long_entry()</code></h4>
+<p>Constructs full path via <code>snprintf(fullpath, "%s/%s", path, name)</code> (4096-byte buffer, checks truncation), then calls <code>lstat()</code> and <code>print_long_stat()</code>.</p>
+
+<h3>Usage</h3>
+<pre>onetool ls [options] [path...]
+
+Options:
+  -a, --all     show hidden files (dotfiles)
+  -l, --long    long listing (permissions, owner, size, date)
+  -h, --human   human readable sizes (with -l)
+  --help        show help
+
+If no path is given, lists the current directory (".").
+Multiple paths are supported.
+</pre>
+
+<h3>Examples</h3>
+<pre>$ onetool ls
+file1.txt
+file2.txt
+mydir
+
+$ onetool ls -la
+total 0
+drwxr-xr-x  2 user group  4096 Jan 15 10:30 .
+drwxr-xr-x  3 user group  4096 Jan 15 10:30 ..
+-rw-r--r--  1 user group   234 Jan 15 10:30 file1.txt
+-rw-r--r--  1 user group  1234 Jan 15 10:30 file2.txt
+drwxr-xr-x  2 user group  4096 Jan 15 10:30 mydir
+
+$ onetool ls -lh /bin/bash
+-rwxr-xr-x  1 root root  1.4M Jan 15 10:30 /bin/bash
+</pre>
+
+<h3>Limitations</h3>
+<ul>
+<li><strong>No sorting:</strong> Entries are printed in <code>readdir()</code> order (filesystem-dependent, typically hash table order)</li>
+<li><strong>No color:</strong> No type-based coloring (unlike GNU ls with <code>--color</code>)</li>
+<li><strong>Single-column:</strong> Short format prints one entry per line (no column alignment)</li>
+<li><strong>No recursive:</strong> <code>-R</code> is not implemented</li>
+</ul>
+
+
+
+
+<h1>OneTool — Network Tools</h1>
+<p>Three network tools: HTTP downloader (down), ICMP ping, and DHCP client (nsetup). All use raw sockets or the shared network library (<code>libs/net</code>).</p>
+
+<hr>
+<h2>down — HTTP Downloader</h2>
+<p><strong>Source:</strong> <code>tools/network/down/</code> — 6 files</p>
+<table>
+<tr><th>File</th><th>Lines</th><th>Purpose</th></tr>
+<tr><td><code>down.h</code></td><td>40</td><td>Request/response type definitions and function declarations</td></tr>
+<tr><td><code>cli.c</code></td><td>20</td><td>Entry point: parses CLI, opens output file, calls down_run()</td></tr>
+<tr><td><code>core/parse.c</code></td><td>175</td><td>CLI option parsing, URL parsing via libs/net, request init/free</td></tr>
+<tr><td><code>core/send.c</code></td><td>88</td><td>HTTP request execution: connect, send, read response, status output</td></tr>
+<tr><td><code>core/robots.c</code></td><td>28</td><td>Robots.txt compliance check</td></tr>
+<tr><td><code>net/socket.c</code></td><td>—</td><td>Socket-level operations</td></tr>
+</table>
+<p><strong>Entry:</strong> <code>dn()</code> in <code>cli.c</code></p>
+<p>A curl-like HTTP client supporting GET, POST, and HEAD methods with TLS, custom headers, request body, and robots.txt etiquette.</p>
+
+<h3>Architecture</h3>
+<p>The down tool delegates all network operations to the shared library <code>libs/net</code>:</p>
+<ul>
+<li><code>net_parse_http_url()</code> — URL parsing into host/port/path/TLS flag</li>
+<li><code>net_conn_open()</code> — TCP connection with optional TLS upgrade</li>
+<li><code>net_http_send_request()</code> — HTTP/1.1 request construction</li>
+<li><code>net_http_read_response()</code> — Response header parsing + body reading (chunked, content-length, connection-close)</li>
+<li><code>net_robots_is_allowed()</code> — robots.txt fetch and parse</li>
+</ul>
+
+<h3>Request Structure — <code>down_request_t</code></h3>
+<pre><span class="kwd">typedef struct</span> {
+    <span class="kwd">char</span> *url;              <span class="cmt">// Target URL (e.g. "https://example.com/index.html")</span>
+    <span class="kwd">char</span> *method;           <span class="cmt">// HTTP method: GET (default), POST, HEAD</span>
+    <span class="kwd">char</span> *host;             <span class="cmt">// Hostname extracted from URL (e.g. "example.com")</span>
+    <span class="kwd">char</span> *port;             <span class="cmt">// Port extracted from URL ("80" or "443" by default)</span>
+    <span class="kwd">char</span> *path;             <span class="cmt">// URL path + query (e.g. "/index.html?q=1")</span>
+    <span class="kwd">char</span> *body;             <span class="cmt">// Request body for POST requests</span>
+    <span class="kwd">char</span> *output_path;      <span class="cmt">// File path to save response (NULL = stdout)</span>
+    <span class="kwd">char</span> *headers[<span class="num">64</span>];   <span class="cmt">// Custom header strings (array of malloc'd copies)</span>
+    <span class="kwd">int</span> header_count;       <span class="cmt">// Number of custom headers</span>
+    <span class="kwd">int</span> timeout_sec;        <span class="cmt">// Connection timeout in seconds (default 10)</span>
+    <span class="kwd">int</span> verbose;            <span class="cmt">// Print diagnostics to stderr</span>
+    <span class="kwd">int</span> quiet;              <span class="cmt">// Suppress status lines on stderr</span>
+    <span class="kwd">int</span> use_tls;            <span class="cmt">// 1 if HTTPS (TLS) should be used</span>
+    <span class="kwd">int</span> ignore_robots;      <span class="cmt">// Skip robots.txt check</span>
+} down_request_t;
+</pre>
+
+<h3>CLI Parsing — <code>down_parse_cli()</code></h3>
+<p>Located in <code>core/parse.c</code> (175 lines). Implements iterative argument processing:</p>
+<ul>
+<li><strong>Flags parsed:</strong> <code>-v</code> (verbose), <code>-q</code>/<code>--quiet</code>, <code>-o</code> (output file), <code>-X</code> (method), <code>-H</code> (custom header, up to 64), <code>-d</code> (body), <code>--timeout</code> (1-3600 seconds, validated with strtol), <code>--ignore-robots</code>, <code>--help</code></li>
+<li><strong>Method auto-detection:</strong> If no <code>-X</code> is given but <code>-d</code> (body) is provided, method defaults to POST. Otherwise defaults to GET.</li>
+<li><strong>Method normalization:</strong> Converts method string to uppercase via <code>toupper()</code></li>
+<li><strong>URL parsing:</strong> Delegates to <code>down_parse_url()</code> which calls <code>net_parse_http_url()</code>, storing the extracted host, port, path, and TLS flag into the request struct</li>
+<li><strong>Memory management:</strong> Uses internal <code>down_strdup()</code> wrapper. All strings freed by <code>down_request_free()</code></li>
+<li><strong>Error handling:</strong> Prints errors to stderr (unknown option, missing value, too many headers, OOM). Returns 0 on success, 1 on error, 2 for help (don't run).</li>
+</ul>
+
+<h3>Request Execution — <code>down_run()</code></h3>
+<p>Located in <code>core/send.c</code> (88 lines). The HTTP request lifecycle:</p>
+<ol>
+<li><strong>Status header:</strong> If not quiet, prints <code>down: METHOD scheme://host:port/path</code> to stderr</li>
+<li><strong>Robots check:</strong> Calls <code>down_check_robots()</code> which calls <code>net_robots_is_allowed()</code>. If the fetch fails (network error), the check is silently skipped. If robots.txt explicitly disallows the path, prints <code>down: blocked by robots.txt /path</code> and returns error.</li>
+<li><strong>Connect:</strong> Opens TCP connection via <code>net_conn_open()</code> with the configured timeout. If verbose: prints <code>down: connected to host:port (http/https)</code></li>
+<li><strong>Send request:</strong> Calls <code>net_http_send_request()</code> with method, path, host, custom headers array, body, and user-agent <code>"onetool-down/0.2"</code></li>
+<li><strong>Read response:</strong> Calls <code>net_http_read_response()</code> which writes the response body to the output file/stdout, parses status code and content-length</li>
+<li><strong>Status report:</strong> When not quiet, reports HTTP status code + body bytes. If output file was used, reports where the response was saved.</li>
+<li><strong>Cleanup:</strong> Closes the connection and returns 0 on success.</li>
+</ol>
+
+<h3>Robots.txt Checking — <code>down_check_robots()</code></h3>
+<p>Located in <code>core/robots.c</code> (28 lines). Calls <code>net_robots_is_allowed()</code> from <code>libs/net</code> with user-agent <code>"onetool-down"</code>. If the robots.txt fetch itself fails (e.g., DNS resolution fails, connection refused), the check is silently skipped to avoid breaking requests when the server is unreachable for the initial fetch. If the response explicitly disallows the path, the download is aborted with an error message.</p>
+
+<h3>Entry Point — <code>main()</code> in <code>cli.c</code></h3>
+<ol>
+<li>Calls <code>down_parse_cli()</code> — returns 0=run, 1=error, 2=help</li>
+<li>If output path specified: opens file with <code>fopen(path, "wb")</code> — prints error and returns 1 on failure</li>
+<li>Calls <code>down_run()</code> with the request and output FILE*</li>
+<li>If output file was opened, closes it via <code>fclose()</code></li>
+<li>Frees the request struct via <code>down_request_free()</code> — frees all malloc'd string fields and custom headers</li>
+</ol>
+
+<h3>Usage</h3>
+<pre>onetool down [options] <url>
+
+Options:
+  -o file           Output to file instead of stdout
+  -X method         HTTP method (GET, POST, HEAD)
+  -d body           Request body for POST
+  -H header         Add custom header (can repeat, max 64)
+  --timeout sec     Connection timeout (default 10, max 3600)
+  --ignore-robots   Skip robots.txt check
+  -v                Verbose (print diagnostics to stderr)
+  -q, --quiet       Quiet mode (suppress status lines)
+  -h, --help        Show help
+</pre>
+
+<h3>Examples</h3>
+<pre># Simple GET
+onetool down https://example.com
+
+# Save to file
+onetool down -o index.html https://example.com
+
+# POST with body
+onetool down -X POST -d "name=test" https://httpbin.org/post
+
+# Verbose with custom headers
+onetool down -v -H "Authorization: Bearer token" https://api.example.com/data
+
+# HEAD request with timeout
+onetool down -X HEAD --timeout 5 https://example.com
+</pre>
+
+<h3>Status Output</h3>
+<p>When not in quiet mode, the tool prints to stderr:</p>
+<pre>down: GET http://example.com:80/
+down: HTTP 200 OK, 1256 bytes
+</pre>
+<p>Or with <code>-o file</code>:</p>
+<pre>down: HTTP 200 OK, 1256 bytes, saved to index.html
+</pre>
+
+<hr>
+<h2>ping — ICMP Ping</h2>
+<p><strong>Source:</strong> <code>tools/network/ping/cli.c</code> (230 lines, single file)</p>
+<p><strong>Entry:</strong> <code>pg()</code></p>
+<p>A self-contained ICMP echo client (ping) implemented entirely from scratch with raw sockets. Requires root or <code>CAP_NET_RAW</code> for raw socket access.</p>
+
+<h3>Architecture</h3>
+<p>The entire ping tool is a single C file with no external library dependencies beyond standard POSIX headers. It uses:</p>
+<ul>
+<li><code>socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)</code> — raw IPv4 ICMP socket</li>
+<li><code>getaddrinfo()</code> — hostname resolution (IPv4 only)</li>
+<li><code>sendto()</code> / <code>recvfrom()</code> — raw packet I/O</li>
+<li><code>poll()</code> — per-packet timeout with millisecond precision</li>
+<li><code>gettimeofday()</code> — microsecond-precision timestamps for RTT calculation</li>
+</ul>
+
+<h3>Options Structure — <code>ping_opts_t</code></h3>
+<pre><span class="kwd">typedef struct</span> {
+    <span class="kwd">const char</span> *host;       <span class="cmt">// Target hostname or IP</span>
+    <span class="kwd">int</span> count;               <span class="cmt">// Number of echo requests (default 4, max 1000000)</span>
+    <span class="kwd">int</span> timeout_ms;          <span class="cmt">// Per-packet timeout in ms (default 1000, max 600000)</span>
+    <span class="kwd">int</span> payload_size;        <span class="cmt">// Payload size in bytes (default 56, max 1400)</span>
+    <span class="kwd">double</span> interval_sec;     <span class="cmt">// Interval between packets (default 1.0, min 0.01, max 3600)</span>
+    <span class="kwd">int</span> quiet;               <span class="cmt">// Print only final summary</span>
+} ping_opts_t;
+</pre>
+
+<h3>CLI Parsing — <code>parse_opts()</code></h3>
+<p>Parses options from <code>argv[]</code> into <code>ping_opts_t</code>. Uses value helpers with range validation:</p>
+<ul>
+<li><code>parse_int()</code> — uses <code>strtol()</code>, validates range [min_v, max_v], rejects trailing garbage</li>
+<li><code>parse_double()</code> — uses <code>strtod()</code>, validates range [min_v, max_v]</li>
+<li><strong>Flags:</strong> <code>-c</code> (count, 1-1000000), <code>-W</code> (timeout ms, 1-600000), <code>-s</code> (payload size, 0-1400), <code>-i</code> (interval, 0.01-3600.0), <code>-q</code>/<code>--quiet</code>, <code>-h</code>/<code>--help</code></li>
+<li>Defaults: count=4, timeout=1000ms, payload=56, interval=1.0, quiet=0</li>
+</ul>
+
+<h3>ICMP Packet Construction</h3>
+<ol>
+<li><strong>Packet buffer:</strong> 1500-byte buffer (max Ethernet MTU). Total packet size = <code>sizeof(icmphdr) + sizeof(timeval) + payload_size</code></li>
+<li><strong>ICMP header fields:</strong>
+  <ul>
+    <li><code>icmp->type = ICMP_ECHO</code> (8) — echo request</li>
+    <li><code>icmp->code = 0</code></li>
+    <li><code>icmp->un.echo.id = htons(pid & 0xFFFF)</code> — process ID to match replies</li>
+    <li><code>icmp->un.echo.sequence = htons(seq)</code> — sequence number 1..count</li>
+  </ul>
+</li>
+<li><strong>Timestamp embedding:</strong> Immediately after the ICMP header, <code>gettimeofday(&send_tv)</code> is stored — this is used later to compute RTT by comparing with the reception timestamp</li>
+<li><strong>Payload fill:</strong> Remaining bytes are filled with a predictable pattern <code>(i & 0xFF)</code></li>
+<li><strong>Checksum:</strong> Computed via the standard Internet checksum algorithm on the entire packet (header + timestamp + payload) using <code>icmp_checksum()</code></li>
+</ol>
+
+<h3>Send and Receive Loop</h3>
+<p>For each sequence number from 1 to count:</p>
+<ol>
+<li><strong>Build packet</strong> as described above</li>
+<li><strong>Send:</strong> <code>sendto(sock, packet, pkt_len, 0, &dst, sizeof(dst))</code> — increments tx counter. On send error: prints <code>ping: sendto failed: strerror</code> and continues to next sequence</li>
+<li><strong>Poll:</strong> <code>poll(&pfd, 1, timeout_ms)</code> — waits for data on the raw socket:
+  <ul>
+    <li><strong>Timeout (0):</strong> Prints <code>request timeout icmp_seq N</code></li>
+    <li><strong>Error (<0):</strong> Handles EINTR (ignore), otherwise prints poll error</li>
+    <li><strong>Data available (>0):</strong> Calls <code>recvfrom()</code> into a 2048-byte buffer</li>
+  </ul>
+</li>
+<li><strong>Reply parsing:</strong> Validates the received packet is at least <code>sizeof(iphdr) + sizeof(icmphdr)</code> bytes. Parses the IP header to get IHL (IP header length, typically 20 bytes). Extracts the ICMP header from <code>recvbuf + ihl</code>:
+  <ul>
+    <li>Checks <code>ri->type == ICMP_ECHOREPLY</code> (0)</li>
+    <li>Checks <code>ntohs(ri->un.echo.id) == pid_id</code> — matches our process ID to avoid picking up other ping replies</li>
+    <li>Reads embedded timestamp from <code>recvbuf + ihl + sizeof(icmphdr)</code></li>
+    <li>Computes RTT via <code>ms_since(&sent_in_pkt, &recv_tv)</code> — difference in microseconds converted to milliseconds</li>
+    <li>Updates min/max/sum RTT statistics, increments rx counter</li>
+    <li>If not quiet: prints <code>N bytes from IP: icmp_seq=N ttl=N time=XXX.XXX ms</code></li>
+  </ul>
+</li>
+<li><strong>Inter-packet delay:</strong> If not the last packet, calls <code>usleep(interval_sec * 1000000)</code></li>
+</ol>
+
+<h3>Statistics Summary</h3>
+<p>After the loop:</p>
+<ul>
+<li>Prints the target hostname/IP</li>
+<li>If any packets were transmitted: prints <code>N packets transmitted N received X.X% packet loss</code></li>
+<li>If any replies were received: prints <code>rtt min/avg/max = X.XXX/X.XXX/X.XXX ms</code></li>
+<li>Returns 0 if at least one reply was received, 1 otherwise</li>
+</ul>
+
+<h3>ICMP Checksum — <code>icmp_checksum()</code></h3>
+<pre><span class="kwd">static unsigned short</span> icmp_checksum(<span class="kwd">const void</span> *data, <span class="kwd">size_t</span> len) {
+    <span class="kwd">const unsigned short</span> *p = data;
+    <span class="kwd">unsigned int</span> sum = <span class="num">0</span>;
+    <span class="kwd">while</span> (len > <span class="num">1</span>) {
+        sum += *p++;
+        len -= <span class="num">2</span>;
+    }
+    <span class="kwd">if</span> (len == <span class="num">1</span>)
+        sum += *(<span class="kwd">const unsigned char</span> *)p;
+    <span class="kwd">while</span> (sum >> <span class="num">16</span>)
+        sum = (sum & <span class="num">0xFFFF</span>) + (sum >> <span class="num">16</span>);
+    <span class="kwd">return</span> ~sum;
+}
+</pre>
+<p>This is the standard 16-bit one's complement Internet checksum (RFC 1071). Used by ICMP, IP, TCP, and UDP. The algorithm sums 16-bit words, folds carries, and returns the bitwise complement.</p>
+
+<h3>RTT Calculation — <code>ms_since()</code></h3>
+<pre><span class="kwd">static double</span> ms_since(<span class="kwd">const struct timeval</span> *start, <span class="kwd">const struct timeval</span> *end) {
+    <span class="kwd">double</span> sec = (<span class="kwd">double</span>)(end->tv_sec - start->tv_sec);
+    <span class="kwd">double</span> usec = (<span class="kwd">double</span>)(end->tv_usec - start->tv_usec);
+    <span class="kwd">return</span> sec * <span class="num">1000.0</span> + usec / <span class="num">1000.0</span>;
+}
+</pre>
+<p>Computes the difference between two <code>struct timeval</code> timestamps in milliseconds as a double (microsecond precision). This handles the full range of possible RTT values without overflow.</p>
+
+<h3>Error Handling</h3>
+<ul>
+<li><strong>Permission:</strong> If <code>socket()</code> fails with <code>EPERM</code> or <code>EACCES</code>, prints <code>ping: raw socket requires root or CAP_NET_RAW</code> — a helpful message for users who forgot sudo</li>
+<li><strong>DNS resolution:</strong> If <code>getaddrinfo()</code> fails, prints <code>ping: cannot resolve host NAME</code></li>
+<li><strong>Payload overflow:</strong> If computed packet size exceeds 1500 bytes, prints error and exits</li>
+<li><strong>Invalid options:</strong> All option values have min/max bounds checking with descriptive error messages</li>
+</ul>
+
+<h3>Usage</h3>
+<pre>onetool ping <host> [options]
+
+Options:
+  -c count     Number of echo requests to send (default 4, max 1000000)
+  -i seconds   Interval between packets (default 1.0, min 0.01)
+  -W ms        Per-packet timeout in ms (default 1000, max 600000)
+  -s bytes     Payload size in bytes (default 56, max 1400)
+  -q, --quiet  Print only summary at the end
+  -h, --help   Show help
+</pre>
+
+<h3>Example</h3>
+<pre>$ onetool ping 1.1.1.1 -c 3 -q
+PING 1.1.1.1 (1.1.1.1): 56 data bytes
+
+1.1.1.1
+3 packets transmitted 3 received 0.0% packet loss
+rtt min/avg/max = 12.345/13.567/15.890 ms
+</pre>
+
+<p>Verbose output (without -q):</p>
+<pre>$ onetool ping 1.1.1.1 -c 2
+PING 1.1.1.1 (1.1.1.1): 56 data bytes
+64 bytes from 1.1.1.1: icmp_seq=1 ttl=56 time=12.345 ms
+64 bytes from 1.1.1.1: icmp_seq=2 ttl=56 time=13.567 ms
+
+1.1.1.1
+2 packets transmitted 2 received 0.0% packet loss
+rtt min/avg/max = 12.345/12.956/13.567 ms
+</pre>
+
+<hr>
+<h2>nsetup — Network Setup (DHCP)</h2>
+<p><strong>Entry:</strong> <code>ns()</code> in <code>tools/network/nsetup.c</code></p>
+<p>A minimal DHCP client that can bring up a network interface and obtain IPv4 configuration via DHCP. Implements the DHCP protocol from scratch (no external DHCP library).</p>
+
+<h3>Implementation Details</h3>
+<p>The DHCP client implements the full DORA (Discover, Offer, Request, Acknowledge) sequence:</p>
+<ol>
+<li><strong>Discover:</strong> Broadcasts a DHCPDISCOVER packet to find available DHCP servers</li>
+<li><strong>Offer:</strong> Waits for DHCPOFFER from a server containing proposed IP configuration</li>
+<li><strong>Request:</strong> Sends DHCPREQUEST to formally request the offered lease</li>
+<li><strong>Acknowledge:</strong> Waits for DHCPACK confirming the lease</li>
+</ol>
+
+<h3>Packet Format</h3>
+<p>The DHCP packet is defined as a packed C struct matching the RFC 2131 format:</p>
+<pre><span class="kwd">typedef struct</span> __attribute__((packed)) {
+    <span class="kwd">uint8_t</span> op;            <span class="cmt">// Message op code</span>
+    <span class="kwd">uint8_t</span> htype;          <span class="cmt">// Hardware address type</span>
+    <span class="kwd">uint8_t</span> hlen;           <span class="cmt">// Hardware address length</span>
+    <span class="kwd">uint8_t</span> hops;           <span class="cmt">// Hops</span>
+    <span class="kwd">uint32_t</span> xid;           <span class="cmt">// Transaction ID</span>
+    <span class="kwd">uint16_t</span> secs;          <span class="cmt">// Seconds elapsed</span>
+    <span class="kwd">uint16_t</span> flags;         <span class="cmt">// Flags</span>
+    <span class="kwd">uint32_t</span> ciaddr;        <span class="cmt">// Client IP</span>
+    <span class="kwd">uint32_t</span> yiaddr;        <span class="cmt">// Your IP</span>
+    <span class="kwd">uint32_t</span> siaddr;        <span class="cmt">// Server IP</span>
+    <span class="kwd">uint32_t</span> giaddr;        <span class="cmt">// Relay agent IP</span>
+    <span class="kwd">unsigned char</span> chaddr[<span class="num">16</span>]; <span class="cmt">// Client hardware address</span>
+    <span class="kwd">unsigned char</span> sname[<span class="num">64</span>];  <span class="cmt">// Server host name</span>
+    <span class="kwd">unsigned char</span> file[<span class="num">128</span>];   <span class="cmt">// Boot file name</span>
+    <span class="kwd">uint32_t</span> cookie;         <span class="cmt">// Magic cookie (0x63825363)</span>
+    <span class="kwd">unsigned char</span> options[<span class="num">312</span>]; <span class="cmt">// DHCP options</span>
+} dhcp_packet_t;
+</pre>
+
+<h3>DHCP Options Parsed</h3>
+<table>
+<tr><th>Option Code</th><th>Name</th><th>Description</th></tr>
+<tr><td>1</td><td>Subnet Mask</td><td>Network mask for the assigned IP</td></tr>
+<tr><td>3</td><td>Router</td><td>Default gateway(s)</td></tr>
+<tr><td>6</td><td>DNS Server</td><td>DNS nameserver(s)</td></tr>
+<tr><td>12</td><td>Hostname</td><td>Client hostname</td></tr>
+<tr><td>15</td><td>Domain Name</td><td>DNS search domain</td></tr>
+<tr><td>50</td><td>Requested IP</td><td>IP address being requested</td></tr>
+<tr><td>51</td><td>Lease Time</td><td>IP lease duration</td></tr>
+<tr><td>53</td><td>Message Type</td><td>DHCP message type (Discover, Offer, etc.)</td></tr>
+<tr><td>54</td><td>Server Identifier</td><td>DHCP server address</td></tr>
+<tr><td>55</td><td>Parameter Request List</td><td>List of options the client requests</td></tr>
+<tr><td>61</td><td>Client Identifier</td><td>Unique client ID (based on MAC)</td></tr>
+</table>
+
+<h3>Network Configuration Applied</h3>
+<p>After obtaining a DHCP lease, the tool applies:</p>
+<ul>
+<li>Interface brought up (<code>SIOCSIFFLAGS</code> with <code>IFF_UP</code>)</li>
+<li>IP address (<code>SIOCSIFADDR</code>)</li>
+<li>Netmask (<code>SIOCSIFNETMASK</code>)</li>
+<li>Broadcast address (<code>SIOCSIFBRDADDR</code>)</li>
+<li>Subnet route via <code>SIOCADDRT</code></li>
+<li>Default gateway via <code>SIOCADDRT</code> with <code>RTF_GATEWAY</code></li>
+<li><code>/etc/resolv.conf</code> updated with DNS servers and search domain</li>
+</ul>
+
+<h3>Usage</h3>
+<pre>onetool nsetup [interface]
+
+Without arguments, lists available interfaces and prompts selection.
+Requires root.
+</pre>
+
+<h3>Example</h3>
+<pre># onetool nsetup eth0
+waiting for DHCP offer...
+waiting for DHCP ack...
+
+network ready on eth0
+  ip:      192.168.1.100
+  netmask: 255.255.255.0
+  gateway: 192.168.1.1
+  dns:     8.8.8.8, 8.8.4.4
+</pre>
+
+<h3>Interface Discovery</h3>
+<p>The tool uses <code>getifaddrs()</code> to enumerate all network interfaces, reads operstate from <code>/sys/class/net/*/operstate</code>, and shows MAC addresses via <code>SIOCGIFHWADDR</code>. Interfaces with <code>IFF_LOOPBACK</code> flag are excluded from DHCP.</p>
+
+
+
+
+<h1>OneTool — System Tools</h1>
+
+<hr>
+<h2>taskmng — Task Manager (TUI)</h2>
+<p><strong>Entry:</strong> <code>tm()</code> in <code>tools/system/taskmng/</code></p>
+<p>An interactive terminal-based process manager similar to <code>top</code>/<code>htop</code>. Displays real-time process list with CPU and memory usage, and supports process control operations.</p>
+
+<h3>Architecture</h3>
+<p>The task manager is split across several files:</p>
+<table>
+<tr><th>File</th><th>Purpose</th></tr>
+<tr><td><code>taskmng.h</code></td><td>Core type definitions (processes, snapshots, views)</td></tr>
+<tr><td><code>info.c</code></td><td>System info collection (CPU, memory, uptime, hostname, kernel)</td></tr>
+<tr><td><code>list.c</code></td><td>Process enumeration and refresh logic</td></tr>
+<tr><td><code>process.c</code></td><td>Signal sending, process control</td></tr>
+<tr><td><code>tui.c</code></td><td>TUI rendering and keyboard handling</td></tr>
+</table>
+
+<h3>Core Types</h3>
+
+<h4><code>taskmng_snapshot_t</code></h4>
+<p>A point-in-time capture of system state:</p>
+<ul>
+<li>Hostname, kernel version, uptime</li>
+<li>Load average (1, 5, 15 min)</li>
+<li>Per-core and total CPU usage percentages</li>
+<li>Total, available RAM and swap</li>
+<li>GPU usage text (read from <code>/sys</code> or nvidia-smi output)</li>
+<li>Array of up to <code>TASKMNG_MAX_PROCESSES</code> (512) processes</li>
+<li>Process count and running count</li>
+</ul>
+
+<h4><code>taskmng_process_t</code></h4>
+<p>Individual process information:</p>
+<table>
+<tr><th>Field</th><th>Source</th><th>Description</th></tr>
+<tr><td><code>pid</code></td><td>/proc/[pid]/stat</td><td>Process ID</td></tr>
+<tr><td><code>ppid</code></td><td>/proc/[pid]/stat</td><td>Parent process ID</td></tr>
+<tr><td><code>uid</code></td><td>/proc/[pid]/status</td><td>User ID</td></tr>
+<tr><td><code>user</code></td><td>UID→name mapping</td><td>User name</td></tr>
+<tr><td><code>state</code></td><td>/proc/[pid]/stat</td><td>Process state (R, S, D, Z, T)</td></tr>
+<tr><td><code>priority</code></td><td>/proc/[pid]/stat</td><td>Process priority</td></tr>
+<tr><td><code>nice_value</code></td><td>/proc/[pid]/stat</td><td>Nice value</td></tr>
+<tr><td><code>virt_kb</code></td><td>/proc/[pid]/statm</td><td>Virtual memory size in KB</td></tr>
+<tr><td><code>rss_kb</code></td><td>/proc/[pid]/statm</td><td>Resident set size in KB</td></tr>
+<tr><td><code>cpu_percent</code></td><td>Calculated</td><td>CPU usage since last refresh</td></tr>
+<tr><td><code>mem_percent</code></td><td>Calculated</td><td>RSS / total RAM</td></tr>
+<tr><td><code>command</code></td><td>/proc/[pid]/comm + cmdline</td><td>Process command line</td></tr>
+</table>
+
+<h4><code>taskmng_view_t</code></h4>
+<p>UI state for the process list:</p>
+<ul>
+<li><code>selected</code> — Currently focused process index in visible list</li>
+<li><code>scroll</code> — Scroll position</li>
+<li><code>frozen_pid</code> — PID of frozen process for monitoring</li>
+<li><code>filter_text</code>, <code>filter_input</code> — Process filter</li>
+<li><code>filter_editing</code> — Whether filter prompt is active</li>
+</ul>
+
+<h3>CPU Tracking</h3>
+<p>The <code>taskmng_runtime_t</code> structure tracks CPU samples across refreshes to compute accurate delta-based CPU usage percentages. It samples <code>/proc/stat</code> for aggregate and per-core ticks, then computes the delta between consecutive reads.</p>
+
+<h3>Keyboard Controls</h3>
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td><code>W</code>/<code>w</code></td><td>Scroll up process list</td></tr>
+<tr><td><code>S</code>/<code>s</code></td><td>Scroll down process list</td></tr>
+<tr><td><code>k</code></td><td>Send SIGKILL to selected process</td></tr>
+<tr><td><code>t</code></td><td>Send SIGTERM to selected process</td></tr>
+<tr><td><code>f</code></td><td>Toggle freeze on selected process</td></tr>
+<tr><td><code>g</code></td><td>Rescan /proc for new processes</td></tr>
+<tr><td><code>h</code></td><td>Open filter prompt</td></tr>
+</table>
+
+<h3>Collected System Info</h3>
+<p>The tool reads from multiple <code>/proc</code> sources:</p>
+<ul>
+<li><code>/proc/stat</code> — CPU ticks</li>
+<li><code>/proc/meminfo</code> — Memory and swap</li>
+<li><code>/proc/loadavg</code> — Load averages</li>
+<li><code>/proc/uptime</code> — System uptime</li>
+<li><code>/proc/version</code> — Kernel version string</li>
+<li><code>/proc/[pid]/stat</code> — Per-process stats</li>
+<li><code>/proc/[pid]/status</code> — Per-process user/state</li>
+<li><code>/proc/[pid]/statm</code> — Memory usage</li>
+<li><code>/proc/[pid]/cmdline</code> — Command line</li>
+</ul>
+
+<hr>
+<h2>userc — User Control (TUI)</h2>
+<p><strong>Source:</strong> <code>tools/system/userc/</code> — 4 files</p>
+<table>
+<tr><th>File</th><th>Lines</th><th>Purpose</th></tr>
+<tr><td><code>userc.h</code></td><td>45</td><td>Type definitions: user, list, view; function declarations</td></tr>
+<tr><td><code>users.c</code></td><td>56</td><td>User data loading from <code>/etc/passwd</code>, add/delete via system commands</td></tr>
+<tr><td><code>tui.c</code></td><td>197</td><td>TUI rendering, keyboard handling, form UI for add/edit</td></tr>
+</table>
+<p><strong>Entry:</strong> <code>uc()</code> in <code>tui.c</code></p>
+<p>An interactive terminal user management tool for adding, deleting, and editing system user accounts. Runs as a full-screen TUI application using the shared ncurses-based TUI library. Requires root privileges for user modification operations.</p>
+
+<h3>Architecture — Three Modes</h3>
+<p>The tool operates in four distinct modes controlled by <code>userc_view_t.mode</code>:</p>
+
+<table>
+<tr><th>Mode</th><th>Value</th><th>Description</th></tr>
+<tr><td>List</td><td>0</td><td>Default: browse existing users in a scrollable table</td></tr>
+<tr><td>Add</td><td>1</td><td>Fill in fields for a new user account</td></tr>
+<tr><td>Edit</td><td>2</td><td>Modify an existing user's properties (pre-filled from selected user)</td></tr>
+<tr><td>Delete</td><td>3</td><td>Confirmation dialog before deleting a user</td></tr>
+</table>
+
+<h3>Core Types — Complete Reference</h3>
+
+<h4><code>userc_user_t</code> — User Record</h4>
+<pre><span class="kwd">typedef struct</span> {
+    <span class="kwd">char</span> name[<span class="num">64</span>];       <span class="cmt">// Username (from /etc/passwd field 1)</span>
+    <span class="kwd">int</span> uid;               <span class="cmt">// User ID (field 3)</span>
+    <span class="kwd">int</span> gid;               <span class="cmt">// Primary group ID (field 4)</span>
+    <span class="kwd">char</span> home[<span class="num">128</span>];       <span class="cmt">// Home directory (field 6)</span>
+    <span class="kwd">char</span> shell[<span class="num">64</span>];       <span class="cmt">// Login shell (field 7)</span>
+    <span class="kwd">char</span> comment[<span class="num">128</span>];    <span class="cmt">// GECOS comment (field 5)</span>
+} userc_user_t;
+</pre>
+
+<h4><code>userc_list_t</code> — User List</h4>
+<pre><span class="kwd">typedef struct</span> {
+    userc_user_t users[<span class="num">USERC_MAX_USERS</span>];   <span class="cmt">// Fixed-size array (256)</span>
+    <span class="kwd">int</span> count;                              <span class="cmt">// Number of loaded users</span>
+} userc_list_t;</pre>
+<p>Uses a fixed-size array rather than dynamic allocation — safe for the checked allocation conventions used elsewhere in the project.</p>
+
+<h4><code>userc_view_t</code> — UI State</h4>
+<pre><span class="kwd">typedef struct</span> {
+    <span class="kwd">int</span> selected;              <span class="cmt">// Index of currently highlighted user</span>
+    <span class="kwd">int</span> scroll;                <span class="cmt">// Scroll offset in the list</span>
+    <span class="kwd">int</span> mode;                  <span class="cmt">// 0=list, 1=adding, 2=editing, 3=deleting</span>
+    <span class="kwd">char</span> status[<span class="num">128</span>];         <span class="cmt">// Status bar message</span>
+    <span class="kwd">char</span> name_buf[<span class="num">64</span>];       <span class="cmt">// Form: username input</span>
+    <span class="kwd">char</span> uid_buf[<span class="num">16</span>];        <span class="cmt">// Form: UID input</span>
+    <span class="kwd">char</span> gid_buf[<span class="num">16</span>];        <span class="cmt">// Form: GID input</span>
+    <span class="kwd">char</span> home_buf[<span class="num">128</span>];       <span class="cmt">// Form: home directory input</span>
+    <span class="kwd">char</span> shell_buf[<span class="num">64</span>];       <span class="cmt">// Form: login shell input</span>
+    <span class="kwd">int</span> field_idx;             <span class="cmt">// Currently focused form field (0-4)</span>
+} userc_view_t;
+</pre>
+
+<h3>User Data Loading — <code>userc_load_users()</code></h3>
+<p>Located in <code>users.c</code>. Parses <code>/etc/passwd</code> line by line:</p>
+<ol>
+<li>Opens <code>/etc/passwd</code> with <code>fopen()</code>, reads each line with <code>fgets()</code> (max 512 bytes per line)</li>
+<li>Uses <code>strsep()</code> with <code>:</code> delimiter to extract the 7 standard POSIX passwd fields:</li>
+<li>Skips the password field (field 2, historically the hashed password, now typically <code>x</code> when using shadow passwords)</li>
+<li>UID and GID fields are converted from strings to integers via <code>atoi()</code></li>
+<li>Strips trailing newline from the shell field</li>
+<li>Stops early if <code>USERC_MAX_USERS</code> (256) is reached</li>
+<li>Returns 0 on success, -1 if <code>/etc/passwd</code> cannot be opened</li>
+</ol>
+
+<h3>User Operations — <code>users.c</code></h3>
+
+<h4>Adding Users — <code>userc_add_user()</code></h4>
+<p>Constructs a <code>useradd</code> system command via <code>snprintf()</code> into a 512-byte buffer:</p>
+<pre>useradd [-u UID] [-g GID] [-d HOME] [-s SHELL] USERNAME</pre>
+<p>Each option flag+value pair is emitted only if the corresponding field is non-empty. Executed via <code>system(cmd)</code> — relies on the system's <code>useradd</code> binary being present in <code>PATH</code>.</p>
+
+<h4>Deleting Users — <code>userc_del_user()</code></h4>
+<p>Constructs and executes:</p>
+<pre>userdel -r USERNAME</pre>
+<p>The <code>-r</code> flag removes the user's home directory and mail spool. Uses <code>system(cmd)</code>.</p>
+
+<h3>TUI Rendering — <code>userc_draw_panel()</code></h3>
+<p>Located in <code>tui.c</code>. Renders different content depending on <code>view->mode</code>:</p>
+
+<h4>List Mode (mode 0)</h4>
+<ul>
+<li><strong>Header:</strong> Column titles "USER", "UID", "GID", "HOME", "SHELL" in accent style</li>
+<li><strong>Scroll logic:</strong> Adjusts <code>view->scroll</code> so the selected item is always visible. Computes visible rows as <code>height - 4</code> (reserving space for header, status line, and borders)</li>
+<li><strong>Rows:</strong> Each user is rendered as <code><name> <uid> <gid> <home> <shell></code> with field widths 16, 5, 5, 20, 16</li>
+<li><strong>Selection highlighting:</strong> Selected row uses <code>TUI_STYLE_SELECTION</code> (inverted colors), others use <code>TUI_STYLE_NORMAL</code></li>
+<li><strong>Clip protection:</strong> All text is clipped to available width via <code>clip_and_draw()</code> helper using <code>tui_clip_text()</code></li>
+<li><strong>Footer:</strong> <code>A: Add | D: Delete | E: Edit | Q: Quit | W/S: Navigate list</code> in muted style</li>
+</ul>
+
+<h4>Add/Edit Mode (mode 1/2)</h4>
+<ul>
+<li><strong>Title:</strong> "ADD NEW USER" (mode 1) or "EDIT USER" (mode 2) in accent style</li>
+<li><strong>Five form fields</strong> displayed vertically with 2-line spacing:</li>
+  <ul>
+    <li><code>Username:</code> — text input (max 63 chars)</li>
+    <li><code>UID:</code> — numeric text input (max 15 chars)</li>
+    <li><code>GID:</code> — numeric text input (max 15 chars)</li>
+    <li><code>Home:</code> — path text input (max 127 chars)</li>
+    <li><code>Shell:</code> — path text input (max 63 chars)</li>
+  </ul>
+<li>Each field has a label on the left (12-char offset) and the current value on the right</li>
+<li>Currently focused field (<code>view->field_idx</code>) uses <code>TUI_STYLE_SELECTION</code>, empty fields display <code>(empty)</code></li>
+<li>Footer: <code>Enter: Next/Submit | Esc: Cancel | Backspace: Delete char</code></li>
+</ul>
+
+<h4>Delete Confirmation (mode 3)</h4>
+<ul>
+<li>Shows <code>"DELETE USER?"</code> in error style</li>
+<li>Displays the username being deleted</li>
+<li>Presents two buttons: <code>[ YES ]</code> (highlighted) and <code>[ NO ]</code> (normal)</li>
+<li>Footer: <code>Enter: Confirm | Esc/N: Cancel</code></li>
+</ul>
+
+<h3>Keyboard Handling — <code>userc_handle_key()</code></h3>
+<p>Returns 1 if the key was consumed, 0 if it should be passed to the parent handler.</p>
+
+<h4>List Mode (mode 0) Keys</h4>
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td><code>W</code> / <code>w</code> / Up arrow</td><td>Move selection up (decrement <code>selected</code>, clamped at 0)</td></tr>
+<tr><td><code>S</code> / <code>s</code> / Down arrow</td><td>Move selection down (increment <code>selected</code>, clamped at <code>count-1</code>)</td></tr>
+<tr><td><code>A</code> / <code>a</code></td><td>Enter Add mode (mode 1). Clears all form buffers via <code>memset()</code></td></tr>
+<tr><td><code>D</code> / <code>d</code></td><td>Enter Delete confirmation mode (mode 3) — only if user list is non-empty</td></tr>
+<tr><td><code>E</code> / <code>e</code></td><td>Enter Edit mode (mode 2). Pre-fills form fields from the selected user's data (name, uid, gid, home, shell). UID and GID are converted to strings via <code>snprintf()</code></td></tr>
+</table>
+
+<h4>Add/Edit Mode (mode 1/2) Keys</h4>
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td>Esc</td><td>Cancel: return to List mode without saving</td></tr>
+<tr><td>Enter</td><td>Advance to next field (0→1→2→3→4). On field 4 (Shell): submit the form. In Add mode, calls <code>userc_add_user()</code> then reloads the list. In Edit mode, sets a "submitted (mock)" status</td></tr>
+<tr><td>Backspace / 127</td><td>Delete the last character from the current field's buffer</td></tr>
+<tr><td>Printable chars (32-126)</td><td>Append character to current field buffer, respecting per-field max lengths (63/15/15/127/63)</td></tr>
+</table>
+
+<h4>Delete Mode (mode 3) Keys</h4>
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td>Enter / Y / y</td><td>Confirm deletion: calls <code>userc_del_user()</code> with the selected user's name, reloads the list, adjusts selection if needed</td></tr>
+<tr><td>Esc / N / n</td><td>Cancel: return to List mode</td></tr>
+</table>
+
+<h3>Status Messages</h3>
+<p>The tool displays status messages in the bottom status bar:</p>
+<ul>
+<li><code>"User Control: A add, D delete, E edit, Q quit."</code> — default prompt on startup</li>
+<li><code>"User added successfully."</code> — after successful <code>useradd</code> (exit code 0)</li>
+<li><code>"Failed to add user."</code> — after failed <code>useradd</code> (non-zero exit)</li>
+<li><code>"User deleted."</code> — after successful <code>userdel</code></li>
+<li><code>"Failed to delete user."</code> — after failed <code>userdel</code></li>
+<li><code>"User edit submitted (mock)."</code> — edit mode is currently a placeholder (no <code>usermod</code> call yet)</li>
+</ul>
+
+<h3>Main Loop — <code>uc()</code></h3>
+<ol>
+<li>Initializes <code>userc_list_t</code> and <code>userc_view_t</code> (zeroed), loads users from <code>/etc/passwd</code></li>
+<li>Initializes TUI via <code>tui_init()</code> — returns 1 on failure</li>
+<li>Frame loop (350ms poll interval via <code>tui_poll_event</code>):</li>
+  <ol>
+  <li>Gets terminal dimensions</li>
+  <li>Clears and draws a bordered panel titled "User Control"</li>
+  <li>Renders the current mode's UI via <code>userc_draw_panel()</code></li>
+  <li>Draws the status bar at the bottom</li>
+  <li>Flushes via <code>tui_end_frame()</code></li>
+  <li>Polls for keyboard input</li>
+  <li>Passes to <code>userc_handle_key()</code> — if not consumed, checks for Quit (Q/q/Esc in list mode)</li>
+  </ol>
+<li>On quit: shuts down TUI via <code>tui_shutdown()</code>, returns 0</li>
+</ol>
+
+<h3>Limitations</h3>
+<ul>
+<li><strong>Root required:</strong> <code>useradd</code> and <code>userdel</code> need superuser privileges</li>
+<li><strong>Edit mode:</strong> Currently only sets a status message — <code>usermod</code> is not called (TODO)</li>
+<li><strong>Password management:</strong> Not implemented — no <code>passwd</code> interaction</li>
+<li><strong>Group management:</strong> GID field is set but no group creation/deletion UI</li>
+<li><strong>Error granularity:</strong> Uses <code>system()</code> exit code only, no stderr capture</li>
+<li><strong>No confirmation on unsaved changes:</strong> Esc in add/edit mode discards without prompt</li>
+</ul>
+
+<hr>
+<h2>configure — System Environment Configuration</h2>
+<p><strong>Entry:</strong> <code>cf()</code> in <code>tools/system/configure/main.c</code></p>
+<p>Sets up a basic Linux environment by mounting essential virtual filesystems and creating necessary device nodes. Useful in minimal/container environments where <code>/proc</code>, <code>/sys</code>, and <code>/dev</code> are not yet populated.</p>
+
+<h3>Multi-file Structure</h3>
+<table>
+<tr><th>File</th><th>Purpose</th></tr>
+<tr><td><code>main.c</code></td><td>Entry point, orchestrates mounting</td></tr>
+<tr><td><code>mount.c</code></td><td>Filesystem mount operations</td></tr>
+<tr><td><code>create.c</code></td><td>Device node creation</td></tr>
+<tr><td><code>helpers.c</code></td><td>Utility functions</td></tr>
+<tr><td><code>size.c</code></td><td>Size calculations</td></tr>
+<tr><td><code>other.c</code></td><td>Miscellaneous setup tasks</td></tr>
+</table>
+
+<h3>Operations</h3>
+<ul>
+<li>Mounts <code>/proc</code> (proc filesystem)</li>
+<li>Mounts <code>/sys</code> (sysfs)</li>
+<li>Mounts <code>/dev</code> (devtmpfs)</li>
+<li>Mounts <code>/tmp</code> (tmpfs)</li>
+<li>Creates basic device nodes if needed</li>
+</ul>
+
+<p>The TUI initialization also calls configure as a fallback: if <code>tui_init()</code> (which needs <code>/dev/tty</code>) fails, it runs configure first, then retries TUI initialization.</p>
+
+<hr>
+<h2>cvm — Current Video Mode</h2>
+<p><strong>Source:</strong> <code>tools/system/video/cvm.c</code> (61 lines)</p>
+<p><strong>Entry:</strong> <code>cv()</code></p>
+<p>Displays the current video mode and screen resolution by querying the Linux framebuffer device (<code>/dev/fb0</code>) via <code>ioctl()</code> and <code>/sys/class/graphics/fb0/modes</code>.</p>
+
+<h3>Implementation</h3>
+<p>The tool is a single C function <code>print_fb_info()</code> plus <code>main()</code>:</p>
+
+<ol>
+<li><strong>Framebuffer detection:</strong> Attempts to open <code>/dev/fb0</code> with <code>open("/dev/fb0", O_RDONLY)</code>. If the device doesn't exist or can't be opened (e.g., no framebuffer driver, running in a VM without fbdev, or in text mode), prints <code>"video mode: vga text mode (no framebuffer detected)"</code> and returns.</li>
+
+<li><strong>ioctl queries:</strong> Uses two Linux framebuffer ioctls on the opened fd:
+  <ul>
+    <li><code>FBIOGET_VSCREENINFO</code> — fills <code>struct fb_var_screeninfo</code> with variable screen parameters:
+      <ul>
+        <li><code>xres</code>, <code>yres</code> — current visible resolution (e.g. 1920×1080)</li>
+        <li><code>xres_virtual</code>, <code>yres_virtual</code> — virtual buffer size (may be larger than visible for panning)</li>
+        <li><code>bits_per_pixel</code> — color depth (e.g. 32 for ARGB8888)</li>
+      </ul>
+    </li>
+    <li><code>FBIOGET_FSCREENINFO</code> — fills <code>struct fb_fix_screeninfo</code> with fixed parameters:
+      <ul>
+        <li><code>id</code> — driver name string (e.g. <code>"efifb"</code>, <code>"vesafb"</code>, <code>"simpledrm"</code>, <code>"bochs-drm"</code>)</li>
+      </ul>
+    </li>
+  </ul>
+</li>
+
+<li><strong>Sysfs max resolution:</strong> Opens <code>/sys/class/graphics/fb0/modes</code> and reads all lines. Each line is a mode descriptor in the format <code>"WxHp-bpp@refresh"</code> (e.g. <code>"1920x1080p-32"</code>). The tool iterates through all lines and stores the <strong>last</strong> one (which is typically the highest/available mode in the sysfs list). This provides information about what resolutions the framebuffer driver can support, beyond the current setting.</li>
+
+<li><strong>Cleanup:</strong> Closes the framebuffer fd and returns.</li>
+</ol>
+
+<h3>Output Format</h3>
+<pre>cvm output:
+-------------------------------
+video mode: efifb
+current resolution: 1920x1080 (32 bpp)
+virtual resolution: 1920x1080
+available/max modes (sysfs): 1920x1080p-32
+</pre>
+
+<p><strong>Fields explained:</strong></p>
+<table>
+<tr><th>Field</th><th>Source</th><th>Example</th></tr>
+<tr><td><code>video mode</code></td><td><code>fb_fix_screeninfo.id</code> — framebuffer driver name</td><td><code>efifb</code>, <code>vesafb</code>, <code>simpledrm</code></td></tr>
+<tr><td><code>current resolution</code></td><td><code>xres × yres</code> with <code>bits_per_pixel</code></td><td><code>1920x1080 (32 bpp)</code></td></tr>
+<tr><td><code>virtual resolution</code></td><td><code>xres_virtual × yres_virtual</code></td><td><code>1920x1080</code> (equal when no panning)</td></tr>
+<tr><td><code>available/max modes</code></td><td>Last line from <code>/sys/class/graphics/fb0/modes</code></td><td><code>1920x1080p-32</code></td></tr>
+</table>
+
+<h3>Usage</h3>
+<pre>onetool cvm</pre>
+<p>Takes no arguments — simply probes the framebuffer subsystem and prints diagnostics.</p>
+
+<h3>Notes</h3>
+<ul>
+<li><strong>No framebuffer:</strong> On systems without <code>/dev/fb0</code> (e.g., modern systems using KMS/drm only, or SSH sessions), the tool reports <code>"vga text mode (no framebuffer detected)"</code>. This is not an error — it's expected behavior on headless systems or when the framebuffer driver isn't loaded.</li>
+<li><strong>Driver names:</strong> Common values for <code>finfo.id</code> include <code>"efifb"</code> (UEFI GOP framebuffer), <code>"vesafb"</code> (VESA BIOS framebuffer), <code>"simpledrm"</code> (simpledrm driver), and <code>"bochs-drm"</code> (QEMU/Bochs virtual GPU).</li>
+<li><strong>KMS note:</strong> This tool uses the legacy fbdev interface, not KMS (kernel modesetting). Modern Linux graphics are moving toward KMS/drm, but fbdev is still widely available via the <code>simpledrm</code> or compatibility layers.</li>
+<li><strong>Sysfs modes:</strong> The <code>/sys/class/graphics/fb0/modes</code> file may not exist on all systems — in that case, only the current resolution from ioctl is shown.</li>
+</ul>
+
+
+
+
+<h1>OneTool — Developer Tools</h1>
+
+<hr>
+<h2>mlink — Minimal ELF64 x86-64 Linker</h2>
+<p><strong>Entry:</strong> <code>ml()</code> in <code>tools/dev/mlink/</code></p>
+<p>A minimal but fully functional linker for ELF64 x86-64 relocatable object files (<code>.o</code>). It takes one or more object files (and optionally simple <code>.a</code> archives) and produces a static ELF64 executable. mlink is the most complex tool in OneTool, spanning 10 source files with ~1500 lines of code.</p>
+
+<h3>Architecture — File by File</h3>
+<table>
+<tr><th>File</th><th>Lines</th><th>Purpose</th></tr>
+<tr><td><code>mlink.h</code></td><td>160</td><td>Master header: every struct, enum, and function declaration for the entire linker</td></tr>
+<tr><td><code>cli.c</code></td><td>199</td><td>CLI argument parsing (getopt-like), <code>main()</code> orchestrator, link map file writing</td></tr>
+<tr><td><code>bytes.c</code></td><td>144</td><td>File I/O (<code>ml_read_file</code>, <code>ml_write_file_mode</code>), alignment (<code>ml_align_up</code>), byte accessors (<code>ml_get16/32/64</code>, <code>ml_put16/32/64</code>), checked <code>ml_x*</code> alloc wrappers</td></tr>
+<tr><td><code>elf-reader.c</code></td><td>205</td><td>ELF object parser: section classification, symbol loading, relocation loading</td></tr>
+<tr><td><code>object.c</code></td><td>229</td><td>Archive (<code>.a</code>) parser (BSD, GNU, POSIX styles), context init/free, input path management</td></tr>
+<tr><td><code>symtab.c</code></td><td>200</td><td>Symbol resolution: global symbol table, archive member selection, duplicate detection, weak/strong semantics</td></tr>
+<tr><td><code>layout.c</code></td><td>257</td><td>Memory layout: segment computation, section ordering, address assignment, common symbol allocation, entry point verification</td></tr>
+<tr><td><code>reloc.c</code></td><td>367</td><td>Relocation application: all x86-64 relocation types with overflow checking</td></tr>
+<tr><td><code>emit.c</code></td><td>164</td><td>Output generation: ELF header, program headers, section data copying, file writing, map/symbol printing</td></tr>
+<tr><td><code>log.c</code></td><td>89</td><td>Error/verbose logging, section kind names, relocation type names</td></tr>
+</table>
+
+<h3>Core Data Structures — Complete Reference</h3>
+
+<h4><code>ml_context_t</code> — The Linker Context</h4>
+<p>This is the central state object that flows through every linker phase:</p>
+<pre>typedef struct {
+    // Output configuration
+    const char *output_path;    // Output file path (default: "a.out")
+    const char *entry_name;     // Entry symbol name (default: "_start")
+    const char *map_path;       // Optional link map output file
+    uint64_t base_addr;         // Image base address (default: 0x400000)
+    int print_map;              // Print link map to stdout
+    int print_symbols;          // Print resolved symbols to stdout
+    int dry_run;                // Parse + layout only, no output written
+    int verbose;                // Print archive selection messages
+
+    // Input tracking
+    char **inputs;              // Input file path strings
+    size_t input_count;         // Number of input paths
+    size_t input_cap;           // Allocated capacity
+
+    // Object tracking
+    ml_object_t **objects;      // All parsed object files
+    size_t object_count;        // Number of objects
+    size_t object_cap;          // Allocated capacity
+
+    // Symbol table
+    ml_global_t *globals;       // Global symbol table
+    size_t global_count;        // Number of global symbols
+    size_t global_cap;          // Allocated capacity
+
+    // Error state
+    int error_count;            // Number of errors encountered
+
+    // Segment layout
+    uint16_t phnum;             // Number of program headers
+    int has_rodata_segment;     // Has read-only data segment
+    int has_rw_segment;         // Has read-write segment
+    uint64_t rx_filesz;         // RX segment file size
+    uint64_t ro_offset;         // RO segment file offset
+    uint64_t ro_filesz;         // RO segment file size
+    uint64_t data_offset;       // RW segment file offset
+    uint64_t data_filesz;       // RW segment file size (on disk)
+    uint64_t data_memsz;        // RW segment memory size (includes bss)
+    uint64_t final_file_size;   // Total output file size
+    uint64_t entry_addr;        // Resolved entry point address
+} ml_context_t;</pre>
+
+<h4><code>ml_object_t</code> — Parsed Object File</h4>
+<pre>typedef struct ml_object {
+    char *name;                 // Object file name (e.g. "main.o" or "lib.a(member.o)")
+    unsigned char *data;        // Raw file data (owned)
+    size_t size;                // File size
+    int from_archive;           // 1 if extracted from .a archive
+    int selected;               // 1 if this object is included in the link
+    ml_section_t *sections;     // Array of sections
+    size_t section_count;
+    ml_symbol_t *symbols;       // Array of symbols
+    size_t symbol_count;
+    ml_reloc_t *relocs;         // Array of relocations
+    size_t reloc_count;
+} ml_object_t;</pre>
+
+<h4><code>ml_section_t</code> — Internal Section</h4>
+<pre>typedef struct {
+    char *name;                 // Section name (e.g. ".text", ".data")
+    uint32_t type;              // ELF section type (SHT_PROGBITS, SHT_NOBITS, etc.)
+    uint64_t flags;             // SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR, etc.
+    uint64_t align;             // Alignment requirement
+    uint64_t size;              // Total section size
+    uint64_t file_size;         // On-disk size (0 for .bss/NOBITS)
+    unsigned char *image;       // Section content (NULL for NOBITS)
+    ml_section_kind_t kind;     // Classified as TEXT/RODATA/DATA/BSS/SKIP
+    uint64_t out_offset;        // File offset in output
+    uint64_t out_addr;          // Virtual address in output
+} ml_section_t;</pre>
+
+<h4><code>ml_symbol_t</code> — Object-Level Symbol</h4>
+<pre>typedef struct {
+    char *name;                 // Symbol name
+    unsigned char bind;         // STB_LOCAL(0), STB_GLOBAL(1), STB_WEAK(2)
+    unsigned char type;         // STT_NOTYPE(0), STT_OBJECT(1), STT_FUNC(2), etc.
+    uint16_t shndx;             // Section index (SHN_UNDEF=0, SHN_ABS=0xFFF1, SHN_COMMON=0xFFF2)
+    uint64_t value;             // Symbol value (offset within section)
+    uint64_t size;              // Symbol size
+    int undefined;              // 1 if shndx == SHN_UNDEF
+    int common;                 // 1 if shndx == SHN_COMMON
+} ml_symbol_t;</pre>
+
+<h4><code>ml_reloc_t</code> — Relocation Entry</h4>
+<pre>typedef struct {
+    uint32_t target_section;    // Section index to apply relocation to
+    uint32_t symbol_index;      // Symbol index in object's symbol table
+    uint32_t type;              // Relocation type (R_X86_64_*)
+    uint64_t offset;            // Offset within target section
+    int64_t addend;             // Explicit addend (for RELA)
+    int has_addend;             // 1 for RELA, 0 for REL (implicit addend)
+} ml_reloc_t;</pre>
+
+<h4><code>ml_global_t</code> — Resolved Global Symbol</h4>
+<pre>typedef struct {
+    const char *name;           // Symbol name
+    ml_object_t *object;        // Defining object
+    ml_symbol_t *symbol;        // Defining symbol
+    int defined;                // 1 if symbol is defined (non-common)
+    int weak;                   // 1 if symbol is weak
+    int common;                 // 1 if common symbol
+    int absolute;               // 1 if symbol is absolute (SHN_ABS)
+    int referenced;             // 1 if symbol is referenced by any object
+    int strong_ref;             // 1 if referenced by a non-weak reference
+    uint64_t value;             // Resolved value (address)
+    uint64_t size;              // Symbol size
+    uint64_t common_align;      // Alignment for common symbols
+    uint64_t common_addr;       // Assigned address for common symbols
+} ml_global_t;</pre>
+
+<h3>Section Classification — <code>classify_section()</code></h3>
+<p>Each ELF section is classified into one of 5 kinds based on its type, flags, and name:</p>
+<table>
+<tr><th>Kind</th><th>Conditions</th></tr>
+<tr><td><code>ML_SEC_SKIP</code></td><td>No SHF_ALLOC flag, or .eh_frame, .comment, .note.GNU-stack sections</td></tr>
+<tr><td><code>ML_SEC_TEXT</code></td><td>SHF_EXECINSTR flag set (executable code)</td></tr>
+<tr><td><code>ML_SEC_RODATA</code></td><td>Allocatable, not writable, not executable (read-only data)</td></tr>
+<tr><td><code>ML_SEC_DATA</code></td><td>SHF_WRITE set and SHT_PROGBITS (writable initialized data)</td></tr>
+<tr><td><code>ML_SEC_BSS</code></td><td>SHF_WRITE set and SHT_NOBITS (zero-initialized data)</td></tr>
+</table>
+
+<h3>Archive Parsing — <code>load_archive()</code></h3>
+<p>mlink supports three archive formats:</p>
+<ul>
+<li><strong>POSIX/BSD style</strong> (<code>#1/</code> prefix): The member name is stored at the beginning of the member data, followed by the actual object content</li>
+<li><strong>GNU style</strong> (<code>/123</code> long names): The archive has a <code>//</code> member containing a string table; member names reference offsets into it</li>
+<li><strong>Standard short names</strong> (16-byte header field): Names are stored directly in the archive header, space-padded, with optional trailing '/'</li>
+</ul>
+<p>The parser also skips symbol table members (<code>/</code> and <code>/SYM64/</code>). Archive member alignment is enforced (odd sizes are padded).</p>
+
+<h3>Linking Pipeline — 6 Phases</h3>
+
+<h4>Phase 1: Load Inputs (<code>ml_load_input()</code>)</h4>
+<p>Each input path is read from disk via <code>ml_read_file()</code>. The file is identified as either:</p>
+<ul>
+<li><strong>Archive (<code>.a</code>):</strong> Checked via <code>ARMAG</code> magic (<code>"!<arch>\n"</code>). Parsed by <code>load_archive()</code>, each ELF object within is parsed and added to the context as an unselected archive member.</li>
+<li><strong>ELF object (<code>.o</code>):</strong> Checked via <code>ELFMAG</code> magic. Parsed by <code>ml_parse_elf_object()</code> and added as a selected (non-archive) object.</li>
+</ul>
+
+<h4>Phase 2: Parse ELF Objects (<code>ml_parse_elf_object()</code>)</h4>
+<p>Uses the shared <code>ot_elf_parse()</code> from <code>libs/elf</code> to validate the ELF header, then:</p>
+<ol>
+<li><strong>Section loading:</strong> Copies section names, types, flags, sizes, aligns. Classifies each section via <code>classify_section()</code>. Copies section data for PROGBITS sections.</li>
+<li><strong>Symbol loading:</strong> Locates <code>SHT_SYMTAB</code> (entry size must be 24). For each symbol: reads name, bind (STB_GLOBAL/STB_LOCAL/STB_WEAK), type, shndx, value, size, and determines if undefined or common.</li>
+<li><strong>Relocation loading:</strong> Locates <code>SHT_RELA</code> (entry size 24) and <code>SHT_REL</code> (entry size 16). For each relocation: reads offset, symbol index, type, and addend (if RELA).</li>
+</ol>
+
+<h4>Phase 3: Symbol Resolution (<code>ml_resolve_symbols()</code>)</h4>
+<p>Three sub-steps:</p>
+
+<h5>3a. Archive Member Selection (<code>select_archive_members()</code>)</h5>
+<p>Iterates archive members in a fixed-point loop. For each unselected archive member, if any of its defined global symbols are referenced by already-selected objects, the member becomes selected. This loop repeats until no more members are selected (standard Unix linker semantics).</p>
+
+<h5>3b. Global Symbol Definition (<code>define_global()</code>)</h5>
+<p>For each selected object's global symbols:</p>
+<ul>
+<li><strong>Common symbols:</strong> If not already defined, the largest size wins (standard COMDAT-like behavior)</li>
+<li><strong>Defined symbols:</strong> If already defined, strong overrides weak; duplicate strong symbols produce an error; duplicate weak symbols are ignored</li>
+</ul>
+
+<h5>3c. Undefined Reference Tracking (<code>record_undefined()</code>)</h5>
+<p>Records all undefined references. After resolution, any symbol that is strongly referenced but neither defined nor common produces an "undefined symbol" error.</p>
+
+<h4>Phase 4: Layout (<code>ml_layout()</code>)</h4>
+<p>Computes output addresses and file offsets for all sections:</p>
+
+<h5>4a. Segment Detection</h5>
+<p>Scans all sections to determine which segments are needed:</p>
+<ul>
+<li><strong>RX segment</strong> — required if any TEXT sections exist</li>
+<li><strong>RO segment</strong> — required if any RODATA sections exist</li>
+<li><strong>RW segment</strong> — required if any DATA, BSS, or COMMON symbols exist</li>
+</ul>
+
+<h5>4b. Section Ordering</h5>
+<p>Sections are assigned in this order within each object:</p>
+<ol>
+<li><strong>.text</strong> sections — aligned, placed in RX segment</li>
+<li><strong>.rodata</strong> sections — aligned, page-aligned boundary from RX end</li>
+<li><strong>.data</strong> sections — aligned, page-aligned boundary from RO end</li>
+<li><strong>.bss</strong> sections — placed after .data (not written to file)</li>
+</ol>
+
+<h5>4c. Segment Boundaries</h5>
+<table>
+<tr><th>Segment</th><th>File Offset</th><th>Virtual Address</th><th>File Size</th><th>Memory Size</th></tr>
+<tr><td>RX (text)</td><td>0</td><td>base_addr</td><td>text_sections_end</td><td>same</td></tr>
+<tr><td>RO (rodata)</td><td>page_align(rx_end)</td><td>base + offset</td><td>rodata_end - offset</td><td>same</td></tr>
+<tr><td>RW (data+bss)</td><td>page_align(ro_end)</td><td>base + offset</td><td>data_end - offset</td><td>bss_end - offset</td></tr>
+</table>
+
+<h5>4d. Common Symbol Allocation</h5>
+<p>Common symbols are placed after all data sections, with their requested alignment. The largest alignment wins. The BSS memory size is extended to cover common symbols.</p>
+
+<h5>4e. Global Value Resolution</h5>
+<p>Each global symbol's value is computed:</p>
+<ul>
+<li><strong>Defined symbols:</strong> <code>section.out_addr + symbol.value</code></li>
+<li><strong>Absolute symbols:</strong> <code>symbol.value</code> (SHN_ABS)</li>
+<li><strong>Common symbols:</strong> <code>base_addr + common_cursor</code> (with alignment)</li>
+</ul>
+<p>Entry symbol is looked up; if not found, linkage fails.</p>
+
+<h4>Phase 5: Apply Relocations (<code>ml_apply_relocations()</code>)</h4>
+<p>For each selected object, each relocation is patched into the section image:</p>
+
+<h5>Relocation Types Supported</h5>
+<table>
+<tr><th>Type</th><th>Width</th><th>Computation</th><th>Description</th></tr>
+<tr><td><code>R_X86_64_NONE</code></td><td>0</td><td>—</td><td>No operation</td></tr>
+<tr><td><code>R_X86_64_64</code></td><td>8</td><td><code>S + A</code></td><td>64-bit absolute address</td></tr>
+<tr><td><code>R_X86_64_PC32</code></td><td>4</td><td><code>S + A - P</code></td><td>32-bit PC-relative</td></tr>
+<tr><td><code>R_X86_64_PLT32</code></td><td>4</td><td><code>S + A - P</code></td><td>32-bit PLT-relative (treats as PC32 for static link)</td></tr>
+<tr><td><code>R_X86_64_32</code></td><td>4</td><td><code>S + A</code> (unsigned)</td><td>32-bit absolute (zero-extended)</td></tr>
+<tr><td><code>R_X86_64_32S</code></td><td>4</td><td><code>S + A</code> (signed)</td><td>32-bit absolute (sign-extended)</td></tr>
+<tr><td><code>R_X86_64_PC64</code></td><td>8</td><td><code>S + A - P</code></td><td>64-bit PC-relative</td></tr>
+<tr><td><code>R_X86_64_PC16</code></td><td>2</td><td><code>S + A - P</code></td><td>16-bit PC-relative</td></tr>
+<tr><td><code>R_X86_64_PC8</code></td><td>1</td><td><code>S + A - P</code></td><td>8-bit PC-relative</td></tr>
+<tr><td><code>R_X86_64_16</code></td><td>2</td><td><code>S + A</code></td><td>16-bit absolute</td></tr>
+<tr><td><code>R_X86_64_8</code></td><td>1</td><td><code>S + A</code></td><td>8-bit absolute</td></tr>
+<tr><td><code>R_X86_64_SIZE32</code></td><td>4</td><td><code>Z + A</code></td><td>32-bit symbol size</td></tr>
+<tr><td><code>R_X86_64_SIZE64</code></td><td>8</td><td><code>Z + A</code></td><td>64-bit symbol size</td></tr>
+</table>
+<p>Where: <strong>S</strong> = symbol value, <strong>A</strong> = addend, <strong>P</strong> = relocation position (section address + offset), <strong>Z</strong> = symbol size.</p>
+
+<h5>Addend Handling</h5>
+<ul>
+<li><strong>RELA relocations</strong> (<code>SHT_RELA</code>): The addend is stored explicitly in the relocation entry</li>
+<li><strong>REL relocations</strong> (<code>SHT_REL</code>): The addend is read from the section data at the relocation offset (<code>read_implicit_addend()</code>)</li>
+</ul>
+
+<h5>Overflow Checking</h5>
+<p>Every relocation that writes a value has overflow checks via <code>checked_u32()</code>, <code>checked_i32()</code>, <code>checked_u16()</code>, <code>checked_i16()</code>, <code>checked_u8()</code>, <code>checked_i8()</code>. On overflow, an error is reported with the relocation type and section name.</p>
+
+<h4>Phase 6: Emit Output (<code>ml_emit_output()</code>)</h4>
+<p>Generates the final executable:</p>
+
+<h5>6a. ELF Header</h5>
+<p>A 64-byte ELF64 header is constructed:</p>
+<ul>
+<li>Magic: <code>0x7f ELF</code></li>
+<li>Class: <code>ELFCLASS64</code> (2)</li>
+<li>Data: <code>ELFDATA2LSB</code> (1, little-endian)</li>
+<li>Version: <code>EV_CURRENT</code> (1)</li>
+<li>OS/ABI: <code>ELFOSABI_SYSV</code> (0)</li>
+<li>Type: <code>ET_EXEC</code> (2)</li>
+<li>Machine: <code>EM_X86_64</code> (62)</li>
+<li>Entry: resolved entry address</li>
+<li>Program header offset: right after ELF header (64 bytes)</li>
+<li>Program header size: 56 bytes, count = phnum</li>
+<li>Section header table: not written (SHN_UNDEF)</li>
+</ul>
+
+<h5>6b. Program Headers</h5>
+<p>1 to 3 <code>PT_LOAD</code> segments are created:</p>
+<table>
+<tr><th>Segment</th><th>Flags</th><th>Alignment</th></tr>
+<tr><td>RX (text)</td><td><code>PF_R | PF_X</code></td><td>0x1000 (page)</td></tr>
+<tr><td>RO (rodata, optional)</td><td><code>PF_R</code></td><td>0x1000</td></tr>
+<tr><td>RW (data+bss, optional)</td><td><code>PF_R | PF_W</code></td><td>0x1000</td></tr>
+</table>
+<p>Each <code>PT_LOAD</code> has: p_offset, p_vaddr, p_paddr (= vaddr), p_filesz, p_memsz, p_align.</p>
+
+<h5>6c. Section Data</h5>
+<p>All selected objects' sections are copied to the output buffer at their assigned offsets. BSS sections are not copied (they are zero-initialized by the OS loader).</p>
+
+<h5>6d. File Writing</h5>
+<p>Written with <code>ml_write_file_mode()</code> with mode 0755 (executable). On <code>--dry-run</code>, no file is written.</p>
+
+<h5>6e. Link Map Output</h5>
+<p>The <code>ml_print_map()</code> function outputs:</p>
+<ul>
+<li>Output file path and dry-run indicator</li>
+<li>Base address and entry symbol with address</li>
+<li>Each segment: type, offset, vaddr, filesz, memsz</li>
+<li>Each included section: address, size, kind, name, object file</li>
+</ul>
+
+<h5>6f. Symbol Table Output</h5>
+<p>The <code>ml_print_symbols()</code> function outputs all defined global symbols with their resolved addresses.</p>
+
+<h3>Usage</h3>
+<pre>onetool mlink [options] file.o [lib.a ...]
+
+Options:
+  -o file            Output executable (default a.out)
+  -e symbol          Entry symbol (default _start)
+  --base addr        Image base address (default 0x400000, must be page-aligned)
+  -Map file          Write link map to file
+  --print-map        Print link map to stdout
+  --print-symbols    Print global symbols to stdout
+  --dry-run          Parse, resolve and layout without writing output
+  -v, --verbose      Print archive member selection details
+  -h, --help         Show help
+</pre>
+
+<h3>Example</h3>
+<pre>onetool mlink -e _start -o myapp start.o main.o libfoo.a
+</pre>
+
+<h3>Limitations</h3>
+<ul>
+<li>Only ELF64 little-endian x86-64 relocatable objects</li>
+<li>No dynamic linking (static executables only)</li>
+<li>No shared library support</li>
+<li>No section header table in output (SHN_UNDEF)</li>
+<li>No debug section preservation</li>
+<li>Simple archive format only (no thin archives, no dash archives)</li>
+<li>Single architecture (no fat binaries)</li>
+</ul>
+
+<hr>
+<h2>lmake — Bundled Build Tool</h2>
+<p><strong>Source:</strong> <code>tools/dev/lmake.zig</code> (807 lines)</p>
+<p><strong>Language:</strong> Zig</p>
+<p><strong>Entry:</strong> <code>lk()</code> — exported as <code>pub export fn lk(argc: c_int, argv: [*][*:0]u8) c_int</code></p>
+<p><strong>argv0_mode:</strong> <code>ONETOOL_ARGV0_BINARY_PATH</code> — <code>argv[0]</code> is set to the binary path so lmake can locate its build scripts relative to the executable</p>
+<p>lmake is a custom build system written in Zig that reads <code>lmakefile</code> — the project's build definition file. It replaces a traditional Makefile with OneTool's own DSL. Without lmake, the project cannot be built. It is compiled as part of OneTool and invoked via <code>onetool lmake [target]</code>.</p>
+
+<h3>Architecture — Three-Phase Pipeline</h3>
+<p>lmake is structured as a classic compiler pipeline with Tokenizer → Parser → Executor phases, all in a single file:</p>
+
+<table>
+<tr><th>Component</th><th>Lines</th><th>Purpose</th></tr>
+<tr><td><code>Tokenizer</code></td><td>~100</td><td>Lexical analysis: converts lmakefile source text into tokens</td></tr>
+<tr><td><code>Parser</code></td><td>~350</td><td>Syntactic analysis: builds a program AST with tasks and variables</td></tr>
+<tr><td><code>Executor</code></td><td>~150</td><td>Runtime: evaluates variables, executes task commands via shell</td></tr>
+<tr><td><code>runLmake()</code></td><td>~60</td><td>Entry: CLI parsing, file loading, orchestration</td></tr>
+<tr><td><code>format()</code></td><td>~80</td><td>Custom string formatter (printf-like with padding support)</td></tr>
+<tr><td><code>lk()</code></td><td>~40</td><td>C ABI export: allocates arena, parses args, calls runLmake()</td></tr>
+</table>
+
+<h3>Tokenizer — <code>Tokenizer</code> struct</h3>
+<p>The tokenizer reads the lmakefile source text character by character and produces tokens:</p>
+
+<table>
+<tr><th>Token</th><th>Lexeme</th><th>Example</th></tr>
+<tr><td><code>eof</code></td><td>end of file</td><td>—</td></tr>
+<tr><td><code>ident</code></td><td>identifier</td><td><code>CC</code>, <code>CFLAGS</code>, <code>TARGET</code></td></tr>
+<tr><td><code>string</code></td><td>quoted string</td><td><code>"clang"</code>, <code>"onetool"</code></td></tr>
+<tr><td><code>at</code></td><td><code>@</code></td><td>directive prefix</td></tr>
+<tr><td><code>lparen</code></td><td><code>(</code></td><td>grouping start</td></tr>
+<tr><td><code>rparen</code></td><td><code>)</code></td><td>grouping end</td></tr>
+<tr><td><code>eq</code></td><td><code>=</code></td><td>assignment operator</td></tr>
+<tr><td><code>kw_string</code></td><td><code>string</code> keyword</td><td>type keyword for variable declaration</td></tr>
+<tr><td><code>kw_task</code></td><td><code>task</code> keyword</td><td>task definition keyword</td></tr>
+</table>
+
+<p>Identifiers are validated with <code>isIdentStart()</code> (alphabetic or underscore) and <code>isIdentContinue()</code> (alphanumeric or underscore). Comments (<code>//</code>) are skipped entirely during tokenization. The tokenizer tracks line and column numbers for error reporting.</p>
+
+<h3>Parser — <code>Parser</code> struct</h3>
+<p>The parser consumes tokens and constructs a program model with two main data structures:</p>
+
+<h4>Program Model</h4>
+<pre>const Program = struct {
+    vars: std.StringArrayHashMap([]const u8),       // Variable name → value
+    task_order: std.ArrayListUnmanaged([]const u8), // Task names in definition order
+    tasks: std.StringArrayHashMap(Task),             // Task name → Task struct
+};
+
+const Task = struct {
+    name: []const u8,         // Task name (e.g. "all", "clean")
+    body: []const u8,         // Raw command text to execute
+    deps: [][]const u8,       // Dependency task names
+};</pre>
+
+<p><strong>Parsing rules:</strong></p>
+<ul>
+<li><strong>Variable declaration:</strong> <code>string NAME = "value";</code> — stores in <code>program.vars</code>. Variables can reference other variables using <code>@(NAME)</code> syntax in string values.</li>
+<li><strong>Task definition:</strong> <code>task "name" [deps...] { body }</code> — stores the task name, dependency list, and body text.</li>
+<li><strong>Variable references:</strong> Inside string values, <code>@(VARNAME)</code> is replaced with the variable's value during variable loading (before execution). References are resolved with dependency order: the parser collects all <code>@(...)</code> references and substitutes them by looking up in <code>program.vars</code>.</li>
+</ul>
+
+<h3>Executor — <code>Executor</code> struct</h3>
+<p>The executor runs tasks by invoking system commands via shell:</p>
+
+<h4><code>loadVars()</code></h4>
+<p>Iterates all declared variables in definition order. For each variable, scans the value for <code>@(NAME)</code> references and substitutes them. This enables variables to reference previously defined variables (e.g., <code>MAIN_OBJ = "main.o"</code> and later <code>OBJS = "@(MAIN_OBJ) tools.o"</code>).</p>
+
+<h4><code>execTask(name)</code></h4>
+<ol>
+<li>Looks up the task by name in <code>program.tasks</code></li>
+<li>If not found: tries <code>"all"</code> or the first task in definition order</li>
+<li>Recursively executes all dependency tasks first (via <code>execTask()</code>)</li>
+<li>If the task has a body, substitutes variable references in the body text using <code>@(NAME)</code> syntax</li>
+<li>Executes the substituted command via <code>std.Io.Command.run()</code> which spawns a shell (<code>/bin/sh -c "..."</code>)</li>
+<li>Checks the exit code — if non-zero, returns <code>error.CommandFailed</code></li>
+</ol>
+
+<h4><code>format()</code> — Custom Formatter</h4>
+<p>A printf-style string formatter supporting:</p>
+<ul>
+<li><code>%s</code> — string</li>
+<li><code>%d</code>, <code>%i</code> — signed integer</li>
+<li><code>%u</code> — unsigned integer</li>
+<li><code>%x</code>, <code>%X</code> — hexadecimal (lower/upper)</li>
+<li><code>%b</code> — binary</li>
+<li><code>%c</code> — character from integer value</li>
+<li><code>%%</code> — literal percent</li>
+<li>Padding: <code>%10s</code> (right-align), <code>%-10s</code> (left-align), <code>%010d</code> (zero-padded)</li>
+</ul>
+<p>All numeric formatting uses <code>std.fmt.parseInt()</code> for parsing and <code>std.fmt.bufPrint()</code> for output. Arguments are passed as <code>[]const u8</code> slices and parsed to integers on demand.</p>
+
+<h3>CLI Entry — <code>runLmake()</code></h3>
+<p>Parses command-line arguments:</p>
+<pre>lmake [-f <file>] [target]
+lmake --list          # list available targets
+lmake -h, --help      # show usage</pre>
+<ul>
+<li><strong>Default file:</strong> <code>lmakefile</code> in the current directory</li>
+<li><strong>Default target:</strong> <code>"all"</code> if defined, otherwise the first task in the file</li>
+<li><strong>--list:</strong> Prints all task names in definition order</li>
+</ul>
+<p>Reads the lmakefile (max 10MB via <code>.limited(10 * 1024 * 1024)</code>), parses it, loads variables, finds the entry target, then executes it with full dependency resolution.</p>
+
+<h3>C ABI Export — <code>lk()</code></h3>
+<p>The <code>lk()</code> function is exported with <code>pub export fn</code> so it can be called by OneTool's C dispatcher with standard C ABI (<code>argc/argv</code>):</p>
+<ul>
+<li>Creates a <code>std.Io</code> instance with threaded I/O and inherits the process environment from <code>std.c.environ</code></li>
+<li>Uses a <code>DebugAllocator</code> for the main heap and an <code>ArenaAllocator</code> for the parser/executor (all memory freed at once via <code>arena.deinit()</code>)</li>
+<li>Converts C <code>argv</code> pointers to Zig slices</li>
+<li>Calls <code>runLmake()</code> — on error, prints the error name and returns 1</li>
+<li>Returns 0 on success</li>
+</ul>
+
+<h3>lmakefile Format</h3>
+<p>The <code>lmakefile</code> at the project root defines the entire OneTool build. Key sections:</p>
+
+<pre>string CC = "clang";
+string CFLAGS = "-O3 -flto";
+string LDFLAGS = "-static";
+string LDLIBS = "-lssl -lcrypto -lz -lzstd -ldl -pthread -lncursesw -ltinfo";
+string TARGET = "onetool";
+
+// Object file variables for every source file
+string LASTMOD_SRC = "tools/filesystem/lastmod.c";
+string LASTMOD_OBJ = "tools/filesystem/lastmod.o";
+// ... (one string variable per tool source)
+
+task "all" ["onetool"] {}
+
+task "onetool" [
+    "@(MAIN_OBJ)" "@(MAIN_TUI_OBJ)"
+    "@(LASTMOD_OBJ)" "@(EXEC_OBJ)" "@(FSINFO_OBJ)" "@(FSIZE_OBJ)"
+    "@(SIZE_OBJ)" "@(NM_OBJ)" "@(GAPI_OBJ)"
+    "@(DOWN_CLI_OBJ)" "@(DOWN_PARSE_OBJ)" "@(DOWN_SEND_OBJ)" "@(DOWN_ROBOTS_OBJ)"
+    "@(NSETUP_OBJ)" "@(PING_CLI_OBJ)"
+    "@(REBOOT_OBJ)" "@(SHUTDOWN_OBJ)"
+    "@(TASKMNG_INFO_OBJ)" "@(TASKMNG_LIST_OBJ)" "@(TASKMNG_PROCESS_OBJ)" "@(TASKMNG_TUI_OBJ)"
+    "@(USERC_TUI_OBJ)" "@(USERC_USERS_OBJ)"
+    "@(CONFIGURE_MAIN_OBJ)" "@(CONFIGURE_MOUNT_OBJ)" "@(CONFIGURE_CREATE_OBJ)"
+    "@(CONFIGURE_HELPERS_OBJ)" "@(CONFIGURE_SIZE_OBJ)" "@(CONFIGURE_OTHER_OBJ)"
+    "@(CVM_OBJ)"
+    "@(MLINK_BYTES_OBJ)" "@(MLINK_CLI_OBJ)" "@(MLINK_ELF_OBJ)" "@(MLINK_EMIT_OBJ)"
+    "@(MLINK_LAYOUT_OBJ)" "@(MLINK_LOG_OBJ)" "@(MLINK_OBJECT_OBJ)" "@(MLINK_RELOC_OBJ)"
+    "@(MLINK_SYMTAB_OBJ)"
+    "@(LPACK_OBJ)" "@(LPACK_RUNTIME_OBJ)"
+    "@(LMAKE_OBJ)"
+] {
+    "@(CC)" @(CFLAGS) -o "@(TARGET)" @(LDFLAGS) @(LDLIBS) ^
+        @(EXTRA_TOOLS_BUNDLE_OBJ) ^
+        @(MAIN_OBJ) @(MAIN_TUI_OBJ) @(LASTMOD_OBJ) ...
+}
+
+task "clean" [] {
+    rm -f @(TARGET)
+    rm -f @(MAIN_OBJ) @(MAIN_TUI_OBJ)
+    rm -f generated/extra_tools_bundle.o
+    // ...
+}</pre>
+
+<p>The file defines:</p>
+<ul>
+<li><strong>Global settings:</strong> CC, CFLAGS, LDFLAGS, LDLIBS, TARGET</li>
+<li><strong>Source/object pairs:</strong> One <code>string</code> variable per source file for its path and corresponding <code>.o</code> output</li>
+<li><strong>Compilation tasks:</strong> Each source file has a task that compiles it with <code>@(CC) @(CFLAGS) -c -o @(OBJ) @(SRC)</code></li>
+<li><strong>Link task:</strong> The <code>"onetool"</code> task links all objects together with extra tools bundle</li>
+<li><strong>Clean task:</strong> Removes all build artifacts</li>
+</ul>
+
+<h3>Usage</h3>
+<pre>onetool lmake [target]
+onetool lmake --list          # list all available targets
+onetool lmake -h, --help      # show help
+onetool lmake -f lmakefile    # specify custom build file (default: lmakefile)
+</pre>
+
+<h3>Example</h3>
+<pre>onetool lmake clean   # remove all build artifacts
+onetool lmake all     # build the full project (same as just "onetool lmake")
+onetool lmake --list  # show all tasks
+</pre>
+
+<hr>
+<h2>lpack — Lua Packager</h2>
+<p><strong>Entry:</strong> <code>lp()</code> in <code>tools/dev/packagers/lpack/</code></p>
+<p>Bundles a Lua script together with a Lua interpreter into a standalone ELF executable.</p>
+
+<h3>Components</h3>
+<table>
+<tr><th>File</th><th>Purpose</th></tr>
+<tr><td><code>lpack.c</code></td><td>Main packaging logic: reads Lua script and interpreter, concatenates them into an ELF with a runtime stub</td></tr>
+<tr><td><code>runtime.c</code></td><td>Runtime stub that embeds extraction logic: extracts the Lua script at runtime and executes it via the bundled interpreter</td></tr>
+</table>
+
+<h3>Usage</h3>
+<pre>onetool lpack [options] script.lua
+
+Options:
+  -i interpreter  Path to Lua interpreter (default: auto-detect)
+  -o output       Output ELF file (default: a.out)
+</pre>
+
+<h3>Example</h3>
+<pre>onetool lpack -i /usr/bin/lua -o bundle main.lua
+./bundle  # runs main.lua with the bundled interpreter
+</pre>
+
+<hr>
+<h2>gapi_supported — Graphics API Check</h2>
+<p><strong>Entry:</strong> <code>ga()</code> in <code>tools/dev/gapi_supported.c</code></p>
+<p>Detects which graphics APIs are available by trying to <code>dlopen()</code> their shared libraries with a fallback variant.</p>
+
+<table>
+<tr><th>API</th><th>Library</th><th>Fallback</th></tr>
+<tr><td>Vulkan</td><td><code>libvulkan.so.1</code></td><td><code>libvulkan.so</code></td></tr>
+<tr><td>OpenGL</td><td><code>libGL.so.1</code></td><td><code>libGL.so</code></td></tr>
+<tr><td>EGL</td><td><code>libEGL.so.1</code></td><td><code>libEGL.so</code></td></tr>
+<tr><td>OpenGL ES 2.0/3.0</td><td><code>libGLESv2.so.2</code></td><td><code>libGLESv2.so</code></td></tr>
+<tr><td>OpenGL ES 1.1</td><td><code>libGLESv1_CM.so.1</code></td><td><code>libGLESv1_CM.so</code></td></tr>
+<tr><td>OpenCL</td><td><code>libOpenCL.so.1</code></td><td><code>libOpenCL.so</code></td></tr>
+</table>
+
+<p><strong>Usage:</strong> <code>onetool gapi_supported</code></p>
+
+
+
+
+<h1>OneTool — Power Management Tools</h1>
+<p>The power management subsystem consists of two minimal tools for system reboot and shutdown. Both are implemented in a single C file each (~50 lines) and use the <code>reboot()</code> Linux syscall directly — no <code>systemctl</code>, <code>shutdown</code>, or external process spawning.</p>
+
+<hr>
+<h2>reboot — Reboot System</h2>
+<p><strong>Source:</strong> <code>tools/power/reboot.c</code> (46 lines)</p>
+<p><strong>Entry:</strong> <code>rb()</code></p>
+<p>Reboots the system immediately or after a configurable delay. Uses the <code>reboot()</code> system call with <code>LINUX_REBOOT_CMD_RESTART</code>.</p>
+
+<h3>Implementation Details</h3>
+<ol>
+<li><strong>Argument parsing:</strong> Accepts an optional <code>-t seconds</code> flag. The value is parsed with <code>strtol()</code> — includes validation for: no characters consumed (<code>end == argv[2]</code>), trailing garbage (<code>*end != '\0'</code>), negative values, and values exceeding <code>INT32_MAX</code> (2,147,483,647 seconds ≈ 68 years).</li>
+<li><strong>Delay:</strong> If a delay was specified, calls <code>sleep(delay)</code> before proceeding.</li>
+<li><strong>sync():</strong> Calls <code>sync()</code> to flush filesystem buffers before triggering the reboot — critical for data integrity.</li>
+<li><strong>Syscall:</strong> Calls <code>reboot(LINUX_REBOOT_CMD_RESTART)</code> which sends the magic shutdown sequence <code>0xfee1dead</code> + <code>672274793</code> to the kernel via the <code>__NR_reboot</code> syscall. On error, prints the errno string via <code>strerror(errno)</code> and returns 1.</li>
+</ol>
+
+<p><strong>Error handling:</strong> Prints <code>invalid timer value: <input></code> for bad formats, <code>timer value is too large</code> for overflow, and <code>reboot failed: <strerror></code> if the syscall fails (typically due to missing <code>CAP_SYS_BOOT</code> capability).</p>
+
+<h3>Usage</h3>
+<pre>onetool reboot [-t seconds]</pre>
+
+<table>
+<tr><th>Option</th><th>Description</th></tr>
+<tr><td><code>-t seconds</code></td><td>Wait the specified number of seconds before rebooting</td></tr>
+</table>
+
+<h3>Examples</h3>
+<pre># Reboot immediately
+onetool reboot
+
+# Reboot after 5 seconds
+onetool reboot -t 5
+</pre>
+
+<p><strong>Note:</strong> Requires <code>CAP_SYS_BOOT</code> (typically root). The delay is a simple <code>sleep()</code> — it blocks the process before the reboot syscall.</p>
+
+<hr>
+<h2>shutdown — Power Off System</h2>
+<p><strong>Source:</strong> <code>tools/power/shutdown.c</code> (46 lines)</p>
+<p><strong>Entry:</strong> <code>sd()</code></p>
+<p>Powers off the system immediately or after a configurable delay. Uses the <code>reboot()</code> system call with <code>LINUX_REBOOT_CMD_POWER_OFF</code>.</p>
+
+<h3>Implementation Details</h3>
+<p>Structurally identical to <code>reboot.c</code> except:</p>
+<ul>
+<li><strong>Syscall:</strong> Uses <code>LINUX_REBOOT_CMD_POWER_OFF</code> instead of <code>LINUX_REBOOT_CMD_RESTART</code>. This triggers kernel shutdown sequence that ACPI power-off on supported hardware.</li>
+<li><strong>Error message:</strong> Prints <code>shutdown failed: <strerror></code> instead of <code>reboot failed</code>.</li>
+<li><strong>Argument parsing:</strong> Same <code>strtol</code>-based parsing with full validation — identical to reboot.</li>
+</ul>
+
+<h3>Usage</h3>
+<pre>onetool shutdown [-t seconds]</pre>
+
+<table>
+<tr><th>Option</th><th>Description</th></tr>
+<tr><td><code>-t seconds</code></td><td>Wait the specified number of seconds before shutting down</td></tr>
+</table>
+
+<h3>Examples</h3>
+<pre># Shut down immediately
+onetool shutdown
+
+# Shut down after 10 seconds
+onetool shutdown -t 10
+</pre>
+
+<p><strong>Note:</strong> Requires <code>CAP_SYS_BOOT</code> (typically root). On systems without ACPI or virtual machines without proper power-off support, the kernel may hang after printing "Power down."</p>
+
+<h3>Common Syscall Behaviour</h3>
+<p>Both tools use the same underlying <code>reboot()</code> libc wrapper, which invokes the <code>__NR_reboot</code> syscall (169 on x86-64). The kernel requires the caller to have <code>CAP_SYS_BOOT</code> in the user namespace. The magic arguments to the syscall are:</p>
+<table>
+<tr><th>Parameter</th><th>Value</th></tr>
+<tr><td>magic1</td><td><code>0xfee1dead</code></td></tr>
+<tr><td>magic2</td><td><code>672274793</code> (<code>LINUX_REBOOT_MAGIC2</code>)</td></tr>
+<tr><td>cmd</td><td><code>LINUX_REBOOT_CMD_RESTART</code> (reboot) or <code>LINUX_REBOOT_CMD_POWER_OFF</code> (shutdown)</td></tr>
+</table>
+
+
+
+
+<h1>OneTool — TUI System</h1>
+<p>The OneTool TUI is defined entirely in <code>tui.c</code> (1336 lines). It provides an interactive terminal interface for browsing tools, configuring options, and launching tools with custom arguments.</p>
+
+<h2>Architecture Overview</h2>
+<p>The TUI is a state-machine driven, event-loop based interface with three screens:</p>
+<ol>
+<li><strong>Tools screen</strong> — List all tools in a left panel with details/preview in the right panel</li>
+<li><strong>Form screen</strong> — Shows a tool-specific form with fields (text, toggle, choice) for each argument</li>
+<li><strong>Settings screen</strong> — Global settings: launch directory and theme palette configuration</li>
+</ol>
+
+<h2>Core State: <code>onetool_tui_state_t</code></h2>
+<pre><span class="kwd">typedef struct</span> {
+    <span class="kwd">int</span> screen;                                 <span class="cmt">// Current screen (0=Tools, 1=Form, 2=Settings)</span>
+    <span class="kwd">int</span> selected_tool;                          <span class="cmt">// Index of selected tool</span>
+    <span class="kwd">int</span> tool_scroll;                            <span class="cmt">// Scroll position in tool list</span>
+    <span class="kwd">int</span> selected_field;                         <span class="cmt">// Currently focused form field</span>
+    <span class="kwd">int</span> current_theme;                          <span class="cmt">// Active theme index (0-4)</span>
+    <span class="kwd">char</span> status[<span class="num">160</span>];                          <span class="cmt">// Status bar text</span>
+    <span class="kwd">char</span> launch_dir[<span class="num">4096</span>];                     <span class="cmt">// Working directory for tool launches</span>
+    onetool_form_t form;                          <span class="cmt">// Active tool form</span>
+    onetool_form_t settings_form;                  <span class="cmt">// Settings form</span>
+    <span class="kwd">const struct</span> onetool_tool *active_tool;       <span class="cmt">// Tool currently being configured</span>
+    <span class="kwd">int</span> settings_selected_field;                 <span class="cmt">// Settings field focus</span>
+    <span class="kwd">int</span> settings_return_screen;                  <span class="cmt">// Screen to return to from settings</span>
+    taskmng_runtime_t taskmng_runtime;             <span class="cmt">// Task manager runtime state</span>
+    taskmng_snapshot_t taskmng_snapshot;           <span class="cmt">// Task manager snapshot</span>
+    taskmng_view_t taskmng_view;                   <span class="cmt">// Task manager view state</span>
+    userc_list_t userc_list;                       <span class="cmt">// User list</span>
+    userc_view_t userc_view;                       <span class="cmt">// User control view state</span>
+} onetool_tui_state_t;
+</pre>
+
+<h2>Tool Forms</h2>
+<p>Each tool can have a custom form with up to <code>TUI_MAX_FIELDS</code> (16) fields. Forms are defined in <code>load_embedded_tool_form()</code> which contains a large <code>if/else if</code> chain mapping tool names to their form definitions.</p>
+
+<h3>Field Types</h3>
+<table>
+<tr><th>Type</th><th>Enum</th><th>Behavior</th></tr>
+<tr><td>Text</td><td><code>ONETOOL_FIELD_TEXT</code></td><td>Free-form text input, supports typing and backspace. Values are passed as arguments with their flag prefix.</td></tr>
+<tr><td>Toggle</td><td><code>ONETOOL_FIELD_TOGGLE</code></td><td>Boolean on/off, toggled with Space. When on, the flag is emitted.</td></tr>
+<tr><td>Choice</td><td><code>ONETOOL_FIELD_CHOICE</code></td><td>Multiple preset options, navigated with Left/Right/Space. The selected value is emitted.</td></tr>
+</table>
+
+<h3>Form Field</h3>
+<pre><span class="kwd">typedef struct</span> {
+    <span class="kwd">char</span> name[<span class="num">48</span>];               <span class="cmt">// Internal field name</span>
+    <span class="kwd">char</span> label[<span class="num">96</span>];              <span class="cmt">// Display label</span>
+    <span class="kwd">char</span> flag[<span class="num">24</span>];               <span class="cmt">// CLI flag prefix (e.g. "-o", "--timeout")</span>
+    <span class="kwd">char</span> value[<span class="num">256</span>];             <span class="cmt">// Current value</span>
+    <span class="kwd">char</span> default_value[<span class="num">256</span>];     <span class="cmt">// Default value</span>
+    <span class="kwd">char</span> placeholder[<span class="num">96</span>];        <span class="cmt">// Placeholder hint</span>
+    <span class="kwd">char</span> help[<span class="num">160</span>];               <span class="cmt">// Help text (shown at bottom)</span>
+    <span class="kwd">int</span> type;                       <span class="cmt">// Field type</span>
+    <span class="kwd">int</span> option_count;               <span class="cmt">// Choice option count</span>
+    <span class="kwd">int</span> choice_index;               <span class="cmt">// Currently selected choice</span>
+    onetool_choice_option_t options[<span class="num">16</span>]; <span class="cmt">// Choice options</span>
+} onetool_form_field_t;
+</pre>
+
+<h3>Field Flags</h3>
+<p>When building the command line for execution:</p>
+<ul>
+<li>Text fields: if <code>flag</code> is non-empty, it is emitted before the value</li>
+<li>Toggle fields: if value is "1"/"true"/"yes"/"on", the flag is emitted</li>
+<li>Choice fields: same as text</li>
+<li>Fields with <code>flag = "@extra"</code>: the value is tokenized (supports quotes, escapes) and appended as-is</li>
+</ul>
+
+<h3>Special Tools: Task Manager & User Control</h3>
+<p>When <code>taskmng</code> or <code>userc</code> are selected on the tools screen, the right panel becomes an interactive live view instead of showing static tool details:</p>
+<ul>
+<li><strong>taskmng:</strong> Live process list refreshed each frame via <code>taskmng_collect()</code>/<code>taskmng_refresh()</code>. Keyboard events for process control are handled inline.</li>
+<li><strong>userc:</strong> User list displayed and managed directly in the right panel. Keyboard events for add/delete/edit are handled inline.</li>
+</ul>
+
+<h2>Themes</h2>
+<p>Five built-in themes (ocean, forest, amber, mono, custom) are defined in <code>g_themes[]</code>. Each theme is a <code>tui_palette_t</code> with 7 color slots.</p>
+
+<h3>Theme Cycling</h3>
+<p>Press <code>T</code> (uppercase) to cycle forward through themes. The cycle wraps around. When in settings, theme presets can be selected and individual colors can be changed, which switches to "custom" theme.</p>
+
+<h2>Settings Screen</h2>
+<p>The settings screen (<code>open_settings()</code>) provides:</p>
+<ul>
+<li><strong>Launch path:</strong> Working directory for tool execution (defaults to current directory)</li>
+<li><strong>Theme preset:</strong> Choice of ocean/forest/amber/mono/custom</li>
+<li><strong>Individual color fields:</strong> Background, Panel, Accent, Text, Muted, Success, Error — each with all 8 color options + default</li>
+</ul>
+<p>Changes to individual colors switch to "custom" theme and apply live.</p>
+
+<h2>Keyboard Shortcuts</h2>
+<table>
+<tr><th>Key</th><th>Tools Screen</th><th>Form Screen</th><th>Settings Screen</th></tr>
+<tr><td>Arrows</td><td>Navigate tools</td><td>Navigate fields</td><td>Navigate settings</td></tr>
+<tr><td>PageUp/Down</td><td>Jump 8 tools</td><td>—</td><td>—</td></tr>
+<tr><td>Home/End</td><td>First/last tool</td><td>—</td><td>—</td></tr>
+<tr><td>Enter</td><td>Open tool form</td><td><strong>Run tool!</strong></td><td>Select choice option</td></tr>
+<tr><td>Esc / Q</td><td>Exit TUI</td><td>Back to tools</td><td>Back to previous</td></tr>
+<tr><td>N</td><td>Open settings</td><td>Open settings</td><td>Close settings</td></tr>
+<tr><td>Tab</td><td>—</td><td>Next field (wraps)</td><td>Next setting (wraps)</td></tr>
+<tr><td>Space</td><td>—</td><td>Toggle/cycle field</td><td>Select choice option</td></tr>
+<tr><td>T</td><td>Cycle theme</td><td>Cycle theme</td><td>—</td></tr>
+<tr><td>R</td><td>—</td><td>Run tool</td><td>—</td></tr>
+<tr><td>Left/Right</td><td>—</td><td>Cycle choice options</td><td>Cycle choice options</td></tr>
+</table>
+
+<h2>Tool Execution Flow</h2>
+<ol>
+<li><code>run_active_tool()</code> builds the argument list from form fields using <code>build_tool_argv()</code></li>
+<li>TUI is shut down via <code>tui_shutdown()</code></li>
+<li>The launch directory is changed if specified</li>
+<li>Tool is executed via <code>onetool_run_tool()</code></li>
+<li>After tool exits, <code>chdir()</code> back to original directory</li>
+<li>Waits for Enter press before reinitializing TUI</li>
+<li>TUI is reinitialized with current theme</li>
+</ol>
+
+<h2>Token Parser</h2>
+<p>The <code>tokenize_extra_args()</code> function handles quoting and escaping for the "Extra args" field:</p>
+<ul>
+<li>Single quotes <code>'...'</code>: literal text, no interpretation</li>
+<li>Double quotes <code>"..."</code>: literal text</li>
+<li>Backslash <code>\</code>: escapes the next character</li>
+<li>Unmatched quotes return error (shown in status)</li>
+<li>Whitespace separates tokens outside quotes</li>
+</ul>
+
+<h2>Preview System</h2>
+<p>At the bottom of form and tool screens, a preview line shows the command that would be executed. This is generated by <code>build_preview_text()</code> which runs the same <code>build_tool_argv()</code> function and formats the resulting arguments.</p>
+
+
+
+
+<h1>OneTool — MOFL Language Subsystem</h1>
+<p>The MOFL subsystem (licensed under BSD 2-Clause) contains two language implementations: <strong>YAP</strong> and <strong>Brainfuck</strong>. These are registered via the extra tools manifest and built as part of OneTool.</p>
+
+<hr>
+<h2>YAP Language</h2>
+<p><strong>Source:</strong> <code>mofl/languages/yap/yap.c</code> (1132 lines)</p>
+<p><strong>Entry:</strong> Registered as extra tool <code>yap</code></p>
+<p>YAP (Yet Another Programming language) is a scripting language interpreter bundled with OneTool. It supports variables, math operations, control flow, external library calls, and subroutines.</p>
+
+<h3>Features</h3>
+<ul>
+<li>Variables (declared before use)</li>
+<li>Integer and string types</li>
+<li>Arithmetic: ADD, SUB, MUL, DIV</li>
+<li>Conditional blocks: IF/ENDIF</li>
+<li>Comparison operators: B (bigger), S (smaller), E (equal)</li>
+<li>Subroutine calls via GOTO/RETURN</li>
+<li>External dynamic library calling (Linux .so, Windows .dll)</li>
+<li>Print output: raw values, strings, numbers</li>
+<li>User input: READINT</li>
+<li>System variables: OPRES (math results), RETVAL (return values)</li>
+</ul>
+
+<h3>Language Syntax</h3>
+
+<h4>Comments</h4>
+<pre>; this is a comment
+; everything after semicolon is ignored</pre>
+
+<h4>Variables</h4>
+<pre>DECLARE VAR name
+SET name "John"
+PRINT name</pre>
+
+<h4>Print Options</h4>
+<pre>PRINT NFORMAT hello    ; print raw value (no variable lookup)
+PRINT "hello"          ; print string literal
+PRINT 123              ; print number</pre>
+
+<h4>User Input</h4>
+<pre>READINT number
+PRINT number           ; prints the read number
+; READINT stores the value into the variable
+; and also updates OPRES with the same integer</pre>
+
+<h4>Math Operations</h4>
+<pre>ADD 2, 3
+PRINT OPRES            ; prints 5
+
+SUB 10 4
+SET result OPRES       ; result = 6
+
+MUL result 2
+PRINT OPRES            ; prints 12
+
+DIV 20 5
+PRINT OPRES            ; prints 4</pre>
+
+<p>All math results are stored in the system variable <code>OPRES</code>. Return values from subroutines are stored in <code>RETVAL</code>.</p>
+
+<h4>If Blocks</h4>
+<pre>IF name E "John"
+  PRINT "user is John"
+ENDIF
+
+IF 10 B 3
+  PRINT "ten is bigger"
+ENDIF
+
+IF NFORMAT name E "name"
+  PRINT "compare raw token without variable lookup"
+ENDIF</pre>
+
+<p>Supported comparison operators:</p>
+<table>
+<tr><th>Operator</th><th>Meaning</th></tr>
+<tr><td><code>B</code></td><td>Bigger (greater than)</td></tr>
+<tr><td><code>S</code></td><td>Smaller (less than)</td></tr>
+<tr><td><code>E</code></td><td>Equal</td></tr>
+</table>
+
+<p>Operators can also be written at the end:</p>
+<pre>IF 10 3 B
+PRINT "same meaning as IF 10 B 3"
+ENDIF</pre>
+
+<h4>Subroutines (GOTO/RETURN)</h4>
+<pre>; Line numbers are addresses (starting from 1)
+; Each line is an address you can jump to
+; After GOTO finishes (see RETURN), execution continues
+; on the line after GOTO
+
+1:  PRINT "start"
+2:  GOTO 5
+3:  PRINT "skipped"         ; this is skipped
+4:  RETURN "done"           ; return to GOTO LINE + 1
+5:  PRINT "subroutine"
+6:  RETURN "back"           ; jump back to line 3
+7:  PRINT RETVAL            ; prints "back"</pre>
+
+<h4>External Library Calls</h4>
+<pre>; Linux
+CALL "/full/path/libexample.so" add_numbers INT2 2 3
+PRINT OPRES
+
+; Windows
+CALL "C:\full\path\example.dll" "hello" STR1 "world"
+PRINT RETVAL</pre>
+
+<p>Supported call signatures:</p>
+<table>
+<tr><th>Signature</th><th>C Function</th></tr>
+<tr><td><code>INT0</code></td><td><code>int func(void)</code></td></tr>
+<tr><td><code>INT1</code></td><td><code>int func(int)</code></td></tr>
+<tr><td><code>INT2</code></td><td><code>int func(int, int)</code></td></tr>
+<tr><td><code>INTSTR1</code></td><td><code>int func(const char*)</code></td></tr>
+<tr><td><code>STR0</code></td><td><code>const char* func(void)</code></td></tr>
+<tr><td><code>STR1</code></td><td><code>const char* func(const char*)</code></td></tr>
+</table>
+
+<h3>Interpreter Internals</h3>
+<p>The interpreter has a lexer (<code>struct lexer</code>) that tokenizes source lines, a line parser, and an execution engine. Key internal structures:</p>
+<ul>
+<li><strong>Lexer:</strong> Splits input text into token lists</li>
+<li><strong>Parsed lines:</strong> Each line <code>struct parsed_line</code> holds up to <code>MAXTOKENS</code> (28) tokens</li>
+<li><strong>Execution:</strong> Interprets line by line with support for jump table (GOTO targets)</li>
+<li><strong>System variables:</strong> <code>OPRES</code> stores math/results, <code>RETVAL</code> stores subroutine return values</li>
+</ul>
+
+<h3>YAP Fork Variant</h3>
+<p>There is also a modified fork of YAP at <code>mofl/languages/yap/fork/yap.c</code> with its own set of examples demonstrating loops, math, subroutines, arrays, floats, and system strings.</p>
+
+<h4>YAP Fork Examples</h4>
+<table>
+<tr><th>File</th><th>Topics</th></tr>
+<tr><td><code>01_loops_math.yap</code></td><td>Loop constructs and arithmetic</td></tr>
+<tr><td><code>02_subroutines.yap</code></td><td>GOTO/RETURN patterns</td></tr>
+<tr><td><code>03_arrays.yap</code></td><td>Array operations</td></tr>
+<tr><td><code>04_floats.yap</code></td><td>Floating point support</td></tr>
+<tr><td><code>05_system_strings.yap</code></td><td>System string operations</td></tr>
+</table>
+
+<hr>
+<h2>Brainfuck Language</h2>
+<p><strong>Source:</strong> <code>mofl/languages/brainfuck/</code></p>
+<p>Brainfuck is implemented in three ways within the project:</p>
+
+<h3>Compiler — <code>compiler/compbf.c</code></h3>
+<p>An optimizing Brainfuck compiler that translates Brainfuck source code into native machine code (or intermediate representation).</p>
+
+<h3>Interpreters</h3>
+<table>
+<tr><th>File</th><th>Language</th><th>Description</th></tr>
+<tr><td><code>interpreter/asbf.s</code></td><td>x86-64 Assembly</td><td>A hand-optimized Brainfuck interpreter in assembly language</td></tr>
+<tr><td><code>interpreter/pybf.py</code></td><td>Python</td><td>A Python-based Brainfuck interpreter for reference and testing</td></tr>
+</table>
+
+<h3>Brainfuck Example</h3>
+<p>The <code>examples/mandelbrot.bf</code> file contains a Mandelbrot set renderer written in Brainfuck — a classic demonstration of the language's computational completeness.</p>
+
+<h3>Brainfuck Language Reference</h3>
+<p>Brainfuck operates on an array of memory cells (typically 30,000 bytes), a data pointer, and uses 8 commands:</p>
+<table>
+<tr><th>Command</th><th>Meaning</th></tr>
+<tr><td><code>></code></td><td>Increment the data pointer (move right)</td></tr>
+<tr><td><code><</code></td><td>Decrement the data pointer (move left)</td></tr>
+<tr><td><code>+</code></td><td>Increment the byte at the data pointer</td></tr>
+<tr><td><code>-</code></td><td>Decrement the byte at the data pointer</td></tr>
+<tr><td><code>.</code></td><td>Output the byte at the data pointer</td></tr>
+<tr><td><code>,</code></td><td>Input a byte and store it at the data pointer</td></tr>
+<tr><td><code>[</code></td><td>Jump forward to matching <code>]</code> if byte at pointer is zero</td></tr>
+<tr><td><code>]</code></td><td>Jump back to matching <code>[</code> if byte at pointer is non-zero</td></tr>
+</table>
+
+
+
+
+<h1>OneTool — Configuration & Extensibility</h1>
+<p>This document covers how tools are registered, how new tools can be added, the build system, output redirection, and the init system integration.</p>
+
+<hr>
+<h2>Tool Registry System</h2>
+<p>The registry API defined in <code>config/tool_registry.h</code> provides the plugin-style interface that every OneTool tool must conform to.</p>
+
+<h3>1. Tool Entry Function</h3>
+<pre><span class="kwd">typedef int</span> (*onetool_entry_fn)(<span class="kwd">int</span> argc, <span class="kwd">char</span> *argv[]);</pre>
+<p>Every tool must expose a function with this signature. It receives <code>argc/argv</code> just like a normal <code>main()</code>. Tools can be implemented as standard C programs with <code>int main(int argc, char *argv[])</code> — the build system renames <code>main</code> to a unique symbol automatically.</p>
+
+<h3>2. argv0 Mode</h3>
+<pre><span class="kwd">enum</span> onetool_argv0_mode {
+    <span class="str">ONETOOL_ARGV0_TOOL_NAME</span> = <span class="num">0</span>,   <span class="cmt">// argv[0] set to tool name (most tools)</span>
+    <span class="str">ONETOOL_ARGV0_BINARY_PATH</span> = <span class="num">1</span>, <span class="cmt">// argv[0] set to binary path (lmake)</span>
+};</pre>
+<p><code>TOOL_NAME</code> mode is standard for utilities — <code>argv[0]</code> becomes the tool name like <code>"ping"</code>. <code>BINARY_PATH</code> mode is used by tools that inspect their own binary location (like lmake, which needs to find build scripts relative to the executable).</p>
+
+<h3>3. Tool Structure</h3>
+<pre><span class="kwd">struct</span> onetool_tool {
+    <span class="kwd">const char</span> *name;          <span class="cmt">// CLI name (e.g., "ping")</span>
+    onetool_entry_fn entry;      <span class="cmt">// Entry function pointer</span>
+    <span class="kwd">const char</span> *description;    <span class="cmt">// Help description</span>
+    <span class="kwd">enum</span> onetool_argv0_mode argv0_mode;
+};</pre>
+<p>The tool table is an array of these structs. The dispatcher iterates the array linearly to find a tool by name. Unrecognized tool names print the full tool list as help.</p>
+
+<h2>Adding Built-in Tools (no manifest)</h2>
+<p>Built-in tools are declared in <code>main.c</code> in the <code>onetool_builtin_tools[]</code> array. To add a new built-in tool:</p>
+<ol>
+<li>Implement a function with signature <code>int my_tool(int argc, char *argv[])</code> (or keep it as <code>main()</code> if using the manifest system)</li>
+<li>Add a forward declaration at the top of <code>main.c</code></li>
+<li>Add an entry to <code>onetool_builtin_tools[]</code> with name, function pointer, description, and argv0 mode</li>
+<li>Rebuild</li>
+</ol>
+
+<p><strong>Current built-in tools registered in main.c:</strong> <code>lm</code> (lastmod), <code>ex</code> (exec), <code>fi</code> (fsinfo), <code>fz</code> (fsize), <code>sz</code> (size), <code>nm</code> (nm), <code>rb</code> (reboot), <code>sd</code> (shutdown), <code>ml</code> (mlink), <code>ga</code> (gapi_supported), <code>lp</code> (lpack), <code>pg</code> (ping), <code>ns</code> (nsetup), <code>dn</code> (down), <code>tm</code> (taskmng), <code>uc</code> (userc), <code>cf</code> (configure), <code>cv</code> (cvm), <code>lk</code> (lmake).</p>
+
+<h2>Adding Extra Tools via Manifest</h2>
+<p>Tools can be added without modifying <code>main.c</code> by using the extra tools manifest at <code>config/extra_tools.manifest</code>.</p>
+
+<h3>Manifest Format</h3>
+<pre>name|source|description|argv0_mode|extra_cflags</pre>
+
+<p>Fields:</p>
+<table>
+<tr><th>Field</th><th>Description</th><th>Example</th></tr>
+<tr><td><code>name</code></td><td>CLI tool name</td><td><code>yap</code></td></tr>
+<tr><td><code>source</code></td><td>Path to C source file (relative to project root)</td><td><code>mofl/languages/yap/yap.c</code></td></tr>
+<tr><td><code>description</code></td><td>Help text for tool list</td><td><code>YAP language interpreter</code></td></tr>
+<tr><td><code>argv0_mode</code></td><td><code>tool</code> or <code>onetool</code></td><td><code>tool</code></td></tr>
+<tr><td><code>extra_cflags</code></td><td>Additional compiler flags (optional)</td><td><code>-lm</code></td></tr>
+</table>
+
+<h3>Build Process for Extra Tools</h3>
+<p>The build script <code>tools/dev/build_extra_tools.sh</code> processes the manifest as follows:</p>
+<ol>
+<li>Reads the manifest line by line, splitting on <code>|</code> delimiter</li>
+<li>For each entry, generates a unique symbol name: <code>onetool_extra_main_<name></code></li>
+<li>Compiles the source file with <code>-Dmain=onetool_extra_main_<name></code> — this renames the tool's <code>main()</code> function to the generated symbol via the C preprocessor</li>
+<li>Passes any <code>extra_cflags</code> to the compiler</li>
+<li>The resulting object file is linked into the <code>onetool</code> binary</li>
+<li>At startup, the extra tools are registered via the auto-generated <code>onetool_extra_tools[]</code> array</li>
+<li>The <code>onetool_find_tool()</code> function searches built-in tools first, then extra tools</li>
+</ol>
+
+<p>This mechanism allows third-party tools to be plugged in without touching any core source files.</p>
+
+<h3>Current Extra Tools</h3>
+<table>
+<tr><th>Name</th><th>Source</th><th>Description</th></tr>
+<tr><td><code>yap</code></td><td><code>mofl/languages/yap/yap.c</code> (1132 lines)</td><td>YAP language interpreter</td></tr>
+</table>
+
+<h2>Global Output Redirection</h2>
+<p>OneTool supports a global <code>-to</code> flag that redirects stdout and stderr of any tool invocation:</p>
+<pre>onetool ping 1.1.1.1 -to /tmp/ping.log
+onetool down https://example.com -to fd   <span class="cmt"># redirect to fd 3</span></pre>
+<p>When <code>-to</code> is used, the dispatcher in <code>main()</code> intercepts it before calling the tool:</p>
+<ul>
+<li>If the argument is <code>"fd"</code>, no action is taken — the caller is expected to have already set up file descriptor 3 for output capture. This is used by the TUI when running tools with output capture.</li>
+<li>Otherwise, the argument is treated as a file path. The file is opened with <code>open(path, O_WRONLY|O_CREAT|O_TRUNC, 0644)</code>, and both <code>stdout</code> (fd 1) and <code>stderr</code> (fd 2) are duplicated to the file descriptor via <code>dup2()</code>.</li>
+</ul>
+<p>Note: The <code>-to</code> flag must appear after the tool name, not as a global flag before it. The tool's <code>main()</code> never sees the <code>-to</code> flag — it is consumed by the dispatcher before calling the entry point.</p>
+
+<h2>Build System</h2>
+<h3>Primary Build</h3>
+<pre>make          <span class="cmt"># builds onetool</span>
+make clean    <span class="cmt"># removes built binaries</span></pre>
+<p>Requirements: <code>clang</code> and <code>make</code>. The build process:</p>
+<ol>
+<li>Compiles the shared libraries (<code>libs/TUI/</code>, <code>libs/elf/</code>, <code>libs/memory/</code>, <code>libs/net/</code>)</li>
+<li>Compiles all built-in tool sources</li>
+<li>Runs <code>build_extra_tools.sh</code> to compile manifest-registered tools</li>
+<li>Links everything into a single static ELF64 binary called <code>onetool</code></li>
+</ol>
+
+<h3>lmake Build Tool</h3>
+<p>The bundled lmake (<code>tools/dev/lmake.zig</code>) is written in Zig and compiled separately. It is registered with <code>ONETOOL_ARGV0_BINARY_PATH</code> mode so it can locate build scripts relative to the binary path. The <code>lmakefile</code> in the project root is the build definition consumed by lmake — it replaces a traditional Makefile with OneTool's own build system.</p>
+
+<h2>InitFS</h2>
+<p>The <code>initfs/init</code> file is an embedded init script designed for minimal Linux environments where OneTool acts as <code>/init</code> (PID 1). This enables OneTool to function as the sole binary in a tiny root filesystem — a self-contained userspace.</p>
+
+<h3>Bootstrap Process</h3>
+<p>When OneTool is used as init:</p>
+<ol>
+<li>The kernel starts OneTool as PID 1</li>
+<li>If the TUI tool is launched (or taskmng/userc), the configure tool (<code>cf</code>) is called automatically as a fallback: if <code>tui_init()</code> (which needs <code>/dev/tty</code>) fails, it runs configure first, then retries TUI initialization</li>
+<li>Configure mounts <code>/proc</code>, <code>/sys</code>, <code>/dev</code> (devtmpfs), and <code>/tmp</code> (tmpfs) to bootstrap the basic Linux filesystem layout</li>
+<li>After this bootstrap, the full TUI becomes available</li>
+</ol>
+
+<h2>Makefile Details (lmakefile)</h2>
+<p>The project root contains <code>lmakefile</code> which is the build definition consumed by lmake. This is a custom build system format — not GNU Make syntax. It defines:</p>
+<ul>
+<li>Source file lists for each tool</li>
+<li>Library dependencies</li>
+<li>CFLAGS, LDFLAGS</li>
+<li>Output binary name and location</li>
+</ul>
+
+<h2>Error Handling Conventions</h2>
+<p>All OneTool tools follow consistent conventions:</p>
+<ul>
+<li><strong>Return value:</strong> 0 for success, 1 for failure</li>
+<li><strong>Errors:</strong> Printed to stderr with <code>fprintf(stderr, ...)</code> and <code>strerror(errno)</code> for system call failures</li>
+<li><strong>Usage:</strong> Invalid arguments print usage to stderr and return 1</li>
+<li><strong>Memory:</strong> All heap allocations go through <code>ot_x*()</code> wrappers that abort on OOM</li>
+</ul>
+
+
+</body>
+</html>
