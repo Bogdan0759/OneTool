@@ -23,6 +23,7 @@ implemented tools:
 - `taskmng` - TUI task manager with process control
 - `gapi_supported` - check available graphics API
 - `fsinfo` - filesystem info
+- `fsize` - print file size
 - `yap` - YAP language interpreter
 - `userc` - interactive user control (add/del/edit users)
 - `nsetup` - simple network setup via DHCP
