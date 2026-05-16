@@ -138,7 +138,7 @@ srapi_result_t srapi_image_map(srapi_image_t *image, void **out, uint32_t *pitch
         return SRAPI_ERROR_BAD_ARG;
     }
     if (image->tiling != SRAPI_IMAGE_LINEAR) {
-        srapi_set_error("image: optimal tiling is not CPU-mappable");
+        srapi_set_error("image: optimal tiling is not host-mappable; use queue transfers");
         return SRAPI_ERROR_UNSUPPORTED;
     }
     if (image->data == NULL) {

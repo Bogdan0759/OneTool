@@ -166,6 +166,10 @@ static int primitive_group_size(srapi_primitive_topology_t topology) {
     }
 }
 
+static float color_channel_unit(srapi_color_t color, uint32_t shift) {
+    return (float)((color >> shift) & 0xff) / 255.0f;
+}
+
 static srapi_result_t submit_draw_vertices(srapi_framebuffer_t *target, const srapi_command_t *op) {
     const srapi_vertex_t *vertices;
     const uint32_t *indices = NULL;
@@ -242,10 +246,10 @@ static srapi_result_t submit_draw_vertices(srapi_framebuffer_t *target, const sr
 
             inputs[SRAPI_VM_INPUT_VERTEX_X] = vertices[i].x;
             inputs[SRAPI_VM_INPUT_VERTEX_Y] = vertices[i].y;
-            inputs[SRAPI_VM_INPUT_VERTEX_R] = (float)((vertices[i].color >> 16) & 0xff);
-            inputs[SRAPI_VM_INPUT_VERTEX_G] = (float)((vertices[i].color >> 8) & 0xff);
-            inputs[SRAPI_VM_INPUT_VERTEX_B] = (float)(vertices[i].color & 0xff);
-            inputs[SRAPI_VM_INPUT_VERTEX_A] = (float)((vertices[i].color >> 24) & 0xff);
+            inputs[SRAPI_VM_INPUT_VERTEX_R] = color_channel_unit(vertices[i].color, 16);
+            inputs[SRAPI_VM_INPUT_VERTEX_G] = color_channel_unit(vertices[i].color, 8);
+            inputs[SRAPI_VM_INPUT_VERTEX_B] = color_channel_unit(vertices[i].color, 0);
+            inputs[SRAPI_VM_INPUT_VERTEX_A] = color_channel_unit(vertices[i].color, 24);
             inputs[SRAPI_VM_INPUT_VERTEX_INDEX] = (float)i;
 
             r = srapi_vm_run_vertex(op->shader, inputs, out_pos, &out_color);
