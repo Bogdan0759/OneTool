@@ -565,6 +565,10 @@ uint32_t srapi_drm_height(const srapi_drm_display_t *display) {
     return display ? display->buffers[display->front].fb.height : 0;
 }
 
+const char *srapi_drm_device_path(const srapi_drm_display_t *display) {
+    return display != NULL ? display->device_path : "";
+}
+
 srapi_result_t srapi_drm_current_mode(
     const srapi_drm_display_t *display,
     srapi_display_mode_t *out

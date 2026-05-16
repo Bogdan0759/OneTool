@@ -102,6 +102,7 @@ struct srapi_shader {
 srapi_result_t srapi_cmd_push(srapi_cmd_buffer_t *cmd, const srapi_command_t *item);
 void srapi_debugf(const char *fmt, ...);
 void srapi_set_error(const char *fmt, ...);
+int srapi_backend_check_enabled(srapi_backend_t backend, uint32_t check);
 srapi_result_t srapi_gpu_probe(srapi_device_info_t *out);
 srapi_result_t srapi_gpu_open_device(const srapi_device_desc_t *desc, srapi_device_t **out);
 void srapi_gpu_close_device(srapi_device_t *device);

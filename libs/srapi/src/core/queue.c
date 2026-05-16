@@ -9,6 +9,7 @@ static int copy_region_ok(
     const srapi_image_t *image,
     const srapi_buffer_image_copy_t *region
 ) {
+    int check_overflow;
     size_t row_bytes;
     size_t copy_bytes;
     size_t buffer_need;
@@ -25,18 +26,19 @@ static int copy_region_ok(
         return 0;
     }
 
+    check_overflow = srapi_backend_check_enabled(image->backend, SRAPI_BACKEND_CHECK_OVERFLOW);
     if ((size_t)region->width > SIZE_MAX / sizeof(uint32_t)) {
-        srapi_set_error("queue copy: row size overflow");
+        srapi_set_error(check_overflow ? "queue copy: row size overflow" : "queue copy: region outside buffer");
         return 0;
     }
     row_bytes = (size_t)region->width * sizeof(uint32_t);
     if (region->height > SIZE_MAX / row_bytes) {
-        srapi_set_error("queue copy: copy size overflow");
+        srapi_set_error(check_overflow ? "queue copy: copy size overflow" : "queue copy: region outside buffer");
         return 0;
     }
     copy_bytes = row_bytes * (size_t)region->height;
     if (region->buffer_offset > SIZE_MAX - copy_bytes) {
-        srapi_set_error("queue copy: buffer offset overflow");
+        srapi_set_error(check_overflow ? "queue copy: buffer offset overflow" : "queue copy: region outside buffer");
         return 0;
     }
     buffer_need = region->buffer_offset + copy_bytes;
@@ -59,7 +61,8 @@ static srapi_result_t check_copy_args(
         srapi_set_error("queue copy: bad args");
         return SRAPI_ERROR_BAD_ARG;
     }
-    if (buffer->device != queue->device || image->device != queue->device) {
+    if (srapi_backend_check_enabled(queue->backend, SRAPI_BACKEND_CHECK_OWNERSHIP) &&
+        (buffer->device != queue->device || image->device != queue->device)) {
         srapi_set_error("queue copy: resources belong to a different device");
         return SRAPI_ERROR_BAD_ARG;
     }
@@ -67,11 +70,13 @@ static srapi_result_t check_copy_args(
         srapi_set_error("queue copy: image has no mapped storage");
         return SRAPI_ERROR_UNSUPPORTED;
     }
-    if ((buffer->usage & buffer_usage) == 0) {
+    if (srapi_backend_check_enabled(queue->backend, SRAPI_BACKEND_CHECK_USAGE) &&
+        (buffer->usage & buffer_usage) == 0) {
         srapi_set_error("queue copy: buffer missing usage 0x%x", buffer_usage);
         return SRAPI_ERROR_BAD_ARG;
     }
-    if ((image->usage & image_usage) == 0) {
+    if (srapi_backend_check_enabled(queue->backend, SRAPI_BACKEND_CHECK_USAGE) &&
+        (image->usage & image_usage) == 0) {
         srapi_set_error("queue copy: image missing usage 0x%x", image_usage);
         return SRAPI_ERROR_BAD_ARG;
     }
@@ -140,7 +145,8 @@ srapi_result_t srapi_queue_submit(
 
     srapi_debugf("queue submit backend=%s family=%u commands=%zu",
                  srapi_backend_name(queue->backend), queue->family_index, cmd->count);
-    if (target->backend != queue->backend) {
+    if (srapi_backend_check_enabled(queue->backend, SRAPI_BACKEND_CHECK_BACKEND_MATCH) &&
+        target->backend != queue->backend) {
         srapi_set_error("queue: target backend=%s does not match queue backend=%s",
                         srapi_backend_name(target->backend), srapi_backend_name(queue->backend));
         return SRAPI_ERROR_BAD_ARG;

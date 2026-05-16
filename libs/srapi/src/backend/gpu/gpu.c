@@ -10,19 +10,48 @@
 
 static int try_node(const char *path, srapi_device_info_t *out) {
     int fd = open(path, O_RDWR | O_CLOEXEC);
+    struct drm_mode_create_dumb create;
+    struct drm_mode_map_dumb map;
+    struct drm_mode_destroy_dumb destroy;
 
     if (fd < 0) {
         srapi_debugf("gpu probe %s failed: %s", path, strerror(errno));
         return 0;
     }
 
-    srapi_debugf("gpu probe %s ok", path);
+    memset(&create, 0, sizeof(create));
+    create.width = 1;
+    create.height = 1;
+    create.bpp = 32;
+    if (srapi_drm_ioctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &create) != 0) {
+        srapi_debugf("gpu probe %s no dumb buffer support: %s", path, strerror(errno));
+        close(fd);
+        return 0;
+    }
+
+    memset(&map, 0, sizeof(map));
+    map.handle = create.handle;
+    if (srapi_drm_ioctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &map) != 0) {
+        srapi_debugf("gpu probe %s cannot map dumb buffer: %s", path, strerror(errno));
+        memset(&destroy, 0, sizeof(destroy));
+        destroy.handle = create.handle;
+        srapi_drm_ioctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
+        close(fd);
+        return 0;
+    }
+
+    memset(&destroy, 0, sizeof(destroy));
+    destroy.handle = create.handle;
+    srapi_drm_ioctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
+
+    srapi_debugf("gpu probe %s ok dumb_buffer pitch=%u size=%llu",
+                 path, create.pitch, (unsigned long long)create.size);
     close(fd);
     if (out != NULL) {
         out->backend = SRAPI_BACKEND_GPU;
         out->available = 1;
         snprintf(out->path, sizeof(out->path), "%s", path);
-        snprintf(out->message, sizeof(out->message), "gpu drm node available");
+        snprintf(out->message, sizeof(out->message), "drm dumb-buffer node available");
     }
     return 1;
 }
@@ -31,6 +60,7 @@ srapi_result_t srapi_gpu_probe(srapi_device_info_t *out) {
     char path[64];
 
     if (out != NULL) {
+        memset(out, 0, sizeof(*out));
         out->backend = SRAPI_BACKEND_GPU;
     }
 
@@ -51,7 +81,7 @@ srapi_result_t srapi_gpu_probe(srapi_device_info_t *out) {
     if (out != NULL) {
         snprintf(out->message, sizeof(out->message), "no usable drm gpu node");
     }
-    srapi_set_error("gpu: no usable /dev/dri/card0..7 or /dev/dri/renderD128..135 node");
+    srapi_set_error("gpu: no usable DRM node with dumb-buffer support");
     return SRAPI_ERROR_UNSUPPORTED;
 }
 
@@ -115,6 +145,8 @@ srapi_result_t srapi_gpu_create_buffer(
     struct drm_mode_create_dumb create;
     struct drm_mode_map_dumb map;
     srapi_buffer_t *buffer;
+    size_t padded_size;
+    size_t width_size;
     uint32_t width;
 
     if (out != NULL) {
@@ -124,10 +156,15 @@ srapi_result_t srapi_gpu_create_buffer(
         return SRAPI_ERROR_BAD_ARG;
     }
 
-    width = (uint32_t)((desc->size + 3u) / 4u);
-    if ((size_t)width * 4u < desc->size || width == 0) {
+    if (desc->size > SIZE_MAX - 3u) {
         return SRAPI_ERROR_OVERFLOW;
     }
+    padded_size = desc->size + 3u;
+    width_size = padded_size / 4u;
+    if (width_size == 0 || width_size > UINT32_MAX) {
+        return SRAPI_ERROR_OVERFLOW;
+    }
+    width = (uint32_t)width_size;
 
     memset(&create, 0, sizeof(create));
     create.width = width;
@@ -190,6 +227,7 @@ srapi_result_t srapi_gpu_create_image(
     struct drm_mode_create_dumb create;
     struct drm_mode_map_dumb map;
     srapi_image_t *image;
+    size_t row_bytes;
 
     if (out != NULL) {
         *out = NULL;
@@ -202,6 +240,10 @@ srapi_result_t srapi_gpu_create_image(
     if (desc->tiling != SRAPI_IMAGE_LINEAR && desc->tiling != SRAPI_IMAGE_OPTIMAL) {
         return SRAPI_ERROR_BAD_ARG;
     }
+    if ((size_t)desc->width > SIZE_MAX / sizeof(uint32_t)) {
+        return SRAPI_ERROR_OVERFLOW;
+    }
+    row_bytes = (size_t)desc->width * sizeof(uint32_t);
 
     memset(&create, 0, sizeof(create));
     create.width = desc->width;
@@ -252,7 +294,7 @@ srapi_result_t srapi_gpu_create_image(
         for (uint32_t y = 0; y < image->height; y++) {
             memcpy((uint8_t *)image->data + (size_t)y * image->pitch,
                    (const uint8_t *)desc->initial_pixels + (size_t)y * image->width * sizeof(uint32_t),
-                   (size_t)image->width * sizeof(uint32_t));
+                   row_bytes);
         }
     }
 

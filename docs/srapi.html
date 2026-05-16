@@ -58,7 +58,7 @@ th{background:#1a1a2e;color:#fff}
 <p>The SR API consists of several architectural layers that work together. At the top is the public API header (<code>srapi.h</code>) which defines all public interfaces. Below that, the internal header (<code>internal.h</code>) exposes private structures and functions. The core layer implements context, buffer, image, and framebuffer management. The backend layer provides CPU, GPU, DRM, and fbdev implementations. The VM layer executes shader bytecode.</p>
 
 <h3>1.3 Backend Support Matrix</h3>
-<p>The SR API supports four backend types. SRAPI_BACKEND_AUTO (0) currently selects CPU. SRAPI_BACKEND_CPU (1) provides software rendering using CPU memory. SRAPI_BACKEND_GPU (2) uses DRM dumb buffers when available. SRAPI_BACKEND_FBDEV (3) is a second-priority display backend that renders into a mapped Linux framebuffer such as <code>/dev/fb0</code>. Command execution currently uses the SRAPI rasterizer on mapped backend memory. The CPU backend is always available, GPU requires DRM nodes, and fbdev requires a usable 32bpp framebuffer device.</p>
+<p>The SR API supports four backend types. SRAPI_BACKEND_AUTO (0) currently selects CPU. SRAPI_BACKEND_CPU (1) provides software rendering using CPU memory. SRAPI_BACKEND_GPU (2) uses DRM dumb buffers when available. SRAPI_BACKEND_FBDEV (3) is a second-priority display backend that renders into a mapped Linux framebuffer such as <code>/dev/fb0</code>. Command execution currently uses the SRAPI rasterizer on mapped backend memory. The CPU backend is always available, GPU requires a DRM node with dumb-buffer create/map support, and fbdev requires a usable 32bpp framebuffer device.</p>
 
 <hr>
 
@@ -299,10 +299,13 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 <h3>11.2 DRM Close</h3>
 <p><code>srapi_drm_close()</code> restores old CRTC state if saved, destroys both buffers, closes the fd, and frees the structure.</p>
 
-<h3>11.3 DRM Present</h3>
+<h3>11.3 DRM Queries</h3>
+<p><code>srapi_drm_device_path()</code> returns the resolved DRM card path used by the display. This lets tools create matching GPU resources/queues for the same node when the display was opened through auto-detection.</p>
+
+<h3>11.4 DRM Present</h3>
 <p><code>srapi_drm_present()</code> swaps buffers via page flip. Tries DRM_MODE_PAGE_FLIP first, falls back to DRM_MODE_SETCRTC if flip fails. Waits for the flip event before returning.</p>
 
-<h3>11.4 Display Probing</h3>
+<h3>11.5 Display Probing</h3>
 <p><code>srapi_display_probe_drm()</code> enumerates connected displays. Opens each DRM card, queries connectors, returns information about connected outputs including preferred mode and connector type.</p>
 
 <hr>
@@ -310,10 +313,10 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 <h2 id="gpu-backend">12. GPU Backend Implementation</h2>
 
 <h3>12.1 GPU Probing</h3>
-<p><code>srapi_gpu_probe()</code> checks for DRM card nodes (card0-card7) and render nodes (renderD128-renderD135). Returns available on first successful open.</p>
+<p><code>srapi_gpu_probe()</code> checks DRM card nodes (card0-card7) and render nodes (renderD128-renderD135), but only reports a node as available if it can create and map a small DRM dumb buffer. This avoids selecting render-only nodes that open successfully but cannot back SRAPI GPU resources.</p>
 
 <h3>12.2 GPU Buffer Creation</h3>
-<p><code>srapi_gpu_create_buffer()</code> creates a 1D dumb buffer large enough for the requested size. Uses DRM_IOCTL_MODE_CREATE_DUMB, DRM_IOCTL_MODE_MAP_DUMB, and mmap for CPU access.</p>
+<p><code>srapi_gpu_create_buffer()</code> creates a 1D dumb buffer large enough for the requested size. It checks size rounding for overflow before passing dimensions to DRM. Uses DRM_IOCTL_MODE_CREATE_DUMB, DRM_IOCTL_MODE_MAP_DUMB, and mmap for CPU access.</p>
 
 <h3>12.3 GPU Image Creation</h3>
 <p><code>srapi_gpu_create_image()</code> creates a 2D DRM dumb buffer for LINEAR and OPTIMAL images. OPTIMAL keeps the public tiling flag and is available to internal queue transfer code, but it is not host-mappable through the public map APIs. Uses row-by-row copy for initial pixels. Image views can reference these DRM-backed images; only LINEAR views can be mapped to host-visible memory.</p>
@@ -368,6 +371,9 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 
 <h3>15.4 Debug Output</h3>
 <p><code>srapi_debugf()</code> prints formatted debug messages when srapi flag is set.</p>
+
+<h3>15.5 Backend Runtime Configuration</h3>
+<p><code>srapi_get_backend_config()</code>, <code>srapi_set_backend_config()</code>, and <code>srapi_reset_backend_config()</code> control validation checks per backend at runtime. The <code>checks</code> bitmask supports <code>SRAPI_BACKEND_CHECK_OVERFLOW</code>, <code>SRAPI_BACKEND_CHECK_USAGE</code>, <code>SRAPI_BACKEND_CHECK_OWNERSHIP</code>, and <code>SRAPI_BACKEND_CHECK_BACKEND_MATCH</code>. All checks are enabled by default. Disabling checks is meant for trusted low-level experiments; SRAPI still keeps minimal hard safety guards around memory copies and allocations.</p>
 
 <hr>
 
