@@ -75,6 +75,9 @@ srapi_result_t srapi_cmd_emit(srapi_cmd_buffer_t *cmd, const srapi_command_t *co
         case SRAPI_COMMAND_FILL_TRIANGLE:
         case SRAPI_COMMAND_SHADE_RECT:
         case SRAPI_COMMAND_DRAW_VERTICES:
+        case SRAPI_COMMAND_SET_SCISSOR:
+        case SRAPI_COMMAND_SET_VIEWPORT:
+        case SRAPI_COMMAND_SET_BLEND:
             return srapi_cmd_push(cmd, command);
         default:
             srapi_set_error("command: unknown kind %d", command->kind);
@@ -261,5 +264,65 @@ srapi_result_t srapi_cmd_draw_vertices_shader(
     op.index_offset = index_offset;
     op.index_count = index_count;
     op.topology = topology;
+    return srapi_cmd_emit(cmd, &op);
+}
+
+srapi_result_t srapi_cmd_set_scissor(
+    srapi_cmd_buffer_t *cmd,
+    int32_t x,
+    int32_t y,
+    uint32_t width,
+    uint32_t height
+) {
+    srapi_command_t op;
+
+    if (width == 0 || height == 0) {
+        srapi_set_error("state: bad scissor size");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    memset(&op, 0, sizeof(op));
+    op.kind = SRAPI_COMMAND_SET_SCISSOR;
+    op.x0 = x;
+    op.y0 = y;
+    op.width = width;
+    op.height = height;
+    return srapi_cmd_emit(cmd, &op);
+}
+
+srapi_result_t srapi_cmd_set_viewport(
+    srapi_cmd_buffer_t *cmd,
+    int32_t x,
+    int32_t y,
+    uint32_t width,
+    uint32_t height
+) {
+    srapi_command_t op;
+
+    if (width == 0 || height == 0) {
+        srapi_set_error("state: bad viewport size");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    memset(&op, 0, sizeof(op));
+    op.kind = SRAPI_COMMAND_SET_VIEWPORT;
+    op.x0 = x;
+    op.y0 = y;
+    op.width = width;
+    op.height = height;
+    return srapi_cmd_emit(cmd, &op);
+}
+
+srapi_result_t srapi_cmd_set_blend(srapi_cmd_buffer_t *cmd, srapi_blend_mode_t mode) {
+    srapi_command_t op;
+
+    if (mode != SRAPI_BLEND_NONE && mode != SRAPI_BLEND_ALPHA) {
+        srapi_set_error("state: bad blend mode %d", mode);
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    memset(&op, 0, sizeof(op));
+    op.kind = SRAPI_COMMAND_SET_BLEND;
+    op.blend_mode = mode;
     return srapi_cmd_emit(cmd, &op);
 }

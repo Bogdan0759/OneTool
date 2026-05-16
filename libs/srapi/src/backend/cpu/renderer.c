@@ -3,11 +3,69 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+static srapi_render_state_t render_state;
+
+static uint8_t color_a(srapi_color_t color) { return (uint8_t)((color >> 24) & 0xff); }
+static uint8_t color_r(srapi_color_t color) { return (uint8_t)((color >> 16) & 0xff); }
+static uint8_t color_g(srapi_color_t color) { return (uint8_t)((color >> 8) & 0xff); }
+static uint8_t color_b(srapi_color_t color) { return (uint8_t)(color & 0xff); }
+
+static srapi_color_t blend_alpha(srapi_color_t dst, srapi_color_t src) {
+    uint32_t sa = color_a(src);
+    uint32_t inv = 255u - sa;
+    uint32_t r = ((uint32_t)color_r(src) * sa + (uint32_t)color_r(dst) * inv + 127u) / 255u;
+    uint32_t g = ((uint32_t)color_g(src) * sa + (uint32_t)color_g(dst) * inv + 127u) / 255u;
+    uint32_t b = ((uint32_t)color_b(src) * sa + (uint32_t)color_b(dst) * inv + 127u) / 255u;
+    uint32_t a = sa + ((uint32_t)color_a(dst) * inv + 127u) / 255u;
+
+    return srapi_rgba((uint8_t)r, (uint8_t)g, (uint8_t)b, (uint8_t)a);
+}
+
+srapi_render_state_t srapi_render_default_state(const srapi_framebuffer_t *fb) {
+    srapi_render_state_t state;
+
+    state.scissor_enabled = 0;
+    state.scissor_x = 0;
+    state.scissor_y = 0;
+    state.scissor_width = fb != NULL ? fb->width : 0;
+    state.scissor_height = fb != NULL ? fb->height : 0;
+    state.viewport_enabled = 0;
+    state.viewport_x = 0;
+    state.viewport_y = 0;
+    state.viewport_width = fb != NULL ? fb->width : 0;
+    state.viewport_height = fb != NULL ? fb->height : 0;
+    state.blend_mode = SRAPI_BLEND_NONE;
+    return state;
+}
+
+void srapi_render_set_state(const srapi_render_state_t *state) {
+    if (state != NULL) {
+        render_state = *state;
+    }
+}
+
 static void put_pixel(srapi_framebuffer_t *fb, int32_t x, int32_t y, srapi_color_t color) {
+    uint32_t *pixel;
+
     if (x < 0 || y < 0 || x >= (int32_t)fb->width || y >= (int32_t)fb->height) {
         return;
     }
-    fb->pixels[(uint32_t)y * (fb->pitch / sizeof(uint32_t)) + (uint32_t)x] = color;
+    if (render_state.scissor_enabled) {
+        int64_t sx1 = (int64_t)render_state.scissor_x + render_state.scissor_width;
+        int64_t sy1 = (int64_t)render_state.scissor_y + render_state.scissor_height;
+
+        if (x < render_state.scissor_x || y < render_state.scissor_y ||
+            x >= sx1 || y >= sy1) {
+            return;
+        }
+    }
+
+    pixel = fb->pixels + (uint32_t)y * (fb->pitch / sizeof(uint32_t)) + (uint32_t)x;
+    if (render_state.blend_mode == SRAPI_BLEND_ALPHA) {
+        *pixel = blend_alpha(*pixel, color);
+    } else {
+        *pixel = color;
+    }
 }
 
 static int clip_rect(
@@ -62,9 +120,8 @@ void srapi_render_clear(srapi_framebuffer_t *fb, srapi_color_t color) {
 
     count = (uint64_t)fb->width;
     for (uint32_t y = 0; y < fb->height; y++) {
-        uint32_t *row = fb->pixels + y * (fb->pitch / sizeof(uint32_t));
         for (uint64_t x = 0; x < count; x++) {
-            row[x] = color;
+            put_pixel(fb, (int32_t)x, (int32_t)y, color);
         }
     }
 }
@@ -87,9 +144,8 @@ void srapi_render_fill_rect(
     }
 
     for (int32_t py = y0; py < y1; py++) {
-        uint32_t *row = fb->pixels + (uint32_t)py * (fb->pitch / sizeof(uint32_t));
         for (int32_t px = x0; px < x1; px++) {
-            row[px] = color;
+            put_pixel(fb, px, py, color);
         }
     }
 }
@@ -254,6 +310,21 @@ static void draw_vertex_line(
     }
 }
 
+static srapi_vertex_t viewport_vertex(const srapi_vertex_t *v) {
+    srapi_vertex_t out = *v;
+
+    if (render_state.viewport_enabled && render_state.viewport_width > 0 && render_state.viewport_height > 0) {
+        float vx = (float)render_state.viewport_x;
+        float vy = (float)render_state.viewport_y;
+        float vw = (float)render_state.viewport_width;
+        float vh = (float)render_state.viewport_height;
+
+        out.x = vx + (v->x + 1.0f) * 0.5f * (vw - 1.0f);
+        out.y = vy + (1.0f - (v->y + 1.0f) * 0.5f) * (vh - 1.0f);
+    }
+    return out;
+}
+
 static void draw_vertex_triangle(
     srapi_framebuffer_t *fb,
     const srapi_vertex_t *v0,
@@ -348,18 +419,23 @@ void srapi_render_draw_vertices(
     switch (topology) {
         case SRAPI_PRIMITIVE_POINTS:
             for (size_t i = 0; i < count; i++) {
-                const srapi_vertex_t *v = VERTEX_AT(i);
-                put_pixel(fb, round_to_i32(v->x), round_to_i32(v->y), v->color);
+                srapi_vertex_t v = viewport_vertex(VERTEX_AT(i));
+                put_pixel(fb, round_to_i32(v.x), round_to_i32(v.y), v.color);
             }
             break;
         case SRAPI_PRIMITIVE_LINES:
             for (size_t i = 0; i + 1 < count; i += 2) {
-                draw_vertex_line(fb, VERTEX_AT(i), VERTEX_AT(i + 1));
+                srapi_vertex_t a = viewport_vertex(VERTEX_AT(i));
+                srapi_vertex_t b = viewport_vertex(VERTEX_AT(i + 1));
+                draw_vertex_line(fb, &a, &b);
             }
             break;
         case SRAPI_PRIMITIVE_TRIANGLES:
             for (size_t i = 0; i + 2 < count; i += 3) {
-                draw_vertex_triangle(fb, VERTEX_AT(i), VERTEX_AT(i + 1), VERTEX_AT(i + 2));
+                srapi_vertex_t a = viewport_vertex(VERTEX_AT(i));
+                srapi_vertex_t b = viewport_vertex(VERTEX_AT(i + 1));
+                srapi_vertex_t c = viewport_vertex(VERTEX_AT(i + 2));
+                draw_vertex_triangle(fb, &a, &b, &c);
             }
             break;
         default:
@@ -420,7 +496,6 @@ void srapi_render_shade_rect(
                  x0, y0, x1 - x0, y1 - y0, shader->inst_count);
 
     for (int32_t py = y0; py < y1; py++) {
-        uint32_t *row = fb->pixels + (uint32_t)py * (fb->pitch / sizeof(uint32_t));
         for (int32_t px = x0; px < x1; px++) {
             srapi_color_t color;
             float inputs[6];
@@ -433,7 +508,7 @@ void srapi_render_shade_rect(
             inputs[SRAPI_VM_INPUT_HEIGHT] = (float)height;
 
             if (srapi_vm_run_fragment(shader, inputs, &color) == SRAPI_OK) {
-                row[px] = color;
+                put_pixel(fb, px, py, color);
             }
         }
     }

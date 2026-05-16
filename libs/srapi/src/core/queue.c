@@ -223,3 +223,50 @@ srapi_result_t srapi_queue_copy_image_to_buffer(
                  region->buffer_offset);
     return SRAPI_OK;
 }
+
+srapi_result_t srapi_queue_fill_image(
+    srapi_queue_t *queue,
+    srapi_image_t *dst,
+    srapi_color_t color
+) {
+    uint32_t *row;
+
+    if (queue == NULL || dst == NULL) {
+        srapi_set_error("queue fill image: bad args");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if (srapi_backend_check_enabled(queue->backend, SRAPI_BACKEND_CHECK_OWNERSHIP) &&
+        dst->device != queue->device) {
+        srapi_set_error("queue fill image: image belongs to a different device");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if (srapi_backend_check_enabled(queue->backend, SRAPI_BACKEND_CHECK_USAGE) &&
+        (dst->usage & SRAPI_IMAGE_TRANSFER_DST) == 0 &&
+        (dst->usage & SRAPI_IMAGE_COLOR_TARGET) == 0) {
+        srapi_set_error("queue fill image: image missing transfer-dst or color-target usage");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    if (queue->backend == SRAPI_BACKEND_GPU &&
+        queue->device != NULL &&
+        queue->device->gpu_driver == 915 &&
+        dst->gpu_memory == 1) {
+        return srapi_i915_fill_image(queue->device, dst, color);
+    }
+
+    if (dst->data == NULL) {
+        srapi_set_error("queue fill image: image has no mapped storage");
+        return SRAPI_ERROR_UNSUPPORTED;
+    }
+
+    for (uint32_t y = 0; y < dst->height; y++) {
+        row = (uint32_t *)((uint8_t *)dst->data + (size_t)y * dst->pitch);
+        for (uint32_t x = 0; x < dst->width; x++) {
+            row[x] = color;
+        }
+    }
+
+    srapi_debugf("queue fill image backend=%s image=%ux%u color=0x%08x",
+                 srapi_backend_name(queue->backend), dst->width, dst->height, color);
+    return SRAPI_OK;
+}

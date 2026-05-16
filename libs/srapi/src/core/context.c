@@ -41,9 +41,12 @@ srapi_result_t srapi_create_context(const srapi_context_desc_t *desc, srapi_cont
     ctx->width = desc->width;
     ctx->height = desc->height;
     ctx->backend = backend;
+    ctx->backend_checks = desc->backend_config != NULL
+        ? desc->backend_config->checks
+        : srapi_backend_enabled_checks(backend);
     *out = ctx;
-    srapi_debugf("context create %ux%u backend=%s",
-                 ctx->width, ctx->height, srapi_backend_name(ctx->backend));
+    srapi_debugf("context create %ux%u backend=%s checks=0x%x",
+                 ctx->width, ctx->height, srapi_backend_name(ctx->backend), ctx->backend_checks);
     if (ctx->backend == SRAPI_BACKEND_GPU) {
         srapi_debugf("context gpu mode: resources and display targets are DRM-backed");
     } else if (ctx->backend == SRAPI_BACKEND_FBDEV) {
@@ -62,6 +65,47 @@ void srapi_destroy_context(srapi_context_t *ctx) {
 
 srapi_backend_t srapi_context_backend(const srapi_context_t *ctx) {
     return ctx != NULL ? ctx->backend : SRAPI_BACKEND_AUTO;
+}
+
+srapi_result_t srapi_context_get_backend_config(
+    const srapi_context_t *ctx,
+    srapi_backend_config_t *out
+) {
+    if (ctx == NULL || out == NULL) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    out->backend = ctx->backend;
+    out->checks = ctx->backend_checks;
+    return SRAPI_OK;
+}
+
+srapi_result_t srapi_context_set_backend_config(
+    srapi_context_t *ctx,
+    const srapi_backend_config_t *config
+) {
+    if (ctx == NULL || config == NULL) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if (config->backend != SRAPI_BACKEND_AUTO && config->backend != ctx->backend) {
+        srapi_set_error("context config: backend=%s does not match context backend=%s",
+                        srapi_backend_name(config->backend), srapi_backend_name(ctx->backend));
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if ((config->checks & ~SRAPI_BACKEND_CHECK_ALL) != 0) {
+        srapi_set_error("context config: unknown check flags 0x%x",
+                        config->checks & ~SRAPI_BACKEND_CHECK_ALL);
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    ctx->backend_checks = config->checks;
+    srapi_debugf("context config set backend=%s checks=0x%x",
+                 srapi_backend_name(ctx->backend), ctx->backend_checks);
+    return SRAPI_OK;
+}
+
+uint32_t srapi_context_enabled_checks(const srapi_context_t *ctx) {
+    return ctx != NULL ? ctx->backend_checks : 0;
 }
 
 srapi_result_t srapi_probe_device(srapi_backend_t backend, srapi_device_info_t *out) {
@@ -170,7 +214,11 @@ static float color_channel_unit(srapi_color_t color, uint32_t shift) {
     return (float)((color >> shift) & 0xff) / 255.0f;
 }
 
-static srapi_result_t submit_draw_vertices(srapi_framebuffer_t *target, const srapi_command_t *op) {
+static srapi_result_t submit_draw_vertices(
+    const srapi_context_t *ctx,
+    srapi_framebuffer_t *target,
+    const srapi_command_t *op
+) {
     const srapi_vertex_t *vertices;
     const uint32_t *indices = NULL;
     srapi_vertex_t *transformed = NULL;
@@ -184,7 +232,8 @@ static srapi_result_t submit_draw_vertices(srapi_framebuffer_t *target, const sr
         srapi_set_error("draw: missing vertex buffer");
         return SRAPI_ERROR_BAD_ARG;
     }
-    if ((op->vertex_buffer->usage & SRAPI_BUFFER_VERTEX) == 0) {
+    if ((ctx == NULL || (ctx->backend_checks & SRAPI_BACKEND_CHECK_USAGE) != 0) &&
+        (op->vertex_buffer->usage & SRAPI_BUFFER_VERTEX) == 0) {
         srapi_set_error("draw: buffer missing vertex usage");
         return SRAPI_ERROR_BAD_ARG;
     }
@@ -202,7 +251,8 @@ static srapi_result_t submit_draw_vertices(srapi_framebuffer_t *target, const sr
             srapi_set_error("draw: missing index buffer");
             return SRAPI_ERROR_BAD_ARG;
         }
-        if ((op->index_buffer->usage & SRAPI_BUFFER_INDEX) == 0) {
+        if ((ctx == NULL || (ctx->backend_checks & SRAPI_BACKEND_CHECK_USAGE) != 0) &&
+            (op->index_buffer->usage & SRAPI_BUFFER_INDEX) == 0) {
             srapi_set_error("draw: buffer missing index usage");
             return SRAPI_ERROR_BAD_ARG;
         }
@@ -289,11 +339,22 @@ srapi_result_t srapi_submit(
     srapi_framebuffer_t *target,
     const srapi_cmd_buffer_t *cmd
 ) {
-    (void)ctx;
+    srapi_render_state_t state;
 
     if (target == NULL || cmd == NULL) {
         return SRAPI_ERROR_BAD_ARG;
     }
+
+    if (ctx != NULL &&
+        (ctx->backend_checks & SRAPI_BACKEND_CHECK_BACKEND_MATCH) != 0 &&
+        target->backend != ctx->backend) {
+        srapi_set_error("submit: target backend=%s does not match context backend=%s",
+                        srapi_backend_name(target->backend), srapi_backend_name(ctx->backend));
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    state = srapi_render_default_state(target);
+    srapi_render_set_state(&state);
 
     srapi_debugf("submit %zu commands ctx_backend=%s target_backend=%s framebuffer=%ux%u pitch=%u",
                  cmd->count,
@@ -338,11 +399,36 @@ srapi_result_t srapi_submit(
                 srapi_debugf("cmd[%zu] draw_vertices topology=%d vertices=%zu indices=%zu",
                              i, op->topology, op->vertex_count, op->index_count);
                 {
-                    srapi_result_t r = submit_draw_vertices(target, op);
+                    srapi_result_t r = submit_draw_vertices(ctx, target, op);
                     if (r != SRAPI_OK) {
                         return r;
                     }
                 }
+                break;
+            case SRAPI_COMMAND_SET_SCISSOR:
+                state.scissor_enabled = 1;
+                state.scissor_x = op->x0;
+                state.scissor_y = op->y0;
+                state.scissor_width = op->width;
+                state.scissor_height = op->height;
+                srapi_render_set_state(&state);
+                srapi_debugf("cmd[%zu] set_scissor x=%d y=%d w=%u h=%u",
+                             i, op->x0, op->y0, op->width, op->height);
+                break;
+            case SRAPI_COMMAND_SET_VIEWPORT:
+                state.viewport_enabled = 1;
+                state.viewport_x = op->x0;
+                state.viewport_y = op->y0;
+                state.viewport_width = op->width;
+                state.viewport_height = op->height;
+                srapi_render_set_state(&state);
+                srapi_debugf("cmd[%zu] set_viewport x=%d y=%d w=%u h=%u",
+                             i, op->x0, op->y0, op->width, op->height);
+                break;
+            case SRAPI_COMMAND_SET_BLEND:
+                state.blend_mode = op->blend_mode;
+                srapi_render_set_state(&state);
+                srapi_debugf("cmd[%zu] set_blend mode=%d", i, op->blend_mode);
                 break;
             default:
                 return SRAPI_ERROR;

@@ -58,7 +58,7 @@ th{background:#1a1a2e;color:#fff}
 <p>The SR API consists of several architectural layers that work together. At the top is the public API header (<code>srapi.h</code>) which defines all public interfaces. Below that, the internal header (<code>internal.h</code>) exposes private structures and functions. The core layer implements context, buffer, image, and framebuffer management. The backend layer provides CPU, GPU, DRM, and fbdev implementations. The VM layer executes shader bytecode.</p>
 
 <h3>1.3 Backend Support Matrix</h3>
-<p>The SR API supports four backend types. SRAPI_BACKEND_AUTO (0) currently selects CPU. SRAPI_BACKEND_CPU (1) provides software rendering using CPU memory. SRAPI_BACKEND_GPU (2) uses DRM dumb buffers when available. SRAPI_BACKEND_FBDEV (3) is a second-priority display backend that renders into a mapped Linux framebuffer such as <code>/dev/fb0</code>. Command execution currently uses the SRAPI rasterizer on mapped backend memory. The CPU backend is always available, GPU requires a DRM node with dumb-buffer create/map support, and fbdev requires a usable 32bpp framebuffer device.</p>
+<p>The SR API supports four backend types. SRAPI_BACKEND_AUTO (0) currently selects CPU. SRAPI_BACKEND_CPU (1) provides software rendering using CPU memory. SRAPI_BACKEND_GPU (2) uses DRM dumb buffers when available and has an initial i915 probe layer for future Intel command submission. SRAPI_BACKEND_FBDEV (3) is a second-priority display backend that renders into a mapped Linux framebuffer such as <code>/dev/fb0</code>. Command execution currently uses the SRAPI rasterizer on mapped backend memory. The CPU backend is always available, GPU requires a DRM node with dumb-buffer create/map support for current resources, and fbdev requires a usable 32bpp framebuffer device.</p>
 
 <hr>
 
@@ -165,6 +165,7 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 
 <h3>4.6 Device Probing</h3>
 <p><code>srapi_probe_device(srapi_backend_t backend, srapi_device_info_t *out)</code> probes for available devices. For AUTO or CPU backend, it always reports available with path "cpu". For GPU backend, it calls <code>srapi_gpu_probe()</code> which checks for DRM card nodes and render nodes. For fbdev it checks <code>/dev/fb0</code> and validates 32bpp screen info. The info structure receives backend type, availability flag, path string, and status message.</p>
+<p><code>srapi_probe_i915(const char *device_path, srapi_i915_info_t *out)</code> probes one Intel i915 DRM node or auto-scans render nodes and card nodes. It verifies the DRM driver name with <code>DRM_IOCTL_VERSION</code>, then reads basic i915 capabilities with <code>DRM_IOCTL_I915_GETPARAM</code>: chipset id, GEM, execbuf2, blitter, exec fence, and command-stream timestamp frequency.</p>
 
 <h3>4.7 Device Creation</h3>
 <p><code>srapi_create_device(const srapi_device_desc_t *desc, srapi_device_t **out)</code> creates a device object. For GPU backend, it delegates to <code>srapi_gpu_open_device()</code>. For CPU backend, it probes the device and allocates the structure. fbdev does not create regular SRAPI devices; use <code>srapi_fbdev_open_display()</code> for display output.</p>
@@ -246,7 +247,7 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 <p><code>srapi_cmd_push()</code> adds a command to the buffer. If capacity is exceeded, doubles it (starting from 16). Returns SRAPI_ERROR_OVERFLOW on size overflow, SRAPI_ERROR_OOM on allocation failure, SRAPI_OK on success.</p>
 
 <h3>8.5 Command Emission Helpers</h3>
-<p><code>srapi_cmd_emit()</code> validates the command kind and calls <code>srapi_cmd_push()</code>. <code>srapi_cmd_clear()</code> creates a CLEAR command. <code>srapi_cmd_fill_rect()</code> creates a FILL_RECT command with position and dimensions. <code>srapi_cmd_draw_line()</code> creates a DRAW_LINE command. <code>srapi_cmd_fill_triangle()</code> creates a FILL_TRIANGLE command with three vertices. <code>srapi_cmd_shade_rect()</code> creates a SHADE_RECT command with a shader.</p>
+<p><code>srapi_cmd_emit()</code> validates the command kind and calls <code>srapi_cmd_push()</code>. <code>srapi_cmd_clear()</code> creates a CLEAR command. <code>srapi_cmd_fill_rect()</code> creates a FILL_RECT command with position and dimensions. <code>srapi_cmd_draw_line()</code> creates a DRAW_LINE command. <code>srapi_cmd_fill_triangle()</code> creates a FILL_TRIANGLE command with three vertices. <code>srapi_cmd_shade_rect()</code> creates a SHADE_RECT command with a shader. State commands include <code>srapi_cmd_set_scissor()</code>, <code>srapi_cmd_set_viewport()</code>, and <code>srapi_cmd_set_blend()</code>.</p>
 
 <hr>
 
@@ -266,6 +267,7 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 
 <h3>9.5 Copy Operations</h3>
 <p><code>srapi_queue_copy_buffer_to_image()</code> and <code>srapi_queue_copy_image_to_buffer()</code> perform row-by-row copies between buffer and image. They validate that resources belong to the queue device and use the image pitch for backend memory layout.</p>
+<p><code>srapi_queue_fill_image()</code> fills an image with a solid color. CPU and mapped GPU fallbacks write rows directly. On i915 GEM-backed images it submits an <code>XY_COLOR_BLT</code> batch through the i915 backend.</p>
 
 <hr>
 
@@ -314,6 +316,7 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 
 <h3>12.1 GPU Probing</h3>
 <p><code>srapi_gpu_probe()</code> checks DRM card nodes (card0-card7) and render nodes (renderD128-renderD135), but only reports a node as available if it can create and map a small DRM dumb buffer. This avoids selecting render-only nodes that open successfully but cannot back SRAPI GPU resources.</p>
+<p>The i915-specific code lives in <code>libs/srapi/src/backend/gpu/i915.c</code> and <code>i915.h</code>. It is separate from generic DRM dumb-buffer resource code. Opening a GPU device queries the fd for i915 metadata and stores the detected driver/chipset internally. Buffers and linear images on detected i915 devices are allocated as GEM objects with <code>DRM_IOCTL_I915_GEM_CREATE</code> and mapped with <code>DRM_IOCTL_I915_GEM_MMAP</code>. The first submit path is <code>srapi_i915_submit_noop()</code>, which sends a tiny <code>MI_BATCH_BUFFER_END</code> batch through <code>DRM_IOCTL_I915_GEM_EXECBUFFER2</code>. <code>srapi_i915_fill_buffer()</code> and <code>srapi_i915_fill_image()</code> submit <code>XY_COLOR_BLT</code> batches on the BLT ring and wait with <code>DRM_IOCTL_I915_GEM_WAIT</code>. Display scanout still uses the old dumb-buffer path until presentation is wired in.</p>
 
 <h3>12.2 GPU Buffer Creation</h3>
 <p><code>srapi_gpu_create_buffer()</code> creates a 1D dumb buffer large enough for the requested size. It checks size rounding for overflow before passing dimensions to DRM. Uses DRM_IOCTL_MODE_CREATE_DUMB, DRM_IOCTL_MODE_MAP_DUMB, and mmap for CPU access.</p>
@@ -356,6 +359,9 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 <h3>14.6 Shaded Rectangle</h3>
 <p><code>srapi_render_shade_rect()</code> executes the shader for each pixel, passing UV coordinates and dimensions as inputs.</p>
 
+<h3>14.7 Render State</h3>
+<p>Command buffers can set scissor, viewport, and blend state. Scissor clips pixel writes. Viewport maps vertex coordinates from NDC [-1,1] into the viewport rectangle for vertex draw commands. <code>SRAPI_BLEND_ALPHA</code> performs source-over alpha blending; <code>SRAPI_BLEND_NONE</code> keeps the old overwrite behavior.</p>
+
 <hr>
 
 <h2 id="debug-system">15. Debug and Error Handling</h2>
@@ -373,20 +379,20 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 <p><code>srapi_debugf()</code> prints formatted debug messages when srapi flag is set.</p>
 
 <h3>15.5 Backend Runtime Configuration</h3>
-<p><code>srapi_get_backend_config()</code>, <code>srapi_set_backend_config()</code>, and <code>srapi_reset_backend_config()</code> control validation checks per backend at runtime. The <code>checks</code> bitmask supports <code>SRAPI_BACKEND_CHECK_OVERFLOW</code>, <code>SRAPI_BACKEND_CHECK_USAGE</code>, <code>SRAPI_BACKEND_CHECK_OWNERSHIP</code>, and <code>SRAPI_BACKEND_CHECK_BACKEND_MATCH</code>. All checks are enabled by default. Disabling checks is meant for trusted low-level experiments; SRAPI still keeps minimal hard safety guards around memory copies and allocations.</p>
+<p><code>srapi_get_backend_config()</code>, <code>srapi_set_backend_config()</code>, and <code>srapi_reset_backend_config()</code> control validation checks per backend at runtime. Contexts copy those defaults on creation and can override them with <code>srapi_context_get_backend_config()</code> and <code>srapi_context_set_backend_config()</code>. The <code>checks</code> bitmask supports <code>SRAPI_BACKEND_CHECK_OVERFLOW</code>, <code>SRAPI_BACKEND_CHECK_USAGE</code>, <code>SRAPI_BACKEND_CHECK_OWNERSHIP</code>, and <code>SRAPI_BACKEND_CHECK_BACKEND_MATCH</code>. All checks are enabled by default. Disabling checks is meant for trusted low-level experiments; SRAPI still keeps minimal hard safety guards around memory copies and allocations.</p>
 
 <hr>
 
 <h2 id="ppm-io">16. PPM Image Output</h2>
 
 <h3>16.1 Save Function</h3>
-<p><code>srapi_save_ppm()</code> writes a framebuffer to a PPM file. Uses P6 (binary) format. Converts ARGB to RGB by dropping alpha. Returns SRAPI_ERROR_BAD_ARG for invalid parameters, SRAPI_ERROR on file open failure, SRAPI_OK on success.</p>
+<p><code>srapi_save_ppm()</code> writes a framebuffer to a PPM file. Uses P6 (binary) format. <code>srapi_save_bmp()</code> writes a simple 24-bit BMP file. Both convert ARGB to RGB/BGR by dropping alpha and return SRAPI_ERROR_BAD_ARG for invalid parameters, SRAPI_ERROR on file open failure, SRAPI_OK on success.</p>
 
 <hr>
 
 <h2 id="demo-tool">17. Demo Tool Implementation</h2>
 
-<p>The demo tool (<code>srapi_demo.c</code>) demonstrates SR API features. It supports CPU rendering to PPM, GPU resource smoke tests, DRM display output, fbdev display output, command primitives, and shader execution. Key test flags include <code>--smoke-low</code>, <code>--smoke-gpu</code>, <code>--smoke-fbdev</code>, <code>--probe-gpu</code>, and <code>--probe-fbdev</code>. Use <code>--fbdev [/dev/fbN]</code> to render directly to a Linux framebuffer.</p>
+<p>The demo tool (<code>srapi_demo.c</code>) demonstrates SR API features. It supports CPU rendering to PPM, GPU resource smoke tests, DRM display output, fbdev display output, command primitives, and shader execution. Key test flags include <code>--smoke-low</code>, <code>--smoke-gpu</code>, <code>--smoke-i915 [node]</code>, <code>--smoke-fbdev</code>, <code>--probe-gpu</code>, <code>--probe-i915 [node]</code>, and <code>--probe-fbdev</code>. Use <code>--fbdev [/dev/fbN]</code> to render directly to a Linux framebuffer.</p>
 
 <hr>
 

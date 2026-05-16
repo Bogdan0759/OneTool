@@ -83,6 +83,9 @@ typedef enum {
     SRAPI_COMMAND_FILL_TRIANGLE = 4,
     SRAPI_COMMAND_SHADE_RECT = 5,
     SRAPI_COMMAND_DRAW_VERTICES = 6,
+    SRAPI_COMMAND_SET_SCISSOR = 7,
+    SRAPI_COMMAND_SET_VIEWPORT = 8,
+    SRAPI_COMMAND_SET_BLEND = 9,
 } srapi_command_kind_t;
 
 typedef enum {
@@ -90,6 +93,11 @@ typedef enum {
     SRAPI_PRIMITIVE_LINES = 2,
     SRAPI_PRIMITIVE_TRIANGLES = 3,
 } srapi_primitive_topology_t;
+
+typedef enum {
+    SRAPI_BLEND_NONE = 0,
+    SRAPI_BLEND_ALPHA = 1,
+} srapi_blend_mode_t;
 
 typedef enum {
     SRAPI_VM_END = 0,
@@ -130,6 +138,7 @@ typedef struct {
     uint32_t width;
     uint32_t height;
     srapi_backend_t backend;
+    const srapi_backend_config_t *backend_config;
 } srapi_context_desc_t;
 
 typedef struct {
@@ -143,6 +152,17 @@ typedef struct {
     char path[64];
     char message[128];
 } srapi_device_info_t;
+
+typedef struct {
+    uint32_t available;
+    char path[64];
+    uint32_t chipset_id;
+    uint32_t has_gem;
+    uint32_t has_execbuf2;
+    uint32_t has_blt;
+    uint32_t has_exec_fence;
+    uint32_t cs_timestamp_frequency;
+} srapi_i915_info_t;
 
 typedef struct {
     size_t size;
@@ -209,6 +229,7 @@ typedef struct {
     size_t vertex_count;
     size_t index_offset;
     size_t index_count;
+    srapi_blend_mode_t blend_mode;
 } srapi_command_t;
 
 typedef struct {
@@ -253,8 +274,28 @@ srapi_result_t srapi_get_backend_config(srapi_backend_t backend, srapi_backend_c
 srapi_result_t srapi_set_backend_config(const srapi_backend_config_t *config);
 void srapi_reset_backend_config(srapi_backend_t backend);
 uint32_t srapi_backend_enabled_checks(srapi_backend_t backend);
+srapi_result_t srapi_context_get_backend_config(
+    const srapi_context_t *ctx,
+    srapi_backend_config_t *out
+);
+srapi_result_t srapi_context_set_backend_config(
+    srapi_context_t *ctx,
+    const srapi_backend_config_t *config
+);
+uint32_t srapi_context_enabled_checks(const srapi_context_t *ctx);
 
 srapi_result_t srapi_probe_device(srapi_backend_t backend, srapi_device_info_t *out);
+srapi_result_t srapi_probe_i915(const char *device_path, srapi_i915_info_t *out);
+srapi_result_t srapi_i915_submit_noop(srapi_device_t *device);
+srapi_result_t srapi_i915_fill_buffer(
+    srapi_device_t *device,
+    srapi_buffer_t *dst,
+    uint32_t width,
+    uint32_t height,
+    uint32_t pitch,
+    uint32_t color
+);
+srapi_result_t srapi_i915_fill_image(srapi_device_t *device, srapi_image_t *image, uint32_t color);
 srapi_result_t srapi_create_device(const srapi_device_desc_t *desc, srapi_device_t **out);
 void srapi_destroy_device(srapi_device_t *device);
 srapi_backend_t srapi_device_backend(const srapi_device_t *device);
@@ -322,6 +363,11 @@ srapi_result_t srapi_queue_copy_image_to_buffer(
     srapi_image_t *src,
     srapi_buffer_t *dst,
     const srapi_buffer_image_copy_t *region
+);
+srapi_result_t srapi_queue_fill_image(
+    srapi_queue_t *queue,
+    srapi_image_t *dst,
+    srapi_color_t color
 );
 
 srapi_result_t srapi_create_framebuffer(
@@ -395,6 +441,21 @@ srapi_result_t srapi_cmd_draw_vertices_shader(
     size_t index_count,
     srapi_shader_t *vertex_shader
 );
+srapi_result_t srapi_cmd_set_scissor(
+    srapi_cmd_buffer_t *cmd,
+    int32_t x,
+    int32_t y,
+    uint32_t width,
+    uint32_t height
+);
+srapi_result_t srapi_cmd_set_viewport(
+    srapi_cmd_buffer_t *cmd,
+    int32_t x,
+    int32_t y,
+    uint32_t width,
+    uint32_t height
+);
+srapi_result_t srapi_cmd_set_blend(srapi_cmd_buffer_t *cmd, srapi_blend_mode_t mode);
 
 srapi_result_t srapi_submit(
     srapi_context_t *ctx,
@@ -403,6 +464,7 @@ srapi_result_t srapi_submit(
 );
 
 srapi_result_t srapi_save_ppm(const srapi_framebuffer_t *fb, const char *path);
+srapi_result_t srapi_save_bmp(const srapi_framebuffer_t *fb, const char *path);
 
 srapi_result_t srapi_create_shader(
     const uint32_t *bytecode,
