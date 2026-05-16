@@ -601,6 +601,7 @@ static int i915_smoke(const char *device_path) {
     srapi_i915_info_t info;
     srapi_device_t *device = NULL;
     srapi_queue_t *queue = NULL;
+    srapi_cmd_buffer_t *cmd = NULL;
     srapi_buffer_t *buffer = NULL;
     srapi_image_t *image = NULL;
     uint32_t values[4] = { 0x10203040u, 0x55667788u, 0xaabbccddu, 0x13572468u };
@@ -624,16 +625,19 @@ static int i915_smoke(const char *device_path) {
     if (r != SRAPI_OK) goto fail;
     r = srapi_create_queue(&(srapi_queue_desc_t){ .device = device }, &queue);
     if (r != SRAPI_OK) goto fail;
+    r = srapi_create_cmd_buffer(NULL, &cmd);
+    if (r != SRAPI_OK) goto fail;
 
     r = srapi_create_buffer(
         device,
         &(srapi_buffer_desc_t){
             .size = 4096,
             .usage = SRAPI_BUFFER_TRANSFER_SRC | SRAPI_BUFFER_TRANSFER_DST | SRAPI_BUFFER_STORAGE,
-            .initial_data = values,
         },
         &buffer
     );
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_buffer_write(buffer, 0, values, sizeof(values));
     if (r != SRAPI_OK) goto fail;
 
     r = srapi_buffer_read(buffer, sizeof(uint32_t), &readback, sizeof(readback));
@@ -663,6 +667,41 @@ static int i915_smoke(const char *device_path) {
     r = srapi_i915_submit_noop(device);
     if (r != SRAPI_OK) goto fail;
 
+    {
+        uint32_t raw_batch_words[2] = { 0x05000000u, 0x00000000u };
+        srapi_i915_exec_object_t raw_obj;
+        srapi_i915_exec_desc_t raw_exec;
+
+        r = srapi_create_buffer(
+            device,
+            &(srapi_buffer_desc_t){
+                .size = sizeof(raw_batch_words),
+                .usage = SRAPI_BUFFER_STORAGE,
+                .initial_data = raw_batch_words,
+            },
+            &buffer
+        );
+        if (r != SRAPI_OK) goto fail;
+        r = srapi_i915_set_domain(device, buffer, SRAPI_I915_DOMAIN_CPU, SRAPI_I915_DOMAIN_CPU);
+        if (r != SRAPI_OK) goto fail;
+
+        memset(&raw_obj, 0, sizeof(raw_obj));
+        raw_obj.buffer = buffer;
+        raw_obj.flags = SRAPI_I915_OBJECT_SUPPORTS_48B_ADDRESS;
+
+        memset(&raw_exec, 0, sizeof(raw_exec));
+        raw_exec.batch = buffer;
+        raw_exec.batch_len = sizeof(raw_batch_words);
+        raw_exec.flags = SRAPI_I915_EXEC_RENDER;
+        raw_exec.objects = &raw_obj;
+        raw_exec.object_count = 1;
+        r = srapi_i915_exec(device, &raw_exec);
+        if (r != SRAPI_OK) goto fail;
+
+        srapi_destroy_buffer(buffer);
+        buffer = NULL;
+    }
+
     r = srapi_create_buffer(
         device,
         &(srapi_buffer_desc_t){
@@ -672,7 +711,7 @@ static int i915_smoke(const char *device_path) {
         &buffer
     );
     if (r != SRAPI_OK) goto fail;
-    r = srapi_i915_fill_buffer(device, buffer, 64, 64, 64 * sizeof(uint32_t), fill_color);
+    r = srapi_i915_fill_buffer(device, buffer, 0, 0, 64, 64, 64 * sizeof(uint32_t), fill_color);
     if (r != SRAPI_OK) goto fail;
     r = srapi_buffer_read(buffer, 17 * sizeof(uint32_t), &readback, sizeof(readback));
     if (r != SRAPI_OK) goto fail;
@@ -708,15 +747,45 @@ static int i915_smoke(const char *device_path) {
         goto fail;
     }
 
-    printf("i915 smoke ok: path=%s chipset=0x%x gem=%u execbuf2=%u buffer_size=%u noop_submit=1 blt_fill=1 image_fill=1\n",
+    srapi_cmd_reset(cmd);
+    r = srapi_cmd_clear(cmd, srapi_rgba(10, 20, 30, 255));
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_cmd_set_scissor(cmd, 4, 4, 16, 16);
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_cmd_fill_rect(cmd, 0, 0, 32, 32, srapi_rgba(90, 110, 130, 255));
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_queue_submit_image(queue, image, cmd);
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_image_map(image, (void **)&mapped, &pitch);
+    if (r != SRAPI_OK) goto fail;
+    readback = mapped[0];
+    if (readback != srapi_rgba(10, 20, 30, 255)) {
+        fprintf(stderr, "i915 render clear failed: 0x%08x\n", readback);
+        srapi_image_unmap(image);
+        r = SRAPI_ERROR;
+        goto fail;
+    }
+    readback = mapped[8 + 8 * (pitch / sizeof(uint32_t))];
+    srapi_image_unmap(image);
+    if (readback != srapi_rgba(90, 110, 130, 255)) {
+        fprintf(stderr, "i915 render fill_rect failed: 0x%08x\n", readback);
+        r = SRAPI_ERROR;
+        goto fail;
+    }
+
+    printf("i915 smoke ok: path=%s chipset=0x%x gem=%u execbuf2=%u blt=%u buffer_size=%u noop_batch=%zu fill_batch=%zu raw_exec=1 noop_submit=1 blt_fill=1 image_fill=1 render_clear=1 render_fill_rect=1\n",
            info.path,
            info.chipset_id,
            info.has_gem,
            info.has_execbuf2,
-           4096u);
+           info.has_blt,
+           4096u,
+           sizeof(uint32_t) * 2,
+           sizeof(uint32_t) * 8);
 
     srapi_destroy_image(image);
     srapi_destroy_buffer(buffer);
+    srapi_destroy_cmd_buffer(cmd);
     srapi_destroy_queue(queue);
     srapi_destroy_device(device);
     return 0;
@@ -725,6 +794,7 @@ fail:
     fprintf(stderr, "i915 smoke failed: %s\n", srapi_last_error());
     srapi_destroy_image(image);
     srapi_destroy_buffer(buffer);
+    srapi_destroy_cmd_buffer(cmd);
     srapi_destroy_queue(queue);
     srapi_destroy_device(device);
     return 1;
@@ -940,8 +1010,9 @@ int main(int argc, char *argv[]) {
         srapi_i915_info_t info;
 
         r = srapi_probe_i915(i915_device, &info);
-        printf("i915 available=%u path=%s chipset=0x%x gem=%u execbuf2=%u blt=%u fence=%u cs_timestamp_frequency=%u\n",
+        printf("i915 available=%u usable=%u path=%s chipset=0x%x gem=%u execbuf2=%u blt=%u fence=%u cs_timestamp_frequency=%u\n",
                info.available,
+               info.available && info.has_gem && info.has_execbuf2 && info.has_blt,
                info.path,
                info.chipset_id,
                info.has_gem,

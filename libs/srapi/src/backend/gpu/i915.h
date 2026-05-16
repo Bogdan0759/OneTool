@@ -31,12 +31,28 @@ srapi_result_t srapi_i915_submit_noop(srapi_device_t *device);
 srapi_result_t srapi_i915_fill_buffer(
     srapi_device_t *device,
     srapi_buffer_t *dst,
+    uint32_t x,
+    uint32_t y,
     uint32_t width,
     uint32_t height,
     uint32_t pitch,
     uint32_t color
 );
+srapi_result_t srapi_i915_fill_rect_image(
+    srapi_device_t *device,
+    srapi_image_t *image,
+    uint32_t x,
+    uint32_t y,
+    uint32_t width,
+    uint32_t height,
+    uint32_t color
+);
 srapi_result_t srapi_i915_fill_image(srapi_device_t *device, srapi_image_t *image, uint32_t color);
+srapi_result_t srapi_i915_render_image(
+    srapi_device_t *device,
+    srapi_image_t *target,
+    const srapi_cmd_buffer_t *cmd
+);
 void srapi_i915_destroy_gem(int fd, uint32_t handle);
 
 #endif

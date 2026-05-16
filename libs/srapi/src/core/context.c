@@ -1,5 +1,6 @@
 #include "internal.h"
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -280,6 +281,10 @@ static srapi_result_t submit_draw_vertices(
     }
 
     if (op->shader != NULL) {
+        if (op->vertex_count > SIZE_MAX / (sizeof(*positions) * 2)) {
+            srapi_set_error("draw: transformed vertex allocation overflow");
+            return SRAPI_ERROR_OVERFLOW;
+        }
         transformed = calloc(op->vertex_count, sizeof(*transformed));
         positions = calloc(op->vertex_count * 2, sizeof(*positions));
         if (transformed == NULL || positions == NULL) {
