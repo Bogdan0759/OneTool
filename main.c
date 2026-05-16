@@ -17,6 +17,7 @@ int fr(int argc, char *argv[]);
 int sz(int argc, char *argv[]);
 int nm(int argc, char *argv[]);
 int ga(int argc, char *argv[]);
+int sr(int argc, char *argv[]);
 int dn(int argc, char *argv[]);
 int pg(int argc, char *argv[]);
 int ns(int argc, char *argv[]);
@@ -30,7 +31,7 @@ int cf(int argc, char *argv[]);
 int cv(int argc, char *argv[]);
 int uc(int argc, char *argv[]);
 int tui_main(const char *onetool_argv0);
-const char onetool_version[] = "1.4.0";
+const char onetool_version[] = "1.5.0";
 
 const struct onetool_tool onetool_builtin_tools[] = {
     {"lastmod", lm, "print the last modification time of a file",
@@ -46,6 +47,7 @@ const struct onetool_tool onetool_builtin_tools[] = {
     {"nm", nm, "print ELF symbols", ONETOOL_ARGV0_TOOL_NAME},
     {"gapi_supported", ga, "check available graphics API",
      ONETOOL_ARGV0_TOOL_NAME},
+    {"srapi_demo", sr, "render a test frame with SRAPI", ONETOOL_ARGV0_TOOL_NAME},
     {"down", dn, "HTTP downloader (curl-like)", ONETOOL_ARGV0_TOOL_NAME},
     {"ping", pg, "ICMP ping with stats", ONETOOL_ARGV0_TOOL_NAME},
     {"nsetup", ns, "simple network setup via DHCP",

@@ -22,6 +22,7 @@ implemented tools:
 - `mlink` - minimalistic ELF64 x86-64 linker
 - `taskmng` - TUI task manager with process control
 - `gapi_supported` - check available graphics API
+- `srapi_demo` - render a test frame with SRAPI
 - `fsinfo` - filesystem info
 - `fsize` - print file size
 - `ls` - list files
@@ -38,6 +39,7 @@ framework parts:
 - `libs/TUI` - TUI library
 - `libs/elf` - ELF parser lib
 - `libs/memory` - checked allocation helpers
+- `libs/srapi` - simple rendering API
 ## build
 
 requirement:

@@ -399,6 +399,12 @@ static void load_embedded_tool_form(onetool_form_t *form, const struct onetool_t
     } else if (strcmp(tool->name, "gapi_supported") == 0) {
         copy_string(form->title, sizeof(form->title), "gapi check");
         copy_string(form->summary, sizeof(form->summary), "check all available graphic API");
+    } else if (strcmp(tool->name, "srapi_demo") == 0) {
+        copy_string(form->title, sizeof(form->title), "SRAPI Demo");
+        copy_string(form->summary, sizeof(form->summary), "Render a command-buffer test frame into a PPM file.");
+        add_text_field(form, "output", "Output", "-o", "srapi_demo.ppm", "frame.ppm", "Output PPM file.");
+        add_text_field(form, "width", "Width", "-w", "640", "640", "Framebuffer width.");
+        add_text_field(form, "height", "Height", "-h", "360", "360", "Framebuffer height.");
     } else if (strcmp(tool->name, "down") == 0) {
         copy_string(form->title, sizeof(form->title), "HTTP Downloader");
         copy_string(form->summary, sizeof(form->summary), "Download an HTTP resource with common OneTool options. Advanced flags can still be added through Extra args.");

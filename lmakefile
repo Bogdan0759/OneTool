@@ -33,6 +33,8 @@ string NM_SRC = "tools/filesystem/nm.c";
 string NM_OBJ = "tools/filesystem/nm.o";
 string GAPI_SRC = "tools/dev/gapi_supported.c";
 string GAPI_OBJ = "tools/dev/gapi_supported.o";
+string SRAPI_DEMO_SRC = "tools/dev/srapi_demo.c";
+string SRAPI_DEMO_OBJ = "tools/dev/srapi_demo.o";
 
 string DOWN_HDR = "tools/network/down/down.h";
 string DOWN_CLI_SRC = "tools/network/down/cli.c";
@@ -65,6 +67,40 @@ string ELF_OBJ = "libs/elf/elf.o";
 string MEMORY_HDR = "libs/memory/memory.h";
 string MEMORY_SRC = "libs/memory/memory.c";
 string MEMORY_OBJ = "libs/memory/memory.o";
+string SRAPI_CFLAGS = "-Ilibs/srapi/include -Ilibs/srapi/src/core";
+string SRAPI_HDR = "libs/srapi/include/srapi/srapi.h";
+string SRAPI_INTERNAL_HDR = "libs/srapi/src/core/internal.h";
+string SRAPI_CONTEXT_SRC = "libs/srapi/src/core/context.c";
+string SRAPI_CONTEXT_OBJ = "libs/srapi/src/core/context.o";
+string SRAPI_DEBUG_SRC = "libs/srapi/src/core/debug.c";
+string SRAPI_DEBUG_OBJ = "libs/srapi/src/core/debug.o";
+string SRAPI_FRAMEBUFFER_SRC = "libs/srapi/src/core/framebuffer.c";
+string SRAPI_FRAMEBUFFER_OBJ = "libs/srapi/src/core/framebuffer.o";
+string SRAPI_COMMAND_SRC = "libs/srapi/src/core/command.c";
+string SRAPI_COMMAND_OBJ = "libs/srapi/src/core/command.o";
+string SRAPI_BUFFER_SRC = "libs/srapi/src/core/buffer.c";
+string SRAPI_BUFFER_OBJ = "libs/srapi/src/core/buffer.o";
+string SRAPI_IMAGE_SRC = "libs/srapi/src/core/image.c";
+string SRAPI_IMAGE_OBJ = "libs/srapi/src/core/image.o";
+string SRAPI_QUEUE_SRC = "libs/srapi/src/core/queue.c";
+string SRAPI_QUEUE_OBJ = "libs/srapi/src/core/queue.o";
+string SRAPI_CPU_RENDERER_SRC = "libs/srapi/src/backend/cpu/renderer.c";
+string SRAPI_CPU_RENDERER_OBJ = "libs/srapi/src/backend/cpu/renderer.o";
+string SRAPI_GPU_SRC = "libs/srapi/src/backend/gpu/gpu.c";
+string SRAPI_GPU_OBJ = "libs/srapi/src/backend/gpu/gpu.o";
+string SRAPI_DRM_INTERNAL_HDR = "libs/srapi/src/backend/drm/drm_internal.h";
+string SRAPI_DRM_BUFFER_SRC = "libs/srapi/src/backend/drm/buffer.c";
+string SRAPI_DRM_BUFFER_OBJ = "libs/srapi/src/backend/drm/buffer.o";
+string SRAPI_DRM_SRC = "libs/srapi/src/backend/drm/drm.c";
+string SRAPI_DRM_OBJ = "libs/srapi/src/backend/drm/drm.o";
+string SRAPI_DISPLAY_DRM_PROBE_SRC = "libs/srapi/src/display/drm_probe.c";
+string SRAPI_DISPLAY_DRM_PROBE_OBJ = "libs/srapi/src/display/drm_probe.o";
+string SRAPI_VM_SHADER_SRC = "libs/srapi/src/vm/shader.c";
+string SRAPI_VM_SHADER_OBJ = "libs/srapi/src/vm/shader.o";
+string SRAPI_VM_EXEC_SRC = "libs/srapi/src/vm/exec.c";
+string SRAPI_VM_EXEC_OBJ = "libs/srapi/src/vm/exec.o";
+string SRAPI_PPM_SRC = "libs/srapi/src/io/ppm.c";
+string SRAPI_PPM_OBJ = "libs/srapi/src/io/ppm.o";
 
 string LMAKE_ZIG_SRC = "tools/dev/lmake.zig";
 string LMAKE_OBJ = "tools/dev/lmake.o";
@@ -126,7 +162,7 @@ string USERC_SRC = "tools/system/userc/users.c";
 string USERC_OBJ = "tools/system/userc/users.o";
 string USERC_TUI_SRC = "tools/system/userc/tui.c";
 string USERC_TUI_OBJ = "tools/system/userc/tui.o";
-string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/filesystem/fsize.o tools/filesystem/ls.o tools/filesystem/cat.o tools/filesystem/free.o tools/filesystem/size.o tools/filesystem/nm.o tools/dev/gapi_supported.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o tools/network/nsetup.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o libs/elf/elf.o libs/memory/memory.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/dev/mlink/cli.o tools/dev/mlink/object.o tools/dev/mlink/elf-reader.o tools/dev/mlink/symtab.o tools/dev/mlink/layout.o tools/dev/mlink/reloc.o tools/dev/mlink/emit.o tools/dev/mlink/bytes.o tools/dev/mlink/log.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o tools/system/configure/size.o tools/system/video/cvm.o tools/system/userc/users.o tools/system/userc/tui.o";
+string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/filesystem/fsize.o tools/filesystem/ls.o tools/filesystem/cat.o tools/filesystem/free.o tools/filesystem/size.o tools/filesystem/nm.o tools/dev/gapi_supported.o tools/dev/srapi_demo.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o tools/network/nsetup.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o libs/elf/elf.o libs/memory/memory.o libs/srapi/src/core/context.o libs/srapi/src/core/debug.o libs/srapi/src/core/framebuffer.o libs/srapi/src/core/command.o libs/srapi/src/core/buffer.o libs/srapi/src/core/image.o libs/srapi/src/core/queue.o libs/srapi/src/backend/cpu/renderer.o libs/srapi/src/backend/gpu/gpu.o libs/srapi/src/backend/drm/buffer.o libs/srapi/src/backend/drm/drm.o libs/srapi/src/display/drm_probe.o libs/srapi/src/vm/shader.o libs/srapi/src/vm/exec.o libs/srapi/src/io/ppm.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/dev/mlink/cli.o tools/dev/mlink/object.o tools/dev/mlink/elf-reader.o tools/dev/mlink/symtab.o tools/dev/mlink/layout.o tools/dev/mlink/reloc.o tools/dev/mlink/emit.o tools/dev/mlink/bytes.o tools/dev/mlink/log.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o tools/system/configure/size.o tools/system/video/cvm.o tools/system/userc/users.o tools/system/userc/tui.o";
 
 task all() {
     build();
@@ -181,6 +217,10 @@ task build() {
     if (@is_outdated(GAPI_OBJ, GAPI_SRC)) {
         @echo("[CC] %s", GAPI_SRC);
         @run("%s %s -Dmain=ga -c %s -o %s", CC, CFLAGS, GAPI_SRC, GAPI_OBJ);
+    }
+    if (@is_outdated(SRAPI_DEMO_OBJ, SRAPI_DEMO_SRC, SRAPI_HDR)) {
+        @echo("[CC] %s", SRAPI_DEMO_SRC);
+        @run("%s %s %s -Dmain=sr -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_DEMO_SRC, SRAPI_DEMO_OBJ);
     }
     if (@is_outdated(DOWN_CLI_OBJ, DOWN_CLI_SRC, DOWN_HDR)) {
         @echo("[CC] %s", DOWN_CLI_SRC);
@@ -343,6 +383,66 @@ task build() {
         @echo("[CC] %s", MEMORY_SRC);
         @run("%s %s -c %s -o %s", CC, CFLAGS, MEMORY_SRC, MEMORY_OBJ);
     }
+    if (@is_outdated(SRAPI_CONTEXT_OBJ, SRAPI_CONTEXT_SRC, SRAPI_HDR, SRAPI_INTERNAL_HDR)) {
+        @echo("[CC] %s", SRAPI_CONTEXT_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_CONTEXT_SRC, SRAPI_CONTEXT_OBJ);
+    }
+    if (@is_outdated(SRAPI_DEBUG_OBJ, SRAPI_DEBUG_SRC, SRAPI_HDR, SRAPI_INTERNAL_HDR)) {
+        @echo("[CC] %s", SRAPI_DEBUG_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_DEBUG_SRC, SRAPI_DEBUG_OBJ);
+    }
+    if (@is_outdated(SRAPI_FRAMEBUFFER_OBJ, SRAPI_FRAMEBUFFER_SRC, SRAPI_HDR, SRAPI_INTERNAL_HDR)) {
+        @echo("[CC] %s", SRAPI_FRAMEBUFFER_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_FRAMEBUFFER_SRC, SRAPI_FRAMEBUFFER_OBJ);
+    }
+    if (@is_outdated(SRAPI_COMMAND_OBJ, SRAPI_COMMAND_SRC, SRAPI_HDR, SRAPI_INTERNAL_HDR)) {
+        @echo("[CC] %s", SRAPI_COMMAND_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_COMMAND_SRC, SRAPI_COMMAND_OBJ);
+    }
+    if (@is_outdated(SRAPI_BUFFER_OBJ, SRAPI_BUFFER_SRC, SRAPI_HDR, SRAPI_INTERNAL_HDR)) {
+        @echo("[CC] %s", SRAPI_BUFFER_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_BUFFER_SRC, SRAPI_BUFFER_OBJ);
+    }
+    if (@is_outdated(SRAPI_IMAGE_OBJ, SRAPI_IMAGE_SRC, SRAPI_HDR, SRAPI_INTERNAL_HDR)) {
+        @echo("[CC] %s", SRAPI_IMAGE_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_IMAGE_SRC, SRAPI_IMAGE_OBJ);
+    }
+    if (@is_outdated(SRAPI_QUEUE_OBJ, SRAPI_QUEUE_SRC, SRAPI_HDR, SRAPI_INTERNAL_HDR)) {
+        @echo("[CC] %s", SRAPI_QUEUE_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_QUEUE_SRC, SRAPI_QUEUE_OBJ);
+    }
+    if (@is_outdated(SRAPI_CPU_RENDERER_OBJ, SRAPI_CPU_RENDERER_SRC, SRAPI_HDR, SRAPI_INTERNAL_HDR)) {
+        @echo("[CC] %s", SRAPI_CPU_RENDERER_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_CPU_RENDERER_SRC, SRAPI_CPU_RENDERER_OBJ);
+    }
+    if (@is_outdated(SRAPI_GPU_OBJ, SRAPI_GPU_SRC, SRAPI_HDR, SRAPI_INTERNAL_HDR)) {
+        @echo("[CC] %s", SRAPI_GPU_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_GPU_SRC, SRAPI_GPU_OBJ);
+    }
+    if (@is_outdated(SRAPI_DRM_BUFFER_OBJ, SRAPI_DRM_BUFFER_SRC, SRAPI_HDR, SRAPI_INTERNAL_HDR, SRAPI_DRM_INTERNAL_HDR)) {
+        @echo("[CC] %s", SRAPI_DRM_BUFFER_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_DRM_BUFFER_SRC, SRAPI_DRM_BUFFER_OBJ);
+    }
+    if (@is_outdated(SRAPI_DRM_OBJ, SRAPI_DRM_SRC, SRAPI_HDR, SRAPI_INTERNAL_HDR, SRAPI_DRM_INTERNAL_HDR)) {
+        @echo("[CC] %s", SRAPI_DRM_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_DRM_SRC, SRAPI_DRM_OBJ);
+    }
+    if (@is_outdated(SRAPI_DISPLAY_DRM_PROBE_OBJ, SRAPI_DISPLAY_DRM_PROBE_SRC, SRAPI_HDR, SRAPI_INTERNAL_HDR)) {
+        @echo("[CC] %s", SRAPI_DISPLAY_DRM_PROBE_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_DISPLAY_DRM_PROBE_SRC, SRAPI_DISPLAY_DRM_PROBE_OBJ);
+    }
+    if (@is_outdated(SRAPI_VM_SHADER_OBJ, SRAPI_VM_SHADER_SRC, SRAPI_HDR, SRAPI_INTERNAL_HDR)) {
+        @echo("[CC] %s", SRAPI_VM_SHADER_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_VM_SHADER_SRC, SRAPI_VM_SHADER_OBJ);
+    }
+    if (@is_outdated(SRAPI_VM_EXEC_OBJ, SRAPI_VM_EXEC_SRC, SRAPI_HDR, SRAPI_INTERNAL_HDR)) {
+        @echo("[CC] %s", SRAPI_VM_EXEC_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_VM_EXEC_SRC, SRAPI_VM_EXEC_OBJ);
+    }
+    if (@is_outdated(SRAPI_PPM_OBJ, SRAPI_PPM_SRC, SRAPI_HDR, SRAPI_INTERNAL_HDR)) {
+        @echo("[CC] %s", SRAPI_PPM_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_PPM_SRC, SRAPI_PPM_OBJ);
+    }
 
     @echo("[GEN] extra tools");
     @run("CC='%s' CFLAGS='%s' sh %s %s %s", CC, CFLAGS, EXTRA_TOOLS_SCRIPT, EXTRA_TOOLS_MANIFEST, EXTRA_TOOLS_BUNDLE_OBJ);
@@ -360,6 +460,7 @@ task build() {
         SIZE_OBJ,
         NM_OBJ,
         GAPI_OBJ,
+        SRAPI_DEMO_OBJ,
         DOWN_CLI_OBJ,
         DOWN_PARSE_OBJ,
         DOWN_SEND_OBJ,
@@ -371,6 +472,21 @@ task build() {
         TUI_LIB_OBJ,
         ELF_OBJ,
         MEMORY_OBJ,
+        SRAPI_CONTEXT_OBJ,
+        SRAPI_DEBUG_OBJ,
+        SRAPI_FRAMEBUFFER_OBJ,
+        SRAPI_COMMAND_OBJ,
+        SRAPI_BUFFER_OBJ,
+        SRAPI_IMAGE_OBJ,
+        SRAPI_QUEUE_OBJ,
+        SRAPI_CPU_RENDERER_OBJ,
+        SRAPI_GPU_OBJ,
+        SRAPI_DRM_BUFFER_OBJ,
+        SRAPI_DRM_OBJ,
+        SRAPI_DISPLAY_DRM_PROBE_OBJ,
+        SRAPI_VM_SHADER_OBJ,
+        SRAPI_VM_EXEC_OBJ,
+        SRAPI_PPM_OBJ,
         PING_CLI_OBJ,
         NSETUP_OBJ,
         LMAKE_OBJ,
@@ -427,6 +543,7 @@ task clean() {
     @run("rm -f %s", SIZE_OBJ);
     @run("rm -f %s", NM_OBJ);
     @run("rm -f %s", GAPI_OBJ);
+    @run("rm -f %s", SRAPI_DEMO_OBJ);
     @run("rm -f %s", DOWN_CLI_OBJ);
     @run("rm -f %s", DOWN_PARSE_OBJ);
     @run("rm -f %s", DOWN_SEND_OBJ);
@@ -439,6 +556,21 @@ task clean() {
     @run("rm -f %s", TUI_LIB_OBJ);
     @run("rm -f %s", ELF_OBJ);
     @run("rm -f %s", MEMORY_OBJ);
+    @run("rm -f %s", SRAPI_CONTEXT_OBJ);
+    @run("rm -f %s", SRAPI_DEBUG_OBJ);
+    @run("rm -f %s", SRAPI_FRAMEBUFFER_OBJ);
+    @run("rm -f %s", SRAPI_COMMAND_OBJ);
+    @run("rm -f %s", SRAPI_BUFFER_OBJ);
+    @run("rm -f %s", SRAPI_IMAGE_OBJ);
+    @run("rm -f %s", SRAPI_QUEUE_OBJ);
+    @run("rm -f %s", SRAPI_CPU_RENDERER_OBJ);
+    @run("rm -f %s", SRAPI_GPU_OBJ);
+    @run("rm -f %s", SRAPI_DRM_BUFFER_OBJ);
+    @run("rm -f %s", SRAPI_DRM_OBJ);
+    @run("rm -f %s", SRAPI_DISPLAY_DRM_PROBE_OBJ);
+    @run("rm -f %s", SRAPI_VM_SHADER_OBJ);
+    @run("rm -f %s", SRAPI_VM_EXEC_OBJ);
+    @run("rm -f %s", SRAPI_PPM_OBJ);
     @run("rm -f %s", PING_CLI_OBJ);
     @run("rm -f %s", NSETUP_OBJ);
     @run("rm -f %s", LMAKE_OBJ);
