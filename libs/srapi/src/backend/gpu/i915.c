@@ -57,6 +57,45 @@ static srapi_result_t gem_wait(int fd, uint32_t handle, int64_t timeout_ns) {
     return SRAPI_OK;
 }
 
+static srapi_result_t create_gem_object_fd(
+    int fd,
+    const char *path,
+    uint64_t size,
+    uint32_t *handle,
+    uint64_t *alloc_size,
+    void **map
+) {
+    struct drm_i915_gem_create create;
+    struct drm_i915_gem_mmap mmap_arg;
+
+    if (fd < 0 || handle == NULL || alloc_size == NULL || map == NULL || size == 0) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    memset(&create, 0, sizeof(create));
+    create.size = size;
+    if (srapi_drm_ioctl(fd, DRM_IOCTL_I915_GEM_CREATE, &create) != 0) {
+        srapi_set_error("i915: GEM_CREATE size=%llu failed on %s: %s",
+                        (unsigned long long)size, path != NULL ? path : "fd", strerror(errno));
+        return SRAPI_ERROR_UNSUPPORTED;
+    }
+
+    memset(&mmap_arg, 0, sizeof(mmap_arg));
+    mmap_arg.handle = create.handle;
+    mmap_arg.size = create.size;
+    if (srapi_drm_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP, &mmap_arg) != 0) {
+        srapi_set_error("i915: GEM_MMAP handle=%u size=%llu failed: %s",
+                        create.handle, (unsigned long long)create.size, strerror(errno));
+        srapi_i915_destroy_gem(fd, create.handle);
+        return SRAPI_ERROR;
+    }
+
+    *handle = create.handle;
+    *alloc_size = create.size;
+    *map = (void *)(uintptr_t)mmap_arg.addr_ptr;
+    return SRAPI_OK;
+}
+
 static int i915_device_ok(const srapi_device_t *device) {
     return device != NULL && device->fd >= 0 && device->gpu_driver == 915;
 }
@@ -283,36 +322,12 @@ static srapi_result_t create_gem_object(
     uint64_t *alloc_size,
     void **map
 ) {
-    struct drm_i915_gem_create create;
-    struct drm_i915_gem_mmap mmap_arg;
-
     if (device == NULL || handle == NULL || alloc_size == NULL || map == NULL ||
         size == 0 || device->fd < 0) {
         return SRAPI_ERROR_BAD_ARG;
     }
 
-    memset(&create, 0, sizeof(create));
-    create.size = size;
-    if (srapi_drm_ioctl(device->fd, DRM_IOCTL_I915_GEM_CREATE, &create) != 0) {
-        srapi_set_error("i915: GEM_CREATE size=%llu failed on %s: %s",
-                        (unsigned long long)size, device->path, strerror(errno));
-        return SRAPI_ERROR_UNSUPPORTED;
-    }
-
-    memset(&mmap_arg, 0, sizeof(mmap_arg));
-    mmap_arg.handle = create.handle;
-    mmap_arg.size = create.size;
-    if (srapi_drm_ioctl(device->fd, DRM_IOCTL_I915_GEM_MMAP, &mmap_arg) != 0) {
-        srapi_set_error("i915: GEM_MMAP handle=%u size=%llu failed: %s",
-                        create.handle, (unsigned long long)create.size, strerror(errno));
-        srapi_i915_destroy_gem(device->fd, create.handle);
-        return SRAPI_ERROR;
-    }
-
-    *handle = create.handle;
-    *alloc_size = create.size;
-    *map = (void *)(uintptr_t)mmap_arg.addr_ptr;
-    return SRAPI_OK;
+    return create_gem_object_fd(device->fd, device->path, size, handle, alloc_size, map);
 }
 
 srapi_result_t srapi_i915_create_image(
@@ -729,6 +744,108 @@ srapi_result_t srapi_i915_fill_buffer(
     return SRAPI_OK;
 }
 
+static srapi_result_t i915_fill_handle_fd(
+    int fd,
+    const char *path,
+    uint32_t dst_handle,
+    uint64_t dst_size,
+    uint32_t x,
+    uint32_t y,
+    uint32_t width,
+    uint32_t height,
+    uint32_t pitch,
+    uint32_t color
+) {
+    uint32_t batch_words[8];
+    uint32_t batch_handle = 0;
+    uint64_t batch_size = 0;
+    void *batch_map = NULL;
+    struct drm_i915_gem_relocation_entry reloc;
+    struct drm_i915_gem_exec_object2 objs[2];
+    struct drm_i915_gem_execbuffer2 execbuf;
+    srapi_result_t r;
+
+    if (fd < 0 || dst_handle == 0 || dst_size == 0 ||
+        width == 0 || height == 0 || pitch == 0) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if (x > 32767 || y > 32767 || width > 32767 || height > 32767 ||
+        x + width > 32767 || y + height > 32767 || pitch > 0xffff) {
+        srapi_set_error("i915: fill dimensions too large %u,%u %ux%u pitch=%u",
+                        x, y, width, height, pitch);
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if ((uint64_t)y * pitch + (uint64_t)(x + width) * sizeof(uint32_t) > dst_size ||
+        (uint64_t)(y + height) * pitch > dst_size) {
+        srapi_set_error("i915: fill rect outside handle=%u %u,%u %ux%u pitch=%u alloc=%llu",
+                        dst_handle, x, y, width, height, pitch, (unsigned long long)dst_size);
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    memset(batch_words, 0, sizeof(batch_words));
+    batch_words[0] = SRAPI_I915_XY_COLOR_BLT |
+                     SRAPI_I915_BLT_WRITE_ALPHA |
+                     SRAPI_I915_BLT_WRITE_RGB |
+                     0x5u;
+    batch_words[1] = (3u << 24) | (0xf0u << 16) | pitch;
+    batch_words[2] = (y << 16) | x;
+    batch_words[3] = ((y + height) << 16) | (x + width);
+    batch_words[4] = 0;
+    batch_words[5] = 0;
+    batch_words[6] = color;
+    batch_words[7] = SRAPI_I915_MI_BATCH_BUFFER_END;
+
+    r = create_gem_object_fd(fd, path, sizeof(batch_words), &batch_handle, &batch_size, &batch_map);
+    if (r != SRAPI_OK) {
+        return r;
+    }
+    memcpy(batch_map, batch_words, sizeof(batch_words));
+    r = gem_set_domain(fd, batch_handle, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+    if (r != SRAPI_OK) {
+        munmap(batch_map, batch_size);
+        srapi_i915_destroy_gem(fd, batch_handle);
+        return r;
+    }
+
+    memset(&reloc, 0, sizeof(reloc));
+    reloc.target_handle = dst_handle;
+    reloc.offset = 4u * sizeof(uint32_t);
+    reloc.write_domain = I915_GEM_DOMAIN_RENDER;
+
+    memset(objs, 0, sizeof(objs));
+    objs[0].handle = dst_handle;
+    objs[0].alignment = 64;
+    objs[0].flags = EXEC_OBJECT_WRITE | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+    objs[1].handle = batch_handle;
+    objs[1].relocation_count = 1;
+    objs[1].relocs_ptr = (uint64_t)(uintptr_t)&reloc;
+    objs[1].flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+
+    memset(&execbuf, 0, sizeof(execbuf));
+    execbuf.buffers_ptr = (uint64_t)(uintptr_t)objs;
+    execbuf.buffer_count = 2;
+    execbuf.batch_len = sizeof(batch_words);
+    execbuf.flags = I915_EXEC_BLT;
+
+    if (srapi_drm_ioctl(fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &execbuf) != 0) {
+        srapi_set_error("i915: EXECBUFFER2 screen fill failed on %s: %s",
+                        path != NULL ? path : "fd", strerror(errno));
+        munmap(batch_map, batch_size);
+        srapi_i915_destroy_gem(fd, batch_handle);
+        return SRAPI_ERROR;
+    }
+
+    r = gem_wait(fd, dst_handle, 1000000000LL);
+    if (r == SRAPI_OK) {
+        r = gem_set_domain(fd, dst_handle, I915_GEM_DOMAIN_CPU, 0);
+    }
+    srapi_debugf("i915 fill handle ok dst=%u batch=%u %u,%u %ux%u pitch=%u color=0x%08x",
+                 dst_handle, batch_handle, x, y, width, height, pitch, color);
+    munmap(batch_map, batch_size);
+    srapi_i915_destroy_gem(fd, batch_handle);
+    return r;
+}
+
 static srapi_result_t image_as_buffer(srapi_device_t *device, srapi_image_t *image, srapi_buffer_t *out) {
     if (device == NULL || image == NULL || out == NULL ||
         image->device != device || image->gpu_memory != 1) {
@@ -901,6 +1018,83 @@ srapi_result_t srapi_i915_render_image(
     }
 
     srapi_debugf("i915 render image ok handle=%u commands=%zu %ux%u",
+                 target->gpu_handle, cmd->count, target->width, target->height);
+    return SRAPI_OK;
+}
+
+srapi_result_t srapi_i915_render_framebuffer(
+    srapi_device_t *device,
+    srapi_framebuffer_t *target,
+    const srapi_cmd_buffer_t *cmd
+) {
+    int scissor_enabled = 0;
+    int32_t scissor_x = 0;
+    int32_t scissor_y = 0;
+    uint32_t scissor_width;
+    uint32_t scissor_height;
+
+    if (!i915_device_ok(device) || target == NULL || cmd == NULL ||
+        target->gpu_fd < 0 || target->gpu_handle == 0 || target->gpu_size == 0) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    scissor_width = target->width;
+    scissor_height = target->height;
+    for (size_t i = 0; i < cmd->count; i++) {
+        const srapi_command_t *op = &cmd->items[i];
+        srapi_result_t r;
+        uint32_t x;
+        uint32_t y;
+        uint32_t width;
+        uint32_t height;
+
+        switch (op->kind) {
+            case SRAPI_COMMAND_CLEAR:
+                if (!clip_to_rect(0, 0, target->width, target->height,
+                                  scissor_enabled ? scissor_x : 0,
+                                  scissor_enabled ? scissor_y : 0,
+                                  scissor_width, scissor_height,
+                                  &x, &y, &width, &height)) {
+                    break;
+                }
+                r = i915_fill_handle_fd(target->gpu_fd, device->path, target->gpu_handle, target->gpu_size,
+                                        x, y, width, height, target->pitch, op->color);
+                if (r != SRAPI_OK) return r;
+                break;
+            case SRAPI_COMMAND_FILL_RECT:
+                if (!clip_to_rect(op->x0, op->y0, op->width, op->height,
+                                  scissor_enabled ? scissor_x : 0,
+                                  scissor_enabled ? scissor_y : 0,
+                                  scissor_width, scissor_height,
+                                  &x, &y, &width, &height)) {
+                    break;
+                }
+                r = i915_fill_handle_fd(target->gpu_fd, device->path, target->gpu_handle, target->gpu_size,
+                                        x, y, width, height, target->pitch, op->color);
+                if (r != SRAPI_OK) return r;
+                break;
+            case SRAPI_COMMAND_SET_SCISSOR:
+                scissor_enabled = 1;
+                scissor_x = op->x0;
+                scissor_y = op->y0;
+                scissor_width = op->width;
+                scissor_height = op->height;
+                break;
+            case SRAPI_COMMAND_SET_VIEWPORT:
+                break;
+            case SRAPI_COMMAND_SET_BLEND:
+                if (op->blend_mode != SRAPI_BLEND_NONE) {
+                    srapi_set_error("i915 screen render: alpha blend is not implemented");
+                    return SRAPI_ERROR_UNSUPPORTED;
+                }
+                break;
+            default:
+                srapi_set_error("i915 screen render: command kind %d is not implemented", op->kind);
+                return SRAPI_ERROR_UNSUPPORTED;
+        }
+    }
+
+    srapi_debugf("i915 render framebuffer ok handle=%u commands=%zu %ux%u",
                  target->gpu_handle, cmd->count, target->width, target->height);
     return SRAPI_OK;
 }

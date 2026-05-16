@@ -80,6 +80,10 @@ srapi_result_t srapi_drm_create_buffer(int fd, const struct drm_mode_modeinfo *m
     buffer->fb.pixels = buffer->map;
     buffer->fb.owns_pixels = 0;
     buffer->fb.backend = SRAPI_BACKEND_GPU;
+    buffer->fb.gpu_fd = fd;
+    buffer->fb.gpu_handle = create.handle;
+    buffer->fb.gpu_size = create.size;
+    buffer->fb.gpu_memory = 0;
     srapi_debugf("drm buffer mapped fb=%u ptr=%p size=%llu", buffer->fb_id, buffer->map, (unsigned long long)buffer->size);
     return SRAPI_OK;
 }

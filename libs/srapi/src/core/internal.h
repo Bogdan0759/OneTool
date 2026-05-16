@@ -70,6 +70,11 @@ struct srapi_framebuffer {
     uint32_t *pixels;
     int owns_pixels;
     srapi_backend_t backend;
+    srapi_device_t *device;
+    int gpu_fd;
+    uint32_t gpu_handle;
+    uint64_t gpu_size;
+    int gpu_memory;
 };
 
 struct srapi_fbdev_display {
@@ -146,6 +151,11 @@ srapi_result_t srapi_fbdev_probe(srapi_device_info_t *out);
 srapi_result_t srapi_i915_render_image(
     srapi_device_t *device,
     srapi_image_t *target,
+    const srapi_cmd_buffer_t *cmd
+);
+srapi_result_t srapi_i915_render_framebuffer(
+    srapi_device_t *device,
+    srapi_framebuffer_t *target,
     const srapi_cmd_buffer_t *cmd
 );
 
