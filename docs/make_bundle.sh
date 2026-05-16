@@ -10,6 +10,7 @@ echo '<!DOCTYPE html>
 
 for f in overview.html \
          libs.html \
+         srapi.html \
          tools-filesystem.html \
          tools-network.html \
          tools-system.html \
