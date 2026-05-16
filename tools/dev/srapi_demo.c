@@ -80,6 +80,7 @@ static int low_level_smoke(void) {
     uint32_t readback = 0;
     uint32_t *pixels;
     uint32_t pitch = 0;
+    srapi_backend_config_t backend_config;
     srapi_result_t r;
 
     r = srapi_create_device(&(srapi_device_desc_t){ .backend = SRAPI_BACKEND_CPU }, &device);
@@ -181,6 +182,33 @@ static int low_level_smoke(void) {
     if (r != SRAPI_OK) goto fail;
     if (readback != upload_pixels[5]) {
         fprintf(stderr, "low-level copy failed: 0x%08x != 0x%08x\n", readback, upload_pixels[5]);
+        r = SRAPI_ERROR;
+        goto fail;
+    }
+
+    r = srapi_get_backend_config(SRAPI_BACKEND_CPU, &backend_config);
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_buffer_write(readback_buffer, 0, upload_pixels, sizeof(upload_pixels));
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_set_backend_config(&(srapi_backend_config_t){
+        .backend = SRAPI_BACKEND_CPU,
+        .checks = backend_config.checks & ~SRAPI_BACKEND_CHECK_USAGE,
+    });
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_queue_copy_buffer_to_image(
+        queue,
+        readback_buffer,
+        linear_image,
+        &(srapi_buffer_image_copy_t){ .width = 4, .height = 4 }
+    );
+    srapi_set_backend_config(&backend_config);
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_image_map(linear_image, (void **)&pixels, &pitch);
+    if (r != SRAPI_OK) goto fail;
+    readback = pixels[7];
+    srapi_image_unmap(linear_image);
+    if (readback != upload_pixels[7]) {
+        fprintf(stderr, "low-level backend config failed\n");
         r = SRAPI_ERROR;
         goto fail;
     }
@@ -566,6 +594,8 @@ int main(int argc, char *argv[]) {
     srapi_framebuffer_t *fb = NULL;
     srapi_drm_display_t *drm = NULL;
     srapi_fbdev_display_t *fbdev = NULL;
+    srapi_device_t *gpu_device = NULL;
+    srapi_queue_t *gpu_queue = NULL;
     srapi_cmd_buffer_t *cmd = NULL;
     srapi_shader_t *shader = NULL;
     srapi_result_t r;
@@ -757,6 +787,29 @@ int main(int argc, char *argv[]) {
         height = srapi_drm_height(drm);
         fb = srapi_drm_backbuffer(drm);
     }
+    if (use_gpu && use_drm) {
+        const char *gpu_path = drm_device != NULL ? drm_device : srapi_drm_device_path(drm);
+
+        r = srapi_create_device(&(srapi_device_desc_t){
+            .backend = SRAPI_BACKEND_GPU,
+            .device_path = gpu_path,
+        }, &gpu_device);
+        if (r == SRAPI_OK) {
+            r = srapi_create_queue(&(srapi_queue_desc_t){
+                .device = gpu_device,
+                .family_index = 0,
+            }, &gpu_queue);
+        }
+        if (r != SRAPI_OK) {
+            fprintf(stderr, "gpu queue unavailable: %s\n", srapi_last_error());
+            fprintf(stderr, "falling back to direct DRM mapped rendering\n");
+            srapi_destroy_queue(gpu_queue);
+            srapi_destroy_device(gpu_device);
+            gpu_queue = NULL;
+            gpu_device = NULL;
+            use_gpu = 0;
+        }
+    }
     if (use_fbdev) {
         r = srapi_fbdev_open_display(&(srapi_fbdev_display_desc_t){
             .device_path = fbdev_device,
@@ -845,7 +898,11 @@ int main(int argc, char *argv[]) {
             fb = srapi_fbdev_framebuffer(fbdev);
         }
 
-        r = srapi_submit(ctx, fb, cmd);
+        if (gpu_queue != NULL) {
+            r = srapi_queue_submit(gpu_queue, fb, cmd);
+        } else {
+            r = srapi_submit(ctx, fb, cmd);
+        }
         if (r != SRAPI_OK) goto fail;
 
         if (use_drm) {
@@ -887,6 +944,8 @@ int main(int argc, char *argv[]) {
 
     srapi_destroy_shader(shader);
     srapi_destroy_cmd_buffer(cmd);
+    srapi_destroy_queue(gpu_queue);
+    srapi_destroy_device(gpu_device);
     if (!use_drm && !use_fbdev) {
         srapi_destroy_framebuffer(fb);
     }
@@ -899,6 +958,8 @@ fail:
     fprintf(stderr, "srapi_demo failed: %d\n", r);
     srapi_destroy_shader(shader);
     srapi_destroy_cmd_buffer(cmd);
+    srapi_destroy_queue(gpu_queue);
+    srapi_destroy_device(gpu_device);
     if (!use_drm && !use_fbdev) {
         srapi_destroy_framebuffer(fb);
     }

@@ -38,6 +38,23 @@ typedef enum {
 } srapi_backend_t;
 
 typedef enum {
+    SRAPI_BACKEND_CHECK_OVERFLOW = 1u << 0,
+    SRAPI_BACKEND_CHECK_USAGE = 1u << 1,
+    SRAPI_BACKEND_CHECK_OWNERSHIP = 1u << 2,
+    SRAPI_BACKEND_CHECK_BACKEND_MATCH = 1u << 3,
+    SRAPI_BACKEND_CHECK_ALL =
+        SRAPI_BACKEND_CHECK_OVERFLOW |
+        SRAPI_BACKEND_CHECK_USAGE |
+        SRAPI_BACKEND_CHECK_OWNERSHIP |
+        SRAPI_BACKEND_CHECK_BACKEND_MATCH,
+} srapi_backend_check_t;
+
+typedef struct {
+    srapi_backend_t backend;
+    uint32_t checks;
+} srapi_backend_config_t;
+
+typedef enum {
     SRAPI_BUFFER_TRANSFER_SRC = 1u << 0,
     SRAPI_BUFFER_TRANSFER_DST = 1u << 1,
     SRAPI_BUFFER_VERTEX = 1u << 2,
@@ -232,6 +249,10 @@ srapi_result_t srapi_create_context(const srapi_context_desc_t *desc, srapi_cont
 void srapi_destroy_context(srapi_context_t *ctx);
 srapi_backend_t srapi_context_backend(const srapi_context_t *ctx);
 const char *srapi_backend_name(srapi_backend_t backend);
+srapi_result_t srapi_get_backend_config(srapi_backend_t backend, srapi_backend_config_t *out);
+srapi_result_t srapi_set_backend_config(const srapi_backend_config_t *config);
+void srapi_reset_backend_config(srapi_backend_t backend);
+uint32_t srapi_backend_enabled_checks(srapi_backend_t backend);
 
 srapi_result_t srapi_probe_device(srapi_backend_t backend, srapi_device_info_t *out);
 srapi_result_t srapi_create_device(const srapi_device_desc_t *desc, srapi_device_t **out);
@@ -410,6 +431,7 @@ srapi_framebuffer_t *srapi_drm_backbuffer(srapi_drm_display_t *display);
 srapi_result_t srapi_drm_present(srapi_drm_display_t *display);
 uint32_t srapi_drm_width(const srapi_drm_display_t *display);
 uint32_t srapi_drm_height(const srapi_drm_display_t *display);
+const char *srapi_drm_device_path(const srapi_drm_display_t *display);
 srapi_result_t srapi_drm_current_mode(
     const srapi_drm_display_t *display,
     srapi_display_mode_t *out
