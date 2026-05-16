@@ -152,6 +152,13 @@ srapi_result_t srapi_queue_submit(
         return SRAPI_ERROR_BAD_ARG;
     }
 
+    if (queue->backend == SRAPI_BACKEND_GPU &&
+        queue->device != NULL &&
+        queue->device->gpu_driver == 915 &&
+        target->gpu_handle != 0) {
+        return srapi_i915_render_framebuffer(queue->device, target, cmd);
+    }
+
     return srapi_submit(NULL, target, cmd);
 }
 
