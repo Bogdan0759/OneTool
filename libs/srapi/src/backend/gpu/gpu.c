@@ -1,3 +1,5 @@
+#include "i915.h"
+
 #include "../drm/drm_internal.h"
 
 #include <errno.h>
@@ -87,6 +89,7 @@ srapi_result_t srapi_gpu_probe(srapi_device_info_t *out) {
 
 srapi_result_t srapi_gpu_open_device(const srapi_device_desc_t *desc, srapi_device_t **out) {
     srapi_device_info_t info;
+    srapi_i915_probe_t i915;
     srapi_device_t *device;
     const char *path;
     int fd;
@@ -120,8 +123,47 @@ srapi_result_t srapi_gpu_open_device(const srapi_device_desc_t *desc, srapi_devi
     device->backend = SRAPI_BACKEND_GPU;
     device->fd = fd;
     snprintf(device->path, sizeof(device->path), "%s", path);
+    if (srapi_i915_query_fd(fd, path, &i915) == SRAPI_OK) {
+        device->gpu_driver = 915;
+        device->chipset_id = i915.chipset_id;
+    }
     *out = device;
-    srapi_debugf("gpu device open path=%s fd=%d", device->path, device->fd);
+    srapi_debugf("gpu device open path=%s fd=%d driver=%s chipset=0x%x",
+                 device->path,
+                 device->fd,
+                 device->gpu_driver == 915 ? "i915" : "drm-dumb",
+                 device->chipset_id);
+    return SRAPI_OK;
+}
+
+srapi_result_t srapi_probe_i915(const char *device_path, srapi_i915_info_t *out) {
+    srapi_i915_probe_t probe;
+    srapi_result_t r;
+
+    if (out != NULL) {
+        memset(out, 0, sizeof(*out));
+    }
+    if (out == NULL) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    if (device_path != NULL && device_path[0] != '\0') {
+        r = srapi_i915_probe_path(device_path, &probe);
+    } else {
+        r = srapi_i915_probe_any(&probe);
+    }
+    if (r != SRAPI_OK) {
+        return r;
+    }
+
+    out->available = (uint32_t)probe.available;
+    snprintf(out->path, sizeof(out->path), "%s", probe.path);
+    out->chipset_id = probe.chipset_id;
+    out->has_gem = (uint32_t)probe.has_gem;
+    out->has_execbuf2 = (uint32_t)probe.has_execbuf2;
+    out->has_blt = (uint32_t)probe.has_blt;
+    out->has_exec_fence = (uint32_t)probe.has_exec_fence;
+    out->cs_timestamp_frequency = (uint32_t)probe.cs_timestamp_frequency;
     return SRAPI_OK;
 }
 
@@ -154,6 +196,9 @@ srapi_result_t srapi_gpu_create_buffer(
     }
     if (device == NULL || desc == NULL || out == NULL || desc->size == 0 || device->fd < 0) {
         return SRAPI_ERROR_BAD_ARG;
+    }
+    if (device->gpu_driver == 915) {
+        return srapi_i915_create_buffer(device, desc, out);
     }
 
     if (desc->size > SIZE_MAX - 3u) {
@@ -208,6 +253,7 @@ srapi_result_t srapi_gpu_create_buffer(
     buffer->usage = desc->usage;
     buffer->gpu_handle = create.handle;
     buffer->gpu_size = create.size;
+    buffer->gpu_memory = 0;
     if (desc->initial_data != NULL) {
         memcpy(buffer->data, desc->initial_data, desc->size);
     }
@@ -217,6 +263,27 @@ srapi_result_t srapi_gpu_create_buffer(
                  device->path, buffer->gpu_handle, buffer->size,
                  (unsigned long long)buffer->gpu_size, create.pitch, buffer->usage);
     return SRAPI_OK;
+}
+
+void srapi_gpu_destroy_buffer(srapi_buffer_t *buffer) {
+    if (buffer == NULL) {
+        return;
+    }
+
+    if (buffer->data != NULL && buffer->gpu_size > 0) {
+        munmap(buffer->data, buffer->gpu_size);
+    }
+    if (buffer->device == NULL || buffer->device->fd < 0 || buffer->gpu_handle == 0) {
+        return;
+    }
+    if (buffer->gpu_memory == 1) {
+        srapi_i915_destroy_gem(buffer->device->fd, buffer->gpu_handle);
+    } else {
+        struct drm_mode_destroy_dumb destroy = { .handle = buffer->gpu_handle };
+        srapi_debugf("gpu buffer destroy handle=%u alloc=%llu",
+                     buffer->gpu_handle, (unsigned long long)buffer->gpu_size);
+        srapi_drm_ioctl(buffer->device->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
+    }
 }
 
 srapi_result_t srapi_gpu_create_image(
@@ -235,6 +302,9 @@ srapi_result_t srapi_gpu_create_image(
     if (device == NULL || desc == NULL || out == NULL ||
         desc->width == 0 || desc->height == 0 || device->fd < 0) {
         return SRAPI_ERROR_BAD_ARG;
+    }
+    if (device->gpu_driver == 915) {
+        return srapi_i915_create_image(device, desc, out);
     }
 
     if (desc->tiling != SRAPI_IMAGE_LINEAR && desc->tiling != SRAPI_IMAGE_OPTIMAL) {
@@ -290,6 +360,7 @@ srapi_result_t srapi_gpu_create_image(
     image->usage = desc->usage;
     image->gpu_handle = create.handle;
     image->gpu_size = create.size;
+    image->gpu_memory = 0;
     if (desc->initial_pixels != NULL) {
         for (uint32_t y = 0; y < image->height; y++) {
             memcpy((uint8_t *)image->data + (size_t)y * image->pitch,
@@ -304,6 +375,27 @@ srapi_result_t srapi_gpu_create_image(
                  device->path, image->gpu_handle, image->width, image->height,
                  image->pitch, (unsigned long long)image->gpu_size, image->usage);
     return SRAPI_OK;
+}
+
+void srapi_gpu_destroy_image(srapi_image_t *image) {
+    if (image == NULL) {
+        return;
+    }
+
+    if (image->data != NULL && image->gpu_size > 0) {
+        munmap(image->data, image->gpu_size);
+    }
+    if (image->device == NULL || image->device->fd < 0 || image->gpu_handle == 0) {
+        return;
+    }
+    if (image->gpu_memory == 1) {
+        srapi_i915_destroy_gem(image->device->fd, image->gpu_handle);
+    } else {
+        struct drm_mode_destroy_dumb destroy = { .handle = image->gpu_handle };
+        srapi_debugf("gpu image destroy handle=%u alloc=%llu",
+                     image->gpu_handle, (unsigned long long)image->gpu_size);
+        srapi_drm_ioctl(image->device->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
+    }
 }
 
 srapi_result_t srapi_gpu_create_queue(const srapi_queue_desc_t *desc, srapi_queue_t **out) {

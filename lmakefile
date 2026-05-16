@@ -90,6 +90,9 @@ string SRAPI_CPU_RENDERER_SRC = "libs/srapi/src/backend/cpu/renderer.c";
 string SRAPI_CPU_RENDERER_OBJ = "libs/srapi/src/backend/cpu/renderer.o";
 string SRAPI_GPU_SRC = "libs/srapi/src/backend/gpu/gpu.c";
 string SRAPI_GPU_OBJ = "libs/srapi/src/backend/gpu/gpu.o";
+string SRAPI_I915_SRC = "libs/srapi/src/backend/gpu/i915.c";
+string SRAPI_I915_HDR = "libs/srapi/src/backend/gpu/i915.h";
+string SRAPI_I915_OBJ = "libs/srapi/src/backend/gpu/i915.o";
 string SRAPI_FBDEV_SRC = "libs/srapi/src/backend/fbdev/fbdev.c";
 string SRAPI_FBDEV_OBJ = "libs/srapi/src/backend/fbdev/fbdev.o";
 string SRAPI_DRM_INTERNAL_HDR = "libs/srapi/src/backend/drm/drm_internal.h";
@@ -166,7 +169,7 @@ string USERC_SRC = "tools/system/userc/users.c";
 string USERC_OBJ = "tools/system/userc/users.o";
 string USERC_TUI_SRC = "tools/system/userc/tui.c";
 string USERC_TUI_OBJ = "tools/system/userc/tui.o";
-string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/filesystem/fsize.o tools/filesystem/ls.o tools/filesystem/cat.o tools/filesystem/free.o tools/filesystem/size.o tools/filesystem/nm.o tools/dev/gapi_supported.o tools/dev/srapi_demo.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o tools/network/nsetup.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o libs/elf/elf.o libs/memory/memory.o libs/srapi/src/core/context.o libs/srapi/src/core/debug.o libs/srapi/src/core/framebuffer.o libs/srapi/src/core/command.o libs/srapi/src/core/buffer.o libs/srapi/src/core/image.o libs/srapi/src/core/image_view.o libs/srapi/src/core/queue.o libs/srapi/src/backend/cpu/renderer.o libs/srapi/src/backend/gpu/gpu.o libs/srapi/src/backend/fbdev/fbdev.o libs/srapi/src/backend/drm/buffer.o libs/srapi/src/backend/drm/drm.o libs/srapi/src/display/drm_probe.o libs/srapi/src/vm/shader.o libs/srapi/src/vm/exec.o libs/srapi/src/io/ppm.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/dev/mlink/cli.o tools/dev/mlink/object.o tools/dev/mlink/elf-reader.o tools/dev/mlink/symtab.o tools/dev/mlink/layout.o tools/dev/mlink/reloc.o tools/dev/mlink/emit.o tools/dev/mlink/bytes.o tools/dev/mlink/log.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o tools/system/configure/size.o tools/system/video/cvm.o tools/system/userc/users.o tools/system/userc/tui.o";
+string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/filesystem/fsize.o tools/filesystem/ls.o tools/filesystem/cat.o tools/filesystem/free.o tools/filesystem/size.o tools/filesystem/nm.o tools/dev/gapi_supported.o tools/dev/srapi_demo.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o tools/network/nsetup.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o libs/elf/elf.o libs/memory/memory.o libs/srapi/src/core/context.o libs/srapi/src/core/debug.o libs/srapi/src/core/framebuffer.o libs/srapi/src/core/command.o libs/srapi/src/core/buffer.o libs/srapi/src/core/image.o libs/srapi/src/core/image_view.o libs/srapi/src/core/queue.o libs/srapi/src/backend/cpu/renderer.o libs/srapi/src/backend/gpu/gpu.o libs/srapi/src/backend/gpu/i915.o libs/srapi/src/backend/fbdev/fbdev.o libs/srapi/src/backend/drm/buffer.o libs/srapi/src/backend/drm/drm.o libs/srapi/src/display/drm_probe.o libs/srapi/src/vm/shader.o libs/srapi/src/vm/exec.o libs/srapi/src/io/ppm.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/dev/mlink/cli.o tools/dev/mlink/object.o tools/dev/mlink/elf-reader.o tools/dev/mlink/symtab.o tools/dev/mlink/layout.o tools/dev/mlink/reloc.o tools/dev/mlink/emit.o tools/dev/mlink/bytes.o tools/dev/mlink/log.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o tools/system/configure/size.o tools/system/video/cvm.o tools/system/userc/users.o tools/system/userc/tui.o";
 
 task all() {
     build();
@@ -423,9 +426,13 @@ task build() {
         @echo("[CC] %s", SRAPI_CPU_RENDERER_SRC);
         @run("%s %s %s -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_CPU_RENDERER_SRC, SRAPI_CPU_RENDERER_OBJ);
     }
-    if (@is_outdated(SRAPI_GPU_OBJ, SRAPI_GPU_SRC, SRAPI_HDR, SRAPI_INTERNAL_HDR)) {
+    if (@is_outdated(SRAPI_GPU_OBJ, SRAPI_GPU_SRC, SRAPI_HDR, SRAPI_INTERNAL_HDR, SRAPI_I915_HDR)) {
         @echo("[CC] %s", SRAPI_GPU_SRC);
         @run("%s %s %s -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_GPU_SRC, SRAPI_GPU_OBJ);
+    }
+    if (@is_outdated(SRAPI_I915_OBJ, SRAPI_I915_SRC, SRAPI_I915_HDR, SRAPI_HDR, SRAPI_INTERNAL_HDR, SRAPI_DRM_INTERNAL_HDR)) {
+        @echo("[CC] %s", SRAPI_I915_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SRAPI_I915_SRC, SRAPI_I915_OBJ);
     }
     if (@is_outdated(SRAPI_FBDEV_OBJ, SRAPI_FBDEV_SRC, SRAPI_HDR, SRAPI_INTERNAL_HDR)) {
         @echo("[CC] %s", SRAPI_FBDEV_SRC);
@@ -494,6 +501,7 @@ task build() {
         SRAPI_QUEUE_OBJ,
         SRAPI_CPU_RENDERER_OBJ,
         SRAPI_GPU_OBJ,
+        SRAPI_I915_OBJ,
         SRAPI_FBDEV_OBJ,
         SRAPI_DRM_BUFFER_OBJ,
         SRAPI_DRM_OBJ,
@@ -580,6 +588,7 @@ task clean() {
     @run("rm -f %s", SRAPI_QUEUE_OBJ);
     @run("rm -f %s", SRAPI_CPU_RENDERER_OBJ);
     @run("rm -f %s", SRAPI_GPU_OBJ);
+    @run("rm -f %s", SRAPI_I915_OBJ);
     @run("rm -f %s", SRAPI_FBDEV_OBJ);
     @run("rm -f %s", SRAPI_DRM_BUFFER_OBJ);
     @run("rm -f %s", SRAPI_DRM_OBJ);

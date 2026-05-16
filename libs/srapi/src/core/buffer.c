@@ -1,9 +1,8 @@
-#include "../backend/drm/drm_internal.h"
+#include "internal.h"
 
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
 
 static int range_ok(size_t total, size_t offset, size_t size) {
     return offset <= total && size <= total - offset;
@@ -65,15 +64,7 @@ void srapi_destroy_buffer(srapi_buffer_t *buffer) {
     srapi_debugf("buffer destroy backend=%s size=%zu usage=0x%x mapped=%d",
                  srapi_backend_name(buffer->backend), buffer->size, buffer->usage, buffer->mapped);
     if (buffer->backend == SRAPI_BACKEND_GPU) {
-        if (buffer->data != NULL && buffer->gpu_size > 0) {
-            munmap(buffer->data, buffer->gpu_size);
-        }
-        if (buffer->device != NULL && buffer->device->fd >= 0 && buffer->gpu_handle != 0) {
-            struct drm_mode_destroy_dumb destroy = { .handle = buffer->gpu_handle };
-            srapi_debugf("gpu buffer destroy handle=%u alloc=%llu",
-                         buffer->gpu_handle, (unsigned long long)buffer->gpu_size);
-            srapi_drm_ioctl(buffer->device->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
-        }
+        srapi_gpu_destroy_buffer(buffer);
     } else {
         free(buffer->data);
     }

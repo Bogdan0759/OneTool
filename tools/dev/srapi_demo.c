@@ -7,7 +7,7 @@
 
 static void help(const char *tool) {
     printf("srapi_demo - render a test frame or simple animation with SRAPI\n");
-    printf("usage: %s [-o output.ppm] [-w width] [-h height] [--frames n] [--gpu] [--probe-gpu] [--probe-fbdev] [--smoke-low] [--smoke-gpu] [--smoke-fbdev] [--drm [card]] [--fbdev [fb]] [--hold seconds] [--debug] [--list-displays] [--list-modes [connector]]\n", tool);
+    printf("usage: %s [-o output.ppm] [-w width] [-h height] [--frames n] [--gpu] [--probe-gpu] [--probe-i915 [node]] [--probe-fbdev] [--smoke-low] [--smoke-gpu] [--smoke-i915 [node]] [--smoke-fbdev] [--drm [card]] [--fbdev [fb]] [--hold seconds] [--debug] [--list-displays] [--list-modes [connector]]\n", tool);
 }
 
 static int parse_u32(const char *text, uint32_t *out) {
@@ -52,6 +52,23 @@ static void frame_path(char *buf, size_t buf_size, const char *output, uint32_t 
         prefix_len = 400;
     }
     snprintf(buf, buf_size, "%.*s_%03u%s", (int)prefix_len, output, frame, dot);
+}
+
+static int has_ext(const char *path, const char *ext) {
+    size_t path_len = strlen(path);
+    size_t ext_len = strlen(ext);
+
+    if (path_len < ext_len) {
+        return 0;
+    }
+    return strcmp(path + path_len - ext_len, ext) == 0;
+}
+
+static srapi_result_t save_framebuffer(srapi_framebuffer_t *fb, const char *path) {
+    if (has_ext(path, ".bmp") || has_ext(path, ".BMP")) {
+        return srapi_save_bmp(fb, path);
+    }
+    return srapi_save_ppm(fb, path);
 }
 
 static int low_level_smoke(void) {
@@ -238,12 +255,21 @@ static int low_level_smoke(void) {
     if (r != SRAPI_OK) goto fail;
 
     r = srapi_create_context(&(srapi_context_desc_t){
-        .width = 2,
-        .height = 2,
+        .width = 4,
+        .height = 4,
         .backend = SRAPI_BACKEND_CPU,
     }, &ctx);
     if (r != SRAPI_OK) goto fail;
-    r = srapi_create_framebuffer(ctx, &(srapi_framebuffer_desc_t){ 2, 2 }, &fb);
+    r = srapi_context_get_backend_config(ctx, &backend_config);
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_context_set_backend_config(ctx, &(srapi_backend_config_t){
+        .backend = SRAPI_BACKEND_CPU,
+        .checks = backend_config.checks & ~SRAPI_BACKEND_CHECK_USAGE,
+    });
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_context_set_backend_config(ctx, &backend_config);
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_create_framebuffer(ctx, &(srapi_framebuffer_desc_t){ 4, 4 }, &fb);
     if (r != SRAPI_OK) goto fail;
     r = srapi_create_cmd_buffer(ctx, &cmd);
     if (r != SRAPI_OK) goto fail;
@@ -330,6 +356,67 @@ static int low_level_smoke(void) {
         r = SRAPI_ERROR;
         goto fail;
     }
+
+    srapi_cmd_reset(cmd);
+    r = srapi_cmd_clear(cmd, srapi_rgba(0, 0, 0, 255));
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_cmd_set_scissor(cmd, 1, 1, 1, 1);
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_cmd_fill_rect(cmd, 0, 0, 4, 4, srapi_rgba(0, 200, 0, 255));
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_queue_submit(queue, fb, cmd);
+    if (r != SRAPI_OK) goto fail;
+
+    pixels = srapi_framebuffer_pixels(fb);
+    if (pixels == NULL ||
+        pixels[0] != srapi_rgba(0, 0, 0, 255) ||
+        pixels[1 + (srapi_framebuffer_pitch(fb) / sizeof(uint32_t))] != srapi_rgba(0, 200, 0, 255)) {
+        fprintf(stderr, "low-level scissor failed\n");
+        r = SRAPI_ERROR;
+        goto fail;
+    }
+
+    srapi_cmd_reset(cmd);
+    r = srapi_cmd_clear(cmd, srapi_rgba(0, 0, 0, 255));
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_cmd_set_blend(cmd, SRAPI_BLEND_ALPHA);
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_cmd_fill_rect(cmd, 0, 0, 1, 1, srapi_rgba(255, 0, 0, 128));
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_queue_submit(queue, fb, cmd);
+    if (r != SRAPI_OK) goto fail;
+
+    pixels = srapi_framebuffer_pixels(fb);
+    if (pixels == NULL || pixels[0] != srapi_rgba(128, 0, 0, 255)) {
+        fprintf(stderr, "low-level alpha blend failed\n");
+        r = SRAPI_ERROR;
+        goto fail;
+    }
+
+    point.x = 0.0f;
+    point.y = 0.0f;
+    point.color = srapi_rgba(40, 50, 60, 255);
+    r = srapi_buffer_write(vertex_buffer, 0, &point, sizeof(point));
+    if (r != SRAPI_OK) goto fail;
+    srapi_cmd_reset(cmd);
+    r = srapi_cmd_clear(cmd, srapi_rgba(0, 0, 0, 255));
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_cmd_set_viewport(cmd, 0, 0, 4, 4);
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_cmd_draw_vertices(cmd, SRAPI_PRIMITIVE_POINTS, vertex_buffer, 0, 1, NULL, 0, 0);
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_queue_submit(queue, fb, cmd);
+    if (r != SRAPI_OK) goto fail;
+
+    pixels = srapi_framebuffer_pixels(fb);
+    if (pixels == NULL ||
+        pixels[2 + 2 * (srapi_framebuffer_pitch(fb) / sizeof(uint32_t))] != point.color) {
+        fprintf(stderr, "low-level viewport failed\n");
+        r = SRAPI_ERROR;
+        goto fail;
+    }
+    r = srapi_save_bmp(fb, "/tmp/srapi_smoke.bmp");
+    if (r != SRAPI_OK) goto fail;
 
     printf("low-level cpu smoke ok: buffer_size=%zu queue_device=%s\n",
            srapi_buffer_size(buffer), srapi_device_path(srapi_queue_device(queue)));
@@ -510,6 +597,139 @@ fail:
     return 1;
 }
 
+static int i915_smoke(const char *device_path) {
+    srapi_i915_info_t info;
+    srapi_device_t *device = NULL;
+    srapi_queue_t *queue = NULL;
+    srapi_buffer_t *buffer = NULL;
+    srapi_image_t *image = NULL;
+    uint32_t values[4] = { 0x10203040u, 0x55667788u, 0xaabbccddu, 0x13572468u };
+    uint32_t fill_color = 0xff3366ccu;
+    uint32_t image_color = 0xffcc6633u;
+    uint32_t readback = 0;
+    uint32_t *mapped = NULL;
+    uint32_t pitch = 0;
+    srapi_result_t r;
+
+    r = srapi_probe_i915(device_path, &info);
+    if (r != SRAPI_OK) {
+        fprintf(stderr, "i915 smoke unavailable: %s\n", srapi_last_error());
+        return 1;
+    }
+
+    r = srapi_create_device(&(srapi_device_desc_t){
+        .backend = SRAPI_BACKEND_GPU,
+        .device_path = info.path,
+    }, &device);
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_create_queue(&(srapi_queue_desc_t){ .device = device }, &queue);
+    if (r != SRAPI_OK) goto fail;
+
+    r = srapi_create_buffer(
+        device,
+        &(srapi_buffer_desc_t){
+            .size = 4096,
+            .usage = SRAPI_BUFFER_TRANSFER_SRC | SRAPI_BUFFER_TRANSFER_DST | SRAPI_BUFFER_STORAGE,
+            .initial_data = values,
+        },
+        &buffer
+    );
+    if (r != SRAPI_OK) goto fail;
+
+    r = srapi_buffer_read(buffer, sizeof(uint32_t), &readback, sizeof(readback));
+    if (r != SRAPI_OK) goto fail;
+    if (readback != values[1]) {
+        fprintf(stderr, "i915 smoke readback failed: 0x%08x != 0x%08x\n", readback, values[1]);
+        r = SRAPI_ERROR;
+        goto fail;
+    }
+
+    r = srapi_buffer_map(buffer, (void **)&mapped);
+    if (r != SRAPI_OK) goto fail;
+    mapped[2] = values[3];
+    srapi_buffer_unmap(buffer);
+
+    r = srapi_buffer_read(buffer, sizeof(uint32_t) * 2, &readback, sizeof(readback));
+    if (r != SRAPI_OK) goto fail;
+    if (readback != values[3]) {
+        fprintf(stderr, "i915 smoke map/read failed: 0x%08x != 0x%08x\n", readback, values[3]);
+        r = SRAPI_ERROR;
+        goto fail;
+    }
+
+    srapi_destroy_buffer(buffer);
+    buffer = NULL;
+
+    r = srapi_i915_submit_noop(device);
+    if (r != SRAPI_OK) goto fail;
+
+    r = srapi_create_buffer(
+        device,
+        &(srapi_buffer_desc_t){
+            .size = 64 * 64 * sizeof(uint32_t),
+            .usage = SRAPI_BUFFER_TRANSFER_SRC | SRAPI_BUFFER_TRANSFER_DST | SRAPI_BUFFER_STORAGE,
+        },
+        &buffer
+    );
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_i915_fill_buffer(device, buffer, 64, 64, 64 * sizeof(uint32_t), fill_color);
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_buffer_read(buffer, 17 * sizeof(uint32_t), &readback, sizeof(readback));
+    if (r != SRAPI_OK) goto fail;
+    if (readback != fill_color) {
+        fprintf(stderr, "i915 smoke fill failed: 0x%08x != 0x%08x\n", readback, fill_color);
+        r = SRAPI_ERROR;
+        goto fail;
+    }
+
+    srapi_destroy_buffer(buffer);
+    buffer = NULL;
+
+    r = srapi_create_image(
+        device,
+        &(srapi_image_desc_t){
+            .width = 32,
+            .height = 32,
+            .tiling = SRAPI_IMAGE_LINEAR,
+            .usage = SRAPI_IMAGE_TRANSFER_SRC | SRAPI_IMAGE_TRANSFER_DST | SRAPI_IMAGE_COLOR_TARGET,
+        },
+        &image
+    );
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_queue_fill_image(queue, image, image_color);
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_image_map(image, (void **)&mapped, &pitch);
+    if (r != SRAPI_OK) goto fail;
+    readback = mapped[7 + 9 * (pitch / sizeof(uint32_t))];
+    srapi_image_unmap(image);
+    if (readback != image_color) {
+        fprintf(stderr, "i915 smoke image fill failed: 0x%08x != 0x%08x\n", readback, image_color);
+        r = SRAPI_ERROR;
+        goto fail;
+    }
+
+    printf("i915 smoke ok: path=%s chipset=0x%x gem=%u execbuf2=%u buffer_size=%u noop_submit=1 blt_fill=1 image_fill=1\n",
+           info.path,
+           info.chipset_id,
+           info.has_gem,
+           info.has_execbuf2,
+           4096u);
+
+    srapi_destroy_image(image);
+    srapi_destroy_buffer(buffer);
+    srapi_destroy_queue(queue);
+    srapi_destroy_device(device);
+    return 0;
+
+fail:
+    fprintf(stderr, "i915 smoke failed: %s\n", srapi_last_error());
+    srapi_destroy_image(image);
+    srapi_destroy_buffer(buffer);
+    srapi_destroy_queue(queue);
+    srapi_destroy_device(device);
+    return 1;
+}
+
 static int fbdev_smoke(void) {
     srapi_context_t *ctx = NULL;
     srapi_framebuffer_t *fb = NULL;
@@ -580,15 +800,18 @@ int main(int argc, char *argv[]) {
     int height_set = 0;
     int use_gpu = 0;
     int probe_gpu = 0;
+    int probe_i915 = 0;
     int probe_fbdev = 0;
     int smoke_low_level = 0;
     int smoke_gpu = 0;
+    int smoke_i915 = 0;
     int smoke_fbdev = 0;
     int use_drm = 0;
     int use_fbdev = 0;
     int list_displays = 0;
     int list_modes = 0;
     uint32_t list_modes_connector = 0;
+    const char *i915_device = NULL;
     int hold_seconds = 5;
     srapi_context_t *ctx = NULL;
     srapi_framebuffer_t *fb = NULL;
@@ -598,6 +821,7 @@ int main(int argc, char *argv[]) {
     srapi_queue_t *gpu_queue = NULL;
     srapi_cmd_buffer_t *cmd = NULL;
     srapi_shader_t *shader = NULL;
+    srapi_backend_t render_backend = SRAPI_BACKEND_CPU;
     srapi_result_t r;
 
     for (int i = 1; i < argc; i++) {
@@ -627,12 +851,22 @@ int main(int argc, char *argv[]) {
             use_gpu = 1;
         } else if (strcmp(argv[i], "--probe-gpu") == 0) {
             probe_gpu = 1;
+        } else if (strcmp(argv[i], "--probe-i915") == 0) {
+            probe_i915 = 1;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                i915_device = argv[++i];
+            }
         } else if (strcmp(argv[i], "--probe-fbdev") == 0 || strcmp(argv[i], "--probe_fbdev") == 0) {
             probe_fbdev = 1;
         } else if (strcmp(argv[i], "--smoke-low") == 0) {
             smoke_low_level = 1;
         } else if (strcmp(argv[i], "--smoke-gpu") == 0) {
             smoke_gpu = 1;
+        } else if (strcmp(argv[i], "--smoke-i915") == 0) {
+            smoke_i915 = 1;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                i915_device = argv[++i];
+            }
         } else if (strcmp(argv[i], "--smoke-fbdev") == 0 || strcmp(argv[i], "--smoke_fbdev") == 0) {
             smoke_fbdev = 1;
         } else if (strcmp(argv[i], "--drm") == 0) {
@@ -678,6 +912,10 @@ int main(int argc, char *argv[]) {
         return gpu_smoke();
     }
 
+    if (smoke_i915) {
+        return i915_smoke(i915_device);
+    }
+
     if (smoke_fbdev) {
         return fbdev_smoke();
     }
@@ -693,6 +931,26 @@ int main(int argc, char *argv[]) {
                info.message);
         if (r != SRAPI_OK) {
             fprintf(stderr, "gpu probe failed: %s\n", srapi_last_error());
+            return 1;
+        }
+        return 0;
+    }
+
+    if (probe_i915) {
+        srapi_i915_info_t info;
+
+        r = srapi_probe_i915(i915_device, &info);
+        printf("i915 available=%u path=%s chipset=0x%x gem=%u execbuf2=%u blt=%u fence=%u cs_timestamp_frequency=%u\n",
+               info.available,
+               info.path,
+               info.chipset_id,
+               info.has_gem,
+               info.has_execbuf2,
+               info.has_blt,
+               info.has_exec_fence,
+               info.cs_timestamp_frequency);
+        if (r != SRAPI_OK) {
+            fprintf(stderr, "i915 probe failed: %s\n", srapi_last_error());
             return 1;
         }
         return 0;
@@ -824,10 +1082,18 @@ int main(int argc, char *argv[]) {
         fb = srapi_fbdev_framebuffer(fbdev);
     }
 
+    if (use_drm) {
+        render_backend = SRAPI_BACKEND_GPU;
+    } else if (use_fbdev) {
+        render_backend = SRAPI_BACKEND_FBDEV;
+    } else if (use_gpu) {
+        render_backend = SRAPI_BACKEND_GPU;
+    }
+
     r = srapi_create_context(&(srapi_context_desc_t){
         .width = width,
         .height = height,
-        .backend = use_gpu ? SRAPI_BACKEND_GPU : (use_fbdev ? SRAPI_BACKEND_FBDEV : SRAPI_BACKEND_CPU),
+        .backend = render_backend,
     }, &ctx);
     if (r == SRAPI_ERROR_UNSUPPORTED && use_gpu) {
         fprintf(stderr, "gpu backend unavailable: %s\n", srapi_last_error());
@@ -916,7 +1182,7 @@ int main(int argc, char *argv[]) {
             char path[512];
 
             frame_path(path, sizeof(path), output, frame, frames);
-            r = srapi_save_ppm(fb, path);
+            r = save_framebuffer(fb, path);
             if (r != SRAPI_OK) goto fail;
         }
     }

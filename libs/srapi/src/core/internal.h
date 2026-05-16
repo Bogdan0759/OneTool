@@ -7,12 +7,15 @@ struct srapi_context {
     uint32_t width;
     uint32_t height;
     srapi_backend_t backend;
+    uint32_t backend_checks;
 };
 
 struct srapi_device {
     srapi_backend_t backend;
     char path[64];
     int fd;
+    int gpu_driver;
+    uint32_t chipset_id;
 };
 
 struct srapi_buffer {
@@ -24,6 +27,7 @@ struct srapi_buffer {
     int mapped;
     uint32_t gpu_handle;
     uint64_t gpu_size;
+    int gpu_memory;
 };
 
 struct srapi_image {
@@ -38,6 +42,7 @@ struct srapi_image {
     int mapped;
     uint32_t gpu_handle;
     uint64_t gpu_size;
+    int gpu_memory;
 };
 
 struct srapi_image_view {
@@ -99,10 +104,26 @@ struct srapi_shader {
     size_t run_count;
 };
 
+typedef struct {
+    int scissor_enabled;
+    int32_t scissor_x;
+    int32_t scissor_y;
+    uint32_t scissor_width;
+    uint32_t scissor_height;
+    int viewport_enabled;
+    int32_t viewport_x;
+    int32_t viewport_y;
+    uint32_t viewport_width;
+    uint32_t viewport_height;
+    srapi_blend_mode_t blend_mode;
+} srapi_render_state_t;
+
 srapi_result_t srapi_cmd_push(srapi_cmd_buffer_t *cmd, const srapi_command_t *item);
 void srapi_debugf(const char *fmt, ...);
 void srapi_set_error(const char *fmt, ...);
 int srapi_backend_check_enabled(srapi_backend_t backend, uint32_t check);
+void srapi_render_set_state(const srapi_render_state_t *state);
+srapi_render_state_t srapi_render_default_state(const srapi_framebuffer_t *fb);
 srapi_result_t srapi_gpu_probe(srapi_device_info_t *out);
 srapi_result_t srapi_gpu_open_device(const srapi_device_desc_t *desc, srapi_device_t **out);
 void srapi_gpu_close_device(srapi_device_t *device);
@@ -111,11 +132,13 @@ srapi_result_t srapi_gpu_create_buffer(
     const srapi_buffer_desc_t *desc,
     srapi_buffer_t **out
 );
+void srapi_gpu_destroy_buffer(srapi_buffer_t *buffer);
 srapi_result_t srapi_gpu_create_image(
     srapi_device_t *device,
     const srapi_image_desc_t *desc,
     srapi_image_t **out
 );
+void srapi_gpu_destroy_image(srapi_image_t *image);
 srapi_result_t srapi_gpu_create_queue(const srapi_queue_desc_t *desc, srapi_queue_t **out);
 srapi_result_t srapi_fbdev_probe(srapi_device_info_t *out);
 

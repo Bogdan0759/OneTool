@@ -1,9 +1,8 @@
-#include "../backend/drm/drm_internal.h"
+#include "internal.h"
 
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
 
 static int image_size(uint32_t width, uint32_t height, uint32_t *pitch, size_t *size) {
     uint64_t p = (uint64_t)width * sizeof(uint32_t);
@@ -93,15 +92,7 @@ void srapi_destroy_image(srapi_image_t *image) {
                  image->pitch, image->tiling, image->usage, image->mapped);
 
     if (image->backend == SRAPI_BACKEND_GPU) {
-        if (image->data != NULL && image->gpu_size > 0) {
-            munmap(image->data, image->gpu_size);
-        }
-        if (image->device != NULL && image->device->fd >= 0 && image->gpu_handle != 0) {
-            struct drm_mode_destroy_dumb destroy = { .handle = image->gpu_handle };
-            srapi_debugf("gpu image destroy handle=%u alloc=%llu",
-                         image->gpu_handle, (unsigned long long)image->gpu_size);
-            srapi_drm_ioctl(image->device->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
-        }
+        srapi_gpu_destroy_image(image);
     } else {
         free(image->data);
     }
