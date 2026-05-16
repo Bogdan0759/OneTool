@@ -4,6 +4,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+static int buffer_range_ok(const srapi_buffer_t *buffer, size_t offset, size_t count, size_t item_size) {
+    size_t available;
+
+    if (buffer == NULL || item_size == 0 || buffer->size % item_size != 0) {
+        return 0;
+    }
+
+    available = buffer->size / item_size;
+    return offset <= available && count <= available - offset;
+}
+
 srapi_result_t srapi_create_cmd_buffer(srapi_context_t *ctx, srapi_cmd_buffer_t **out) {
     srapi_cmd_buffer_t *cmd;
 
@@ -104,6 +115,11 @@ srapi_result_t srapi_cmd_fill_rect(
 ) {
     srapi_command_t op;
 
+    if (width == 0 || height == 0) {
+        srapi_set_error("draw: bad rect size");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
     memset(&op, 0, sizeof(op));
     op.kind = SRAPI_COMMAND_FILL_RECT;
     op.color = color;
@@ -168,6 +184,11 @@ srapi_result_t srapi_cmd_shade_rect(
 ) {
     srapi_command_t op;
 
+    if (width == 0 || height == 0 || shader == NULL) {
+        srapi_set_error("draw: bad shade rect args");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
     memset(&op, 0, sizeof(op));
     op.kind = SRAPI_COMMAND_SHADE_RECT;
     op.x0 = x;
@@ -205,8 +226,17 @@ srapi_result_t srapi_cmd_draw_vertices(
         srapi_set_error("draw: bad vertex draw args");
         return SRAPI_ERROR_BAD_ARG;
     }
+    if (!buffer_range_ok(vertex_buffer, vertex_offset, vertex_count, sizeof(srapi_vertex_t))) {
+        srapi_set_error("draw: vertex range outside buffer");
+        return SRAPI_ERROR_BAD_ARG;
+    }
     if (index_buffer != NULL && index_count == 0) {
         srapi_set_error("draw: index buffer without indices");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if (index_buffer != NULL &&
+        !buffer_range_ok(index_buffer, index_offset, index_count, sizeof(uint32_t))) {
+        srapi_set_error("draw: index range outside buffer");
         return SRAPI_ERROR_BAD_ARG;
     }
     if (draw_count == 0 || draw_count % (size_t)group_size != 0) {
@@ -245,8 +275,17 @@ srapi_result_t srapi_cmd_draw_vertices_shader(
         srapi_set_error("draw: bad vertex shader draw args");
         return SRAPI_ERROR_BAD_ARG;
     }
+    if (!buffer_range_ok(vertex_buffer, vertex_offset, vertex_count, sizeof(srapi_vertex_t))) {
+        srapi_set_error("draw: vertex range outside buffer");
+        return SRAPI_ERROR_BAD_ARG;
+    }
     if (index_buffer != NULL && index_count == 0) {
         srapi_set_error("draw: index buffer without indices");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if (index_buffer != NULL &&
+        !buffer_range_ok(index_buffer, index_offset, index_count, sizeof(uint32_t))) {
+        srapi_set_error("draw: index range outside buffer");
         return SRAPI_ERROR_BAD_ARG;
     }
     if (draw_count == 0 || draw_count % (size_t)group_size != 0) {

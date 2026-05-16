@@ -16,6 +16,55 @@
 #define SRAPI_I915_BLT_WRITE_ALPHA (1u << 21)
 #define SRAPI_I915_BLT_WRITE_RGB (1u << 20)
 
+static int i915_caps_ready(const srapi_i915_probe_t *probe) {
+    return probe != NULL && probe->available != 0 &&
+           probe->has_gem != 0 && probe->has_execbuf2 != 0 && probe->has_blt != 0;
+}
+
+static srapi_result_t gem_set_domain(int fd, uint32_t handle, uint32_t read_domain, uint32_t write_domain) {
+    struct drm_i915_gem_set_domain domain;
+
+    if (fd < 0 || handle == 0) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    memset(&domain, 0, sizeof(domain));
+    domain.handle = handle;
+    domain.read_domains = read_domain;
+    domain.write_domain = write_domain;
+    if (srapi_drm_ioctl(fd, DRM_IOCTL_I915_GEM_SET_DOMAIN, &domain) != 0) {
+        srapi_set_error("i915: GEM_SET_DOMAIN handle=%u read=0x%x write=0x%x failed: %s",
+                        handle, read_domain, write_domain, strerror(errno));
+        return SRAPI_ERROR;
+    }
+    return SRAPI_OK;
+}
+
+static srapi_result_t gem_wait(int fd, uint32_t handle, int64_t timeout_ns) {
+    struct drm_i915_gem_wait wait_arg;
+
+    if (fd < 0 || handle == 0) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    memset(&wait_arg, 0, sizeof(wait_arg));
+    wait_arg.bo_handle = handle;
+    wait_arg.timeout_ns = timeout_ns;
+    if (srapi_drm_ioctl(fd, DRM_IOCTL_I915_GEM_WAIT, &wait_arg) != 0) {
+        srapi_set_error("i915: GEM_WAIT handle=%u failed: %s", handle, strerror(errno));
+        return SRAPI_ERROR;
+    }
+    return SRAPI_OK;
+}
+
+static int i915_device_ok(const srapi_device_t *device) {
+    return device != NULL && device->fd >= 0 && device->gpu_driver == 915;
+}
+
+static int i915_buffer_ok(const srapi_buffer_t *buffer) {
+    return buffer != NULL && buffer->gpu_memory == 1 && buffer->gpu_handle != 0;
+}
+
 static int get_param(int fd, int param, int *out) {
     drm_i915_getparam_t gp;
     int value = 0;
@@ -86,6 +135,13 @@ srapi_result_t srapi_i915_query_fd(int fd, const char *path, srapi_i915_probe_t 
     get_param(fd, I915_PARAM_HAS_EXEC_FENCE, &out->has_exec_fence);
     get_param(fd, I915_PARAM_CS_TIMESTAMP_FREQUENCY, &out->cs_timestamp_frequency);
 
+    if (!i915_caps_ready(out)) {
+        srapi_set_error("i915: unsupported capabilities on %s gem=%d execbuf2=%d blt=%d",
+                        out->path[0] != '\0' ? out->path : "fd",
+                        out->has_gem, out->has_execbuf2, out->has_blt);
+        return SRAPI_ERROR_UNSUPPORTED;
+    }
+
     srapi_debugf("i915 probe %s chipset=0x%x gem=%d execbuf2=%d blt=%d fence=%d cs_ts=%d",
                  out->path[0] != '\0' ? out->path : "fd",
                  out->chipset_id,
@@ -114,7 +170,7 @@ srapi_result_t srapi_i915_probe_path(const char *path, srapi_i915_probe_t *out) 
     r = srapi_i915_query_fd(fd, path, out);
     close(fd);
     if (r == SRAPI_ERROR_UNSUPPORTED) {
-        srapi_set_error("i915: %s is not an i915 DRM node", path);
+        srapi_set_error("i915: %s is not a usable i915 DRM node", path);
     }
     return r;
 }
@@ -154,12 +210,16 @@ srapi_result_t srapi_i915_create_buffer(
     struct drm_i915_gem_create create;
     struct drm_i915_gem_mmap mmap_arg;
     srapi_buffer_t *buffer;
+    srapi_result_t r;
 
     if (out != NULL) {
         *out = NULL;
     }
     if (device == NULL || desc == NULL || out == NULL || desc->size == 0 || device->fd < 0) {
         return SRAPI_ERROR_BAD_ARG;
+    }
+    if (device->gpu_driver != 915) {
+        return SRAPI_ERROR_UNSUPPORTED;
     }
 
     memset(&create, 0, sizeof(create));
@@ -197,6 +257,13 @@ srapi_result_t srapi_i915_create_buffer(
     buffer->gpu_memory = 1;
     if (desc->initial_data != NULL) {
         memcpy(buffer->data, desc->initial_data, desc->size);
+        r = gem_set_domain(device->fd, buffer->gpu_handle, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+        if (r != SRAPI_OK) {
+            munmap(buffer->data, buffer->gpu_size);
+            srapi_i915_destroy_gem(device->fd, buffer->gpu_handle);
+            free(buffer);
+            return r;
+        }
     }
 
     *out = buffer;
@@ -268,6 +335,9 @@ srapi_result_t srapi_i915_create_image(
         desc->width == 0 || desc->height == 0 || device->fd < 0) {
         return SRAPI_ERROR_BAD_ARG;
     }
+    if (device->gpu_driver != 915) {
+        return SRAPI_ERROR_UNSUPPORTED;
+    }
     if (desc->tiling != SRAPI_IMAGE_LINEAR && desc->tiling != SRAPI_IMAGE_OPTIMAL) {
         return SRAPI_ERROR_BAD_ARG;
     }
@@ -305,6 +375,13 @@ srapi_result_t srapi_i915_create_image(
     image->gpu_memory = 1;
     if (desc->initial_pixels != NULL) {
         memcpy(image->data, desc->initial_pixels, (size_t)size);
+        r = gem_set_domain(device->fd, image->gpu_handle, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+        if (r != SRAPI_OK) {
+            munmap(image->data, image->gpu_size);
+            srapi_i915_destroy_gem(device->fd, image->gpu_handle);
+            free(image);
+            return r;
+        }
     }
 
     *out = image;
@@ -319,14 +396,167 @@ srapi_result_t srapi_i915_create_image(
     return SRAPI_OK;
 }
 
+srapi_result_t srapi_i915_buffer_handle(const srapi_buffer_t *buffer, uint32_t *out) {
+    if (out != NULL) {
+        *out = 0;
+    }
+    if (out == NULL || !i915_buffer_ok(buffer)) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    *out = buffer->gpu_handle;
+    return SRAPI_OK;
+}
+
+srapi_result_t srapi_i915_buffer_gpu_offset(const srapi_buffer_t *buffer, uint64_t *out) {
+    if (out != NULL) {
+        *out = 0;
+    }
+    if (out == NULL || !i915_buffer_ok(buffer)) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    *out = buffer->gpu_offset;
+    return SRAPI_OK;
+}
+
+srapi_result_t srapi_i915_set_domain(
+    srapi_device_t *device,
+    srapi_buffer_t *buffer,
+    uint32_t read_domains,
+    uint32_t write_domain
+) {
+    if (!i915_device_ok(device) || !i915_buffer_ok(buffer) || buffer->device != device) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    return gem_set_domain(device->fd, buffer->gpu_handle, read_domains, write_domain);
+}
+
+srapi_result_t srapi_i915_wait(srapi_device_t *device, srapi_buffer_t *buffer, int64_t timeout_ns) {
+    if (!i915_device_ok(device) || !i915_buffer_ok(buffer) || buffer->device != device) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    return gem_wait(device->fd, buffer->gpu_handle, timeout_ns);
+}
+
+srapi_result_t srapi_i915_exec(srapi_device_t *device, const srapi_i915_exec_desc_t *desc) {
+    struct drm_i915_gem_exec_object2 *objs;
+    struct drm_i915_gem_relocation_entry **reloc_sets = NULL;
+    struct drm_i915_gem_execbuffer2 execbuf;
+    srapi_result_t r = SRAPI_OK;
+
+    if (!i915_device_ok(device) || desc == NULL || !i915_buffer_ok(desc->batch) ||
+        desc->batch->device != device || desc->objects == NULL || desc->object_count == 0) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if (desc->batch_start_offset > desc->batch->size ||
+        desc->batch_len == 0 ||
+        desc->batch_len > desc->batch->size - desc->batch_start_offset ||
+        desc->batch_len > UINT32_MAX ||
+        desc->batch_start_offset > UINT32_MAX) {
+        srapi_set_error("i915 exec: bad batch range offset=%zu len=%zu size=%zu",
+                        desc->batch_start_offset, desc->batch_len, desc->batch->size);
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    objs = calloc(desc->object_count, sizeof(*objs));
+    if (objs == NULL) {
+        return SRAPI_ERROR_OOM;
+    }
+    reloc_sets = calloc(desc->object_count, sizeof(*reloc_sets));
+    if (reloc_sets == NULL) {
+        free(objs);
+        return SRAPI_ERROR_OOM;
+    }
+
+    for (uint32_t i = 0; i < desc->object_count; i++) {
+        const srapi_i915_exec_object_t *src = &desc->objects[i];
+
+        if (!i915_buffer_ok(src->buffer) || src->buffer->device != device) {
+            srapi_set_error("i915 exec: bad object %u", i);
+            r = SRAPI_ERROR_BAD_ARG;
+            goto done;
+        }
+
+        objs[i].handle = src->buffer->gpu_handle;
+        objs[i].alignment = src->alignment;
+        objs[i].offset = src->offset;
+        objs[i].flags = src->flags;
+
+        if (src->relocation_count > 0) {
+            if (src->relocations == NULL) {
+                srapi_set_error("i915 exec: object %u has null relocations", i);
+                r = SRAPI_ERROR_BAD_ARG;
+                goto done;
+            }
+            reloc_sets[i] = calloc(src->relocation_count, sizeof(*reloc_sets[i]));
+            if (reloc_sets[i] == NULL) {
+                r = SRAPI_ERROR_OOM;
+                goto done;
+            }
+
+            for (uint32_t j = 0; j < src->relocation_count; j++) {
+                const srapi_i915_relocation_t *reloc = &src->relocations[j];
+
+                if (reloc->target_index >= desc->object_count) {
+                    srapi_set_error("i915 exec: relocation target %u outside object list", reloc->target_index);
+                    r = SRAPI_ERROR_BAD_ARG;
+                    goto done;
+                }
+                reloc_sets[i][j].offset = reloc->offset;
+                reloc_sets[i][j].delta = reloc->delta;
+                reloc_sets[i][j].target_handle = desc->objects[reloc->target_index].buffer->gpu_handle;
+                reloc_sets[i][j].read_domains = reloc->read_domains;
+                reloc_sets[i][j].write_domain = reloc->write_domain;
+                reloc_sets[i][j].presumed_offset = reloc->presumed_offset;
+            }
+
+            objs[i].relocation_count = src->relocation_count;
+            objs[i].relocs_ptr = (uint64_t)(uintptr_t)reloc_sets[i];
+        }
+    }
+
+    memset(&execbuf, 0, sizeof(execbuf));
+    execbuf.buffers_ptr = (uint64_t)(uintptr_t)objs;
+    execbuf.buffer_count = desc->object_count;
+    execbuf.batch_start_offset = (uint32_t)desc->batch_start_offset;
+    execbuf.batch_len = (uint32_t)desc->batch_len;
+    execbuf.flags = desc->flags;
+
+    if (srapi_drm_ioctl(device->fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &execbuf) != 0) {
+        srapi_set_error("i915 exec: EXECBUFFER2 failed on %s: %s", device->path, strerror(errno));
+        r = SRAPI_ERROR;
+        goto done;
+    }
+
+    for (uint32_t i = 0; i < desc->object_count; i++) {
+        desc->objects[i].offset = objs[i].offset;
+        desc->objects[i].buffer->gpu_offset = objs[i].offset;
+    }
+    srapi_debugf("i915 exec ok engine_flags=0x%llx objects=%u batch_len=%u",
+                 (unsigned long long)desc->flags, desc->object_count, execbuf.batch_len);
+
+done:
+    if (reloc_sets != NULL) {
+        for (uint32_t i = 0; i < desc->object_count; i++) {
+            free(reloc_sets[i]);
+        }
+        free(reloc_sets);
+    }
+    free(objs);
+    return r;
+}
+
 srapi_result_t srapi_i915_submit_noop(srapi_device_t *device) {
-    static const uint32_t batch_words[2] = {
+    static const uint32_t batch_words[] = {
         SRAPI_I915_MI_BATCH_BUFFER_END,
         0x00000000u,
     };
     srapi_buffer_t *batch = NULL;
-    struct drm_i915_gem_exec_object2 obj;
-    struct drm_i915_gem_execbuffer2 execbuf;
+    srapi_i915_exec_object_t obj;
+    srapi_i915_exec_desc_t exec;
     srapi_result_t r;
 
     if (device == NULL || device->fd < 0 || device->gpu_driver != 915) {
@@ -336,7 +566,7 @@ srapi_result_t srapi_i915_submit_noop(srapi_device_t *device) {
     r = srapi_i915_create_buffer(
         device,
         &(srapi_buffer_desc_t){
-            .size = 4096,
+            .size = sizeof(batch_words),
             .usage = SRAPI_BUFFER_STORAGE,
             .initial_data = batch_words,
         },
@@ -346,27 +576,33 @@ srapi_result_t srapi_i915_submit_noop(srapi_device_t *device) {
         return r;
     }
 
-    memset(&obj, 0, sizeof(obj));
-    obj.handle = batch->gpu_handle;
-    obj.flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
-
-    memset(&execbuf, 0, sizeof(execbuf));
-    execbuf.buffers_ptr = (uint64_t)(uintptr_t)&obj;
-    execbuf.buffer_count = 1;
-    execbuf.batch_start_offset = 0;
-    execbuf.batch_len = sizeof(batch_words);
-    execbuf.flags = I915_EXEC_RENDER;
-
-    if (srapi_drm_ioctl(device->fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &execbuf) != 0) {
-        srapi_set_error("i915: EXECBUFFER2 noop failed on %s: %s",
-                        device->path, strerror(errno));
+    r = gem_set_domain(device->fd, batch->gpu_handle, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+    if (r != SRAPI_OK) {
         srapi_gpu_destroy_buffer(batch);
         free(batch);
-        return SRAPI_ERROR;
+        return r;
+    }
+
+    memset(&obj, 0, sizeof(obj));
+    obj.buffer = batch;
+    obj.flags = SRAPI_I915_OBJECT_SUPPORTS_48B_ADDRESS;
+
+    memset(&exec, 0, sizeof(exec));
+    exec.batch = batch;
+    exec.batch_len = sizeof(batch_words);
+    exec.flags = SRAPI_I915_EXEC_RENDER;
+    exec.objects = &obj;
+    exec.object_count = 1;
+
+    r = srapi_i915_exec(device, &exec);
+    if (r != SRAPI_OK) {
+        srapi_gpu_destroy_buffer(batch);
+        free(batch);
+        return r;
     }
 
     srapi_debugf("i915 noop submit ok handle=%u batch_len=%u",
-                 batch->gpu_handle, execbuf.batch_len);
+                 batch->gpu_handle, (unsigned int)sizeof(batch_words));
     srapi_gpu_destroy_buffer(batch);
     free(batch);
     return SRAPI_OK;
@@ -375,6 +611,8 @@ srapi_result_t srapi_i915_submit_noop(srapi_device_t *device) {
 srapi_result_t srapi_i915_fill_buffer(
     srapi_device_t *device,
     srapi_buffer_t *dst,
+    uint32_t x,
+    uint32_t y,
     uint32_t width,
     uint32_t height,
     uint32_t pitch,
@@ -382,10 +620,9 @@ srapi_result_t srapi_i915_fill_buffer(
 ) {
     uint32_t batch_words[8];
     srapi_buffer_t *batch = NULL;
-    struct drm_i915_gem_relocation_entry reloc;
-    struct drm_i915_gem_exec_object2 objs[2];
-    struct drm_i915_gem_execbuffer2 execbuf;
-    struct drm_i915_gem_wait wait_arg;
+    srapi_i915_relocation_t reloc;
+    srapi_i915_exec_object_t objs[2];
+    srapi_i915_exec_desc_t exec;
     srapi_result_t r;
 
     if (device == NULL || dst == NULL || device->fd < 0 || device->gpu_driver != 915 ||
@@ -393,13 +630,21 @@ srapi_result_t srapi_i915_fill_buffer(
         width == 0 || height == 0 || pitch == 0) {
         return SRAPI_ERROR_BAD_ARG;
     }
-    if (width > 32767 || height > 32767 || pitch > 0xffff) {
-        srapi_set_error("i915: fill dimensions too large %ux%u pitch=%u", width, height, pitch);
+    if (x > 32767 || y > 32767 || width > 32767 || height > 32767 ||
+        x + width > 32767 || y + height > 32767 || pitch > 0xffff) {
+        srapi_set_error("i915: fill dimensions too large %u,%u %ux%u pitch=%u",
+                        x, y, width, height, pitch);
         return SRAPI_ERROR_BAD_ARG;
     }
     if ((uint64_t)pitch * height > dst->gpu_size) {
         srapi_set_error("i915: fill outside buffer pitch=%u height=%u alloc=%llu",
                         pitch, height, (unsigned long long)dst->gpu_size);
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if ((uint64_t)y * pitch + (uint64_t)(x + width) * sizeof(uint32_t) > dst->gpu_size ||
+        (uint64_t)(y + height) * pitch > dst->gpu_size) {
+        srapi_set_error("i915: fill rect outside buffer %u,%u %ux%u pitch=%u alloc=%llu",
+                        x, y, width, height, pitch, (unsigned long long)dst->gpu_size);
         return SRAPI_ERROR_BAD_ARG;
     }
 
@@ -409,8 +654,8 @@ srapi_result_t srapi_i915_fill_buffer(
                      SRAPI_I915_BLT_WRITE_RGB |
                      0x5u;
     batch_words[1] = (3u << 24) | (0xf0u << 16) | pitch;
-    batch_words[2] = 0;
-    batch_words[3] = (height << 16) | width;
+    batch_words[2] = (y << 16) | x;
+    batch_words[3] = ((y + height) << 16) | (x + width);
     batch_words[4] = 0;
     batch_words[5] = 0;
     batch_words[6] = color;
@@ -419,7 +664,7 @@ srapi_result_t srapi_i915_fill_buffer(
     r = srapi_i915_create_buffer(
         device,
         &(srapi_buffer_desc_t){
-            .size = 4096,
+            .size = sizeof(batch_words),
             .usage = SRAPI_BUFFER_STORAGE,
             .initial_data = batch_words,
         },
@@ -429,70 +674,235 @@ srapi_result_t srapi_i915_fill_buffer(
         return r;
     }
 
+    r = gem_set_domain(device->fd, batch->gpu_handle, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+    if (r != SRAPI_OK) {
+        srapi_gpu_destroy_buffer(batch);
+        free(batch);
+        return r;
+    }
+
     memset(&reloc, 0, sizeof(reloc));
-    reloc.target_handle = dst->gpu_handle;
+    reloc.target_index = 0;
     reloc.offset = 4u * sizeof(uint32_t);
-    reloc.write_domain = I915_GEM_DOMAIN_RENDER;
+    reloc.write_domain = SRAPI_I915_DOMAIN_RENDER;
 
     memset(objs, 0, sizeof(objs));
-    objs[0].handle = dst->gpu_handle;
+    objs[0].buffer = dst;
     objs[0].alignment = 64;
-    objs[0].flags = EXEC_OBJECT_WRITE | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
-    objs[1].handle = batch->gpu_handle;
+    objs[0].flags = SRAPI_I915_OBJECT_WRITE | SRAPI_I915_OBJECT_SUPPORTS_48B_ADDRESS;
+    objs[1].buffer = batch;
+    objs[1].relocations = &reloc;
     objs[1].relocation_count = 1;
-    objs[1].relocs_ptr = (uint64_t)(uintptr_t)&reloc;
-    objs[1].flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+    objs[1].flags = SRAPI_I915_OBJECT_SUPPORTS_48B_ADDRESS;
 
-    memset(&execbuf, 0, sizeof(execbuf));
-    execbuf.buffers_ptr = (uint64_t)(uintptr_t)objs;
-    execbuf.buffer_count = 2;
-    execbuf.batch_len = sizeof(batch_words);
-    execbuf.flags = I915_EXEC_BLT;
+    memset(&exec, 0, sizeof(exec));
+    exec.batch = batch;
+    exec.batch_len = sizeof(batch_words);
+    exec.flags = SRAPI_I915_EXEC_BLT;
+    exec.objects = objs;
+    exec.object_count = 2;
 
-    if (srapi_drm_ioctl(device->fd, DRM_IOCTL_I915_GEM_EXECBUFFER2, &execbuf) != 0) {
-        srapi_set_error("i915: EXECBUFFER2 color fill failed on %s: %s",
-                        device->path, strerror(errno));
+    r = srapi_i915_exec(device, &exec);
+    if (r != SRAPI_OK) {
         srapi_gpu_destroy_buffer(batch);
         free(batch);
-        return SRAPI_ERROR;
+        return r;
     }
 
-    memset(&wait_arg, 0, sizeof(wait_arg));
-    wait_arg.bo_handle = dst->gpu_handle;
-    wait_arg.timeout_ns = 1000000000LL;
-    if (srapi_drm_ioctl(device->fd, DRM_IOCTL_I915_GEM_WAIT, &wait_arg) != 0) {
-        srapi_set_error("i915: GEM_WAIT fill dst handle=%u failed: %s",
-                        dst->gpu_handle, strerror(errno));
+    r = gem_wait(device->fd, dst->gpu_handle, 1000000000LL);
+    if (r != SRAPI_OK) {
         srapi_gpu_destroy_buffer(batch);
         free(batch);
-        return SRAPI_ERROR;
+        return r;
+    }
+    r = gem_set_domain(device->fd, dst->gpu_handle, I915_GEM_DOMAIN_CPU, 0);
+    if (r != SRAPI_OK) {
+        srapi_gpu_destroy_buffer(batch);
+        free(batch);
+        return r;
     }
 
-    srapi_debugf("i915 fill buffer ok dst=%u batch=%u %ux%u pitch=%u color=0x%08x",
-                 dst->gpu_handle, batch->gpu_handle, width, height, pitch, color);
+    srapi_debugf("i915 fill buffer ok dst=%u batch=%u %u,%u %ux%u pitch=%u color=0x%08x",
+                 dst->gpu_handle, batch->gpu_handle, x, y, width, height, pitch, color);
     srapi_gpu_destroy_buffer(batch);
     free(batch);
     return SRAPI_OK;
 }
 
-srapi_result_t srapi_i915_fill_image(srapi_device_t *device, srapi_image_t *image, uint32_t color) {
-    srapi_buffer_t dst;
-
-    if (device == NULL || image == NULL || image->device != device || image->gpu_memory != 1) {
+static srapi_result_t image_as_buffer(srapi_device_t *device, srapi_image_t *image, srapi_buffer_t *out) {
+    if (device == NULL || image == NULL || out == NULL ||
+        image->device != device || image->gpu_memory != 1) {
         return SRAPI_ERROR_BAD_ARG;
     }
 
-    memset(&dst, 0, sizeof(dst));
-    dst.device = device;
-    dst.backend = image->backend;
-    dst.size = (size_t)image->gpu_size;
-    dst.usage = image->usage;
-    dst.data = image->data;
-    dst.gpu_handle = image->gpu_handle;
-    dst.gpu_size = image->gpu_size;
-    dst.gpu_memory = image->gpu_memory;
+    memset(out, 0, sizeof(*out));
+    out->device = device;
+    out->backend = image->backend;
+    out->size = (size_t)image->gpu_size;
+    out->usage = image->usage;
+    out->data = image->data;
+    out->gpu_handle = image->gpu_handle;
+    out->gpu_size = image->gpu_size;
+    out->gpu_memory = image->gpu_memory;
+    return SRAPI_OK;
+}
 
-    return srapi_i915_fill_buffer(device, &dst, image->width, image->height, image->pitch, color);
+srapi_result_t srapi_i915_fill_rect_image(
+    srapi_device_t *device,
+    srapi_image_t *image,
+    uint32_t x,
+    uint32_t y,
+    uint32_t width,
+    uint32_t height,
+    uint32_t color
+) {
+    srapi_buffer_t dst;
+    srapi_result_t r;
+
+    if (image == NULL || width == 0 || height == 0 ||
+        x >= image->width || y >= image->height ||
+        width > image->width - x || height > image->height - y) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    r = image_as_buffer(device, image, &dst);
+    if (r != SRAPI_OK) {
+        return r;
+    }
+    return srapi_i915_fill_buffer(device, &dst, x, y, width, height, image->pitch, color);
+}
+
+srapi_result_t srapi_i915_fill_image(srapi_device_t *device, srapi_image_t *image, uint32_t color) {
+    if (image == NULL) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    return srapi_i915_fill_rect_image(device, image, 0, 0, image->width, image->height, color);
+}
+
+static int clip_to_rect(
+    int32_t x,
+    int32_t y,
+    uint32_t width,
+    uint32_t height,
+    int32_t clip_x,
+    int32_t clip_y,
+    uint32_t clip_width,
+    uint32_t clip_height,
+    uint32_t *out_x,
+    uint32_t *out_y,
+    uint32_t *out_width,
+    uint32_t *out_height
+) {
+    int64_t x0 = x;
+    int64_t y0 = y;
+    int64_t x1 = (int64_t)x + width;
+    int64_t y1 = (int64_t)y + height;
+    int64_t cx0 = clip_x;
+    int64_t cy0 = clip_y;
+    int64_t cx1 = (int64_t)clip_x + clip_width;
+    int64_t cy1 = (int64_t)clip_y + clip_height;
+
+    if (width == 0 || height == 0 || clip_width == 0 || clip_height == 0) {
+        return 0;
+    }
+    if (x0 < cx0) x0 = cx0;
+    if (y0 < cy0) y0 = cy0;
+    if (x1 > cx1) x1 = cx1;
+    if (y1 > cy1) y1 = cy1;
+    if (x0 >= x1 || y0 >= y1) {
+        return 0;
+    }
+
+    *out_x = (uint32_t)x0;
+    *out_y = (uint32_t)y0;
+    *out_width = (uint32_t)(x1 - x0);
+    *out_height = (uint32_t)(y1 - y0);
+    return 1;
+}
+
+srapi_result_t srapi_i915_render_image(
+    srapi_device_t *device,
+    srapi_image_t *target,
+    const srapi_cmd_buffer_t *cmd
+) {
+    int scissor_enabled = 0;
+    int32_t scissor_x = 0;
+    int32_t scissor_y = 0;
+    uint32_t scissor_width;
+    uint32_t scissor_height;
+
+    if (device == NULL || target == NULL || cmd == NULL ||
+        device->gpu_driver != 915 || target->device != device || target->gpu_memory != 1) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if ((target->usage & SRAPI_IMAGE_COLOR_TARGET) == 0 &&
+        (target->usage & SRAPI_IMAGE_TRANSFER_DST) == 0) {
+        srapi_set_error("i915 render: image missing color-target or transfer-dst usage");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    scissor_width = target->width;
+    scissor_height = target->height;
+    for (size_t i = 0; i < cmd->count; i++) {
+        const srapi_command_t *op = &cmd->items[i];
+        srapi_result_t r;
+        uint32_t x;
+        uint32_t y;
+        uint32_t width;
+        uint32_t height;
+
+        switch (op->kind) {
+            case SRAPI_COMMAND_CLEAR:
+                if (!clip_to_rect(0, 0, target->width, target->height,
+                                  scissor_enabled ? scissor_x : 0,
+                                  scissor_enabled ? scissor_y : 0,
+                                  scissor_width, scissor_height,
+                                  &x, &y, &width, &height)) {
+                    break;
+                }
+                r = srapi_i915_fill_rect_image(device, target, x, y, width, height, op->color);
+                if (r != SRAPI_OK) {
+                    return r;
+                }
+                break;
+            case SRAPI_COMMAND_FILL_RECT:
+                if (!clip_to_rect(op->x0, op->y0, op->width, op->height,
+                                  scissor_enabled ? scissor_x : 0,
+                                  scissor_enabled ? scissor_y : 0,
+                                  scissor_width, scissor_height,
+                                  &x, &y, &width, &height)) {
+                    break;
+                }
+                r = srapi_i915_fill_rect_image(device, target, x, y, width, height, op->color);
+                if (r != SRAPI_OK) {
+                    return r;
+                }
+                break;
+            case SRAPI_COMMAND_SET_SCISSOR:
+                scissor_enabled = 1;
+                scissor_x = op->x0;
+                scissor_y = op->y0;
+                scissor_width = op->width;
+                scissor_height = op->height;
+                break;
+            case SRAPI_COMMAND_SET_BLEND:
+                if (op->blend_mode != SRAPI_BLEND_NONE) {
+                    srapi_set_error("i915 render: alpha blend is not implemented");
+                    return SRAPI_ERROR_UNSUPPORTED;
+                }
+                break;
+            case SRAPI_COMMAND_SET_VIEWPORT:
+                break;
+            default:
+                srapi_set_error("i915 render: command kind %d is not implemented", op->kind);
+                return SRAPI_ERROR_UNSUPPORTED;
+        }
+    }
+
+    srapi_debugf("i915 render image ok handle=%u commands=%zu %ux%u",
+                 target->gpu_handle, cmd->count, target->width, target->height);
+    return SRAPI_OK;
 }
 
 void srapi_i915_destroy_gem(int fd, uint32_t handle) {

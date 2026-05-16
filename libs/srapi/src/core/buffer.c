@@ -94,6 +94,12 @@ srapi_result_t srapi_buffer_write(srapi_buffer_t *buffer, size_t offset, const v
     }
 
     memcpy((uint8_t *)buffer->data + offset, data, size);
+    if (buffer->backend == SRAPI_BACKEND_GPU &&
+        buffer->device != NULL &&
+        buffer->device->gpu_driver == 915 &&
+        buffer->gpu_memory == 1) {
+        srapi_i915_set_domain(buffer->device, buffer, SRAPI_I915_DOMAIN_CPU, SRAPI_I915_DOMAIN_CPU);
+    }
     srapi_debugf("buffer write offset=%zu size=%zu", offset, size);
     return SRAPI_OK;
 }
@@ -108,6 +114,12 @@ srapi_result_t srapi_buffer_read(const srapi_buffer_t *buffer, size_t offset, vo
         return SRAPI_ERROR_UNSUPPORTED;
     }
 
+    if (buffer->backend == SRAPI_BACKEND_GPU &&
+        buffer->device != NULL &&
+        buffer->device->gpu_driver == 915 &&
+        buffer->gpu_memory == 1) {
+        srapi_i915_set_domain(buffer->device, (srapi_buffer_t *)buffer, SRAPI_I915_DOMAIN_CPU, 0);
+    }
     memcpy(out, (const uint8_t *)buffer->data + offset, size);
     srapi_debugf("buffer read offset=%zu size=%zu", offset, size);
     return SRAPI_OK;

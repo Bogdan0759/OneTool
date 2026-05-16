@@ -164,6 +164,64 @@ typedef struct {
     uint32_t cs_timestamp_frequency;
 } srapi_i915_info_t;
 
+typedef enum {
+    SRAPI_I915_DOMAIN_CPU = 0x00000001u,
+    SRAPI_I915_DOMAIN_RENDER = 0x00000002u,
+    SRAPI_I915_DOMAIN_SAMPLER = 0x00000004u,
+    SRAPI_I915_DOMAIN_COMMAND = 0x00000008u,
+    SRAPI_I915_DOMAIN_INSTRUCTION = 0x00000010u,
+    SRAPI_I915_DOMAIN_VERTEX = 0x00000020u,
+    SRAPI_I915_DOMAIN_GTT = 0x00000040u,
+    SRAPI_I915_DOMAIN_WC = 0x00000080u,
+} srapi_i915_domain_t;
+
+typedef enum {
+    SRAPI_I915_EXEC_DEFAULT = 0u << 0,
+    SRAPI_I915_EXEC_RENDER = 1u << 0,
+    SRAPI_I915_EXEC_BSD = 2u << 0,
+    SRAPI_I915_EXEC_BLT = 3u << 0,
+    SRAPI_I915_EXEC_VEBOX = 4u << 0,
+} srapi_i915_engine_t;
+
+typedef enum {
+    SRAPI_I915_OBJECT_NEEDS_FENCE = 1u << 0,
+    SRAPI_I915_OBJECT_NEEDS_GTT = 1u << 1,
+    SRAPI_I915_OBJECT_WRITE = 1u << 2,
+    SRAPI_I915_OBJECT_SUPPORTS_48B_ADDRESS = 1u << 3,
+    SRAPI_I915_OBJECT_PINNED = 1u << 4,
+    SRAPI_I915_OBJECT_PAD_TO_SIZE = 1u << 5,
+    SRAPI_I915_OBJECT_ASYNC = 1u << 6,
+    SRAPI_I915_OBJECT_CAPTURE = 1u << 7,
+} srapi_i915_object_flag_t;
+
+typedef struct {
+    uint64_t offset;
+    int32_t delta;
+    uint64_t target_offset;
+    uint32_t target_index;
+    uint32_t read_domains;
+    uint32_t write_domain;
+    uint64_t presumed_offset;
+} srapi_i915_relocation_t;
+
+typedef struct {
+    srapi_buffer_t *buffer;
+    const srapi_i915_relocation_t *relocations;
+    uint32_t relocation_count;
+    uint64_t alignment;
+    uint64_t flags;
+    uint64_t offset;
+} srapi_i915_exec_object_t;
+
+typedef struct {
+    srapi_buffer_t *batch;
+    size_t batch_start_offset;
+    size_t batch_len;
+    uint64_t flags;
+    srapi_i915_exec_object_t *objects;
+    uint32_t object_count;
+} srapi_i915_exec_desc_t;
+
 typedef struct {
     size_t size;
     uint32_t usage;
@@ -286,10 +344,22 @@ uint32_t srapi_context_enabled_checks(const srapi_context_t *ctx);
 
 srapi_result_t srapi_probe_device(srapi_backend_t backend, srapi_device_info_t *out);
 srapi_result_t srapi_probe_i915(const char *device_path, srapi_i915_info_t *out);
+srapi_result_t srapi_i915_buffer_handle(const srapi_buffer_t *buffer, uint32_t *out);
+srapi_result_t srapi_i915_buffer_gpu_offset(const srapi_buffer_t *buffer, uint64_t *out);
+srapi_result_t srapi_i915_set_domain(
+    srapi_device_t *device,
+    srapi_buffer_t *buffer,
+    uint32_t read_domains,
+    uint32_t write_domain
+);
+srapi_result_t srapi_i915_wait(srapi_device_t *device, srapi_buffer_t *buffer, int64_t timeout_ns);
+srapi_result_t srapi_i915_exec(srapi_device_t *device, const srapi_i915_exec_desc_t *desc);
 srapi_result_t srapi_i915_submit_noop(srapi_device_t *device);
 srapi_result_t srapi_i915_fill_buffer(
     srapi_device_t *device,
     srapi_buffer_t *dst,
+    uint32_t x,
+    uint32_t y,
     uint32_t width,
     uint32_t height,
     uint32_t pitch,
@@ -350,6 +420,11 @@ srapi_device_t *srapi_queue_device(srapi_queue_t *queue);
 srapi_result_t srapi_queue_submit(
     srapi_queue_t *queue,
     srapi_framebuffer_t *target,
+    const srapi_cmd_buffer_t *cmd
+);
+srapi_result_t srapi_queue_submit_image(
+    srapi_queue_t *queue,
+    srapi_image_t *target,
     const srapi_cmd_buffer_t *cmd
 );
 srapi_result_t srapi_queue_copy_buffer_to_image(

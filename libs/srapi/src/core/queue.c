@@ -155,6 +155,57 @@ srapi_result_t srapi_queue_submit(
     return srapi_submit(NULL, target, cmd);
 }
 
+srapi_result_t srapi_queue_submit_image(
+    srapi_queue_t *queue,
+    srapi_image_t *target,
+    const srapi_cmd_buffer_t *cmd
+) {
+    srapi_framebuffer_t fb;
+
+    if (queue == NULL || target == NULL || cmd == NULL) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if (queue->backend != SRAPI_BACKEND_CPU && queue->backend != SRAPI_BACKEND_GPU) {
+        srapi_set_error("queue: image submit unsupported for backend=%s", srapi_backend_name(queue->backend));
+        return SRAPI_ERROR_UNSUPPORTED;
+    }
+    if (srapi_backend_check_enabled(queue->backend, SRAPI_BACKEND_CHECK_OWNERSHIP) &&
+        target->device != queue->device) {
+        srapi_set_error("queue: image target belongs to a different device");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if (srapi_backend_check_enabled(queue->backend, SRAPI_BACKEND_CHECK_BACKEND_MATCH) &&
+        target->backend != queue->backend) {
+        srapi_set_error("queue: image backend=%s does not match queue backend=%s",
+                        srapi_backend_name(target->backend), srapi_backend_name(queue->backend));
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    if (queue->backend == SRAPI_BACKEND_GPU &&
+        queue->device != NULL &&
+        queue->device->gpu_driver == 915 &&
+        target->gpu_memory == 1) {
+        return srapi_i915_render_image(queue->device, target, cmd);
+    }
+    if (target->tiling != SRAPI_IMAGE_LINEAR || target->data == NULL) {
+        srapi_set_error("queue: image target is not host-renderable");
+        return SRAPI_ERROR_UNSUPPORTED;
+    }
+
+    memset(&fb, 0, sizeof(fb));
+    fb.width = target->width;
+    fb.height = target->height;
+    fb.pitch = target->pitch;
+    fb.pixels = (uint32_t *)target->data;
+    fb.owns_pixels = 0;
+    fb.backend = target->backend;
+
+    srapi_debugf("queue submit image backend=%s commands=%zu image=%ux%u pitch=%u",
+                 srapi_backend_name(queue->backend), cmd->count,
+                 target->width, target->height, target->pitch);
+    return srapi_submit(NULL, &fb, cmd);
+}
+
 srapi_result_t srapi_queue_copy_buffer_to_image(
     srapi_queue_t *queue,
     srapi_buffer_t *src,

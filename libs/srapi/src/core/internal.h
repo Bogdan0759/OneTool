@@ -27,6 +27,7 @@ struct srapi_buffer {
     int mapped;
     uint32_t gpu_handle;
     uint64_t gpu_size;
+    uint64_t gpu_offset;
     int gpu_memory;
 };
 
@@ -42,6 +43,7 @@ struct srapi_image {
     int mapped;
     uint32_t gpu_handle;
     uint64_t gpu_size;
+    uint64_t gpu_offset;
     int gpu_memory;
 };
 
@@ -141,6 +143,11 @@ srapi_result_t srapi_gpu_create_image(
 void srapi_gpu_destroy_image(srapi_image_t *image);
 srapi_result_t srapi_gpu_create_queue(const srapi_queue_desc_t *desc, srapi_queue_t **out);
 srapi_result_t srapi_fbdev_probe(srapi_device_info_t *out);
+srapi_result_t srapi_i915_render_image(
+    srapi_device_t *device,
+    srapi_image_t *target,
+    const srapi_cmd_buffer_t *cmd
+);
 
 void srapi_render_clear(srapi_framebuffer_t *fb, srapi_color_t color);
 void srapi_render_fill_rect(
