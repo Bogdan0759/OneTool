@@ -24,6 +24,7 @@ struct srapi_drm_display {
     int has_old_crtc;
     int front;
     srapi_drm_buffer_t buffers[2];
+    char device_path[64];
 };
 
 int srapi_drm_ioctl(int fd, unsigned long request, void *arg);

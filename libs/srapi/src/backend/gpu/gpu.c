@@ -199,12 +199,7 @@ srapi_result_t srapi_gpu_create_image(
         return SRAPI_ERROR_BAD_ARG;
     }
 
-    if (desc->tiling == SRAPI_IMAGE_OPTIMAL) {
-        srapi_debugf("gpu image optimal requested %ux%u usage=0x%x", desc->width, desc->height, desc->usage);
-        srapi_set_error("gpu: optimal image storage is not implemented in SRAPI backend yet");
-        return SRAPI_ERROR_UNSUPPORTED;
-    }
-    if (desc->tiling != SRAPI_IMAGE_LINEAR) {
+    if (desc->tiling != SRAPI_IMAGE_LINEAR && desc->tiling != SRAPI_IMAGE_OPTIMAL) {
         return SRAPI_ERROR_BAD_ARG;
     }
 
@@ -249,7 +244,7 @@ srapi_result_t srapi_gpu_create_image(
     image->width = desc->width;
     image->height = desc->height;
     image->pitch = create.pitch;
-    image->tiling = SRAPI_IMAGE_LINEAR;
+    image->tiling = desc->tiling;
     image->usage = desc->usage;
     image->gpu_handle = create.handle;
     image->gpu_size = create.size;

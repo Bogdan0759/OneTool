@@ -74,6 +74,7 @@ srapi_result_t srapi_cmd_emit(srapi_cmd_buffer_t *cmd, const srapi_command_t *co
         case SRAPI_COMMAND_DRAW_LINE:
         case SRAPI_COMMAND_FILL_TRIANGLE:
         case SRAPI_COMMAND_SHADE_RECT:
+        case SRAPI_COMMAND_DRAW_VERTICES:
             return srapi_cmd_push(cmd, command);
         default:
             srapi_set_error("command: unknown kind %d", command->kind);
@@ -171,5 +172,94 @@ srapi_result_t srapi_cmd_shade_rect(
     op.width = width;
     op.height = height;
     op.shader = shader;
+    return srapi_cmd_emit(cmd, &op);
+}
+
+static int primitive_group_size(srapi_primitive_topology_t topology) {
+    switch (topology) {
+        case SRAPI_PRIMITIVE_POINTS: return 1;
+        case SRAPI_PRIMITIVE_LINES: return 2;
+        case SRAPI_PRIMITIVE_TRIANGLES: return 3;
+        default: return 0;
+    }
+}
+
+srapi_result_t srapi_cmd_draw_vertices(
+    srapi_cmd_buffer_t *cmd,
+    srapi_primitive_topology_t topology,
+    srapi_buffer_t *vertex_buffer,
+    size_t vertex_offset,
+    size_t vertex_count,
+    srapi_buffer_t *index_buffer,
+    size_t index_offset,
+    size_t index_count
+) {
+    srapi_command_t op;
+    int group_size = primitive_group_size(topology);
+    size_t draw_count = index_buffer != NULL ? index_count : vertex_count;
+
+    if (cmd == NULL || vertex_buffer == NULL || group_size == 0 || vertex_count == 0) {
+        srapi_set_error("draw: bad vertex draw args");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if (index_buffer != NULL && index_count == 0) {
+        srapi_set_error("draw: index buffer without indices");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if (draw_count == 0 || draw_count % (size_t)group_size != 0) {
+        srapi_set_error("draw: primitive count does not match topology");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    memset(&op, 0, sizeof(op));
+    op.kind = SRAPI_COMMAND_DRAW_VERTICES;
+    op.topology = topology;
+    op.vertex_buffer = vertex_buffer;
+    op.vertex_offset = vertex_offset;
+    op.vertex_count = vertex_count;
+    op.index_buffer = index_buffer;
+    op.index_offset = index_offset;
+    op.index_count = index_count;
+    return srapi_cmd_emit(cmd, &op);
+}
+
+srapi_result_t srapi_cmd_draw_vertices_shader(
+    srapi_cmd_buffer_t *cmd,
+    srapi_primitive_topology_t topology,
+    srapi_buffer_t *vertex_buffer,
+    size_t vertex_offset,
+    size_t vertex_count,
+    srapi_buffer_t *index_buffer,
+    size_t index_offset,
+    size_t index_count,
+    srapi_shader_t *vertex_shader
+) {
+    srapi_command_t op;
+    int group_size = primitive_group_size(topology);
+    size_t draw_count = index_buffer != NULL ? index_count : vertex_count;
+
+    if (cmd == NULL || vertex_buffer == NULL || group_size == 0 || vertex_count == 0 || vertex_shader == NULL) {
+        srapi_set_error("draw: bad vertex shader draw args");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if (index_buffer != NULL && index_count == 0) {
+        srapi_set_error("draw: index buffer without indices");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if (draw_count == 0 || draw_count % (size_t)group_size != 0) {
+        srapi_set_error("draw: primitive count does not match topology");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    memset(&op, 0, sizeof(op));
+    op.kind = SRAPI_COMMAND_DRAW_VERTICES;
+    op.shader = vertex_shader;
+    op.vertex_buffer = vertex_buffer;
+    op.vertex_offset = vertex_offset;
+    op.vertex_count = vertex_count;
+    op.index_buffer = index_buffer;
+    op.index_offset = index_offset;
+    op.index_count = index_count;
+    op.topology = topology;
     return srapi_cmd_emit(cmd, &op);
 }

@@ -11,12 +11,18 @@ srapi_result_t srapi_create_framebuffer(
     srapi_framebuffer_t *fb;
     uint64_t pixel_count;
 
+    if (out != NULL) {
+        *out = NULL;
+    }
     if (desc == NULL || out == NULL || desc->width == 0 || desc->height == 0) {
+        srapi_set_error("framebuffer: bad create args");
         return SRAPI_ERROR_BAD_ARG;
     }
 
     pixel_count = (uint64_t)desc->width * desc->height;
-    if (pixel_count > SIZE_MAX / sizeof(uint32_t)) {
+    if (desc->width > UINT32_MAX / sizeof(uint32_t) ||
+        pixel_count > SIZE_MAX / sizeof(uint32_t)) {
+        srapi_set_error("framebuffer: size overflow %ux%u", desc->width, desc->height);
         return SRAPI_ERROR_OVERFLOW;
     }
 

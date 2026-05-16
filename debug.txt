@@ -1,18 +1,19 @@
-[srapi] drm open card /dev/dri/card0
+[srapi] drm probe card /dev/dri/card0
+[srapi] drm card opened /dev/dri/card0
 [srapi] drm resources connectors=1 crtcs=3 encoders=1
 [srapi] drm connector 99 connection=1 modes=2 encoders=1 current_encoder=98
+[srapi] drm current encoder=98 crtc=53 possible=0x7
 [srapi] drm choose current crtc=53 from encoder=98
-[srapi] drm output connector=99 crtc=53 mode=1920x1080 1920x1080
+[srapi] drm output connector=99 crtc=53 mode=1920x1080 1920x1080 refresh=120002
 [srapi] drm dumb create 1920x1080 pitch=7680 size=8294400 handle=1
-[srapi] drm addfb id=109 depth=24 bpp=32
-[srapi] drm buffer mapped fb=109 ptr=0x7f088bb08000 size=8294400
+[srapi] drm addfb id=110 depth=24 bpp=32
+[srapi] drm buffer mapped fb=110 ptr=0x7f083ab03000 size=8294400
 [srapi] drm dumb create 1920x1080 pitch=7680 size=8294400 handle=2
 [srapi] drm addfb id=114 depth=24 bpp=32
-[srapi] drm buffer mapped fb=114 ptr=0x7f088b31f000 size=8294400
+[srapi] drm buffer mapped fb=114 ptr=0x7f083a31a000 size=8294400
 [srapi] drm saved old crtc=53 fb=107
-[srapi] drm setcrtc ok crtc=53 connector=99 fb=109
-[srapi] context create 1920x1080 backend=gpu
-[srapi] context gpu mode: DRM target buffers are GPU-backed; command execution still uses cpu interpreter
+[srapi] drm setcrtc ok crtc=53 connector=99 fb=110
+[srapi] context create 1920x1080 backend=cpu
 [srapi] cmd_buffer create
 [srapi] shader create words=28 insts=9 uniforms=3
 [srapi] shader inst[0] LOAD_INPUT dst=0 a=2
@@ -32,10 +33,9 @@
 [srapi] cmd_buffer push kind=4 count=5
 [srapi] cmd_buffer push kind=3 count=6
 [srapi] cmd_buffer push kind=3 count=7
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] vm run[0] in x=0.00 y=0.00 u=0.000 v=0.000 w=1920.00 h=1080.00
 [srapi] vm run[0] out rgba=ff0000bb
@@ -47,21 +47,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -69,21 +67,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -91,21 +87,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -113,21 +107,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -135,21 +127,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -157,21 +147,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -179,21 +167,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -201,21 +187,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -223,21 +207,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -245,21 +227,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -267,21 +247,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -289,21 +267,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -311,21 +287,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -333,21 +307,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -355,21 +327,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -377,21 +347,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -399,21 +367,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -421,21 +387,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -443,21 +407,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -465,21 +427,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -487,21 +447,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -509,21 +467,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -531,21 +487,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -553,21 +507,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -575,21 +527,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -597,21 +547,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -619,21 +567,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -641,21 +587,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -663,21 +607,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -685,21 +627,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -707,21 +647,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -729,21 +667,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -751,21 +687,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -773,21 +707,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -795,21 +727,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -817,21 +747,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -839,21 +767,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -861,21 +787,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -883,21 +807,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -905,21 +827,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -927,21 +847,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -949,21 +867,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -971,21 +887,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -993,21 +907,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1015,21 +927,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1037,21 +947,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1059,21 +967,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1081,21 +987,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1103,21 +1007,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1125,21 +1027,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1147,21 +1047,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1169,21 +1067,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1191,21 +1087,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1213,21 +1107,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1235,21 +1127,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1257,21 +1147,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1279,21 +1167,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1301,21 +1187,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1323,21 +1207,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1345,21 +1227,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1367,21 +1247,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1389,21 +1267,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1411,21 +1287,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1433,21 +1307,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1455,21 +1327,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1477,21 +1347,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1499,21 +1367,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1521,21 +1387,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1543,21 +1407,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1565,21 +1427,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1587,21 +1447,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1609,21 +1467,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1631,21 +1487,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1653,21 +1507,19 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] drm page_flip present fb=110 front=0
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
@@ -1675,26 +1527,25 @@
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
 [srapi] drm page_flip present fb=114 front=1
-[srapi] submit 7 commands ctx_backend=gpu target_backend=gpu framebuffer=1920x1080 pitch=7680
-[srapi] submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend
+[srapi] submit 7 commands ctx_backend=cpu target_backend=gpu framebuffer=1920x1080 pitch=7680
 [srapi] cmd[0] clear color=0xff0a0c10
-[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2631ecb0
+[srapi] cmd[1] shade_rect x=0 y=0 w=1920 h=1080 shader=0x2cad1cf0
 [srapi] cpu shade_rect clipped x=0 y=0 w=1920 h=1080 shader_insts=9
 [srapi] cmd[2] fill_rect x=40 y=40 w=960 h=360 color=0xffdc503c
 [srapi] cmd[3] fill_rect x=640 y=360 w=960 h=360 color=0xff37a0e6
 [srapi] cmd[4] fill_triangle 960,24 32,1048 1888,1032 color=0xffb4e650
 [srapi] cmd[5] draw_line 0,0 -> 1919,1079 color=0xfff5dc5a
 [srapi] cmd[6] draw_line 0,1079 -> 1919,0 color=0xff5af5aa
-[srapi] drm page_flip present fb=109 front=0
+[srapi] drm page_flip present fb=110 front=0
 [srapi] shader destroy words=28 insts=9 uniforms=3 runs=311040000
 [srapi] cmd_buffer destroy count=7 capacity=16
 [srapi] drm restore old crtc=53 fb=107
-[srapi] drm munmap fb=109 size=8294400
-[srapi] drm rmfb id=109
+[srapi] drm munmap fb=110 size=8294400
+[srapi] drm rmfb id=110
 [srapi] drm destroy dumb handle=1
 [srapi] drm munmap fb=114 size=8294400
 [srapi] drm rmfb id=114
 [srapi] drm destroy dumb handle=2
 [srapi] drm close fd
-[srapi] context destroy 1920x1080 backend=gpu
-rendered 150 frames to DRM (1920x1080)
+[srapi] context destroy 1920x1080 backend=cpu
+rendered 150 frames to DRM (1920x1080 120.002Hz 1920x1080)

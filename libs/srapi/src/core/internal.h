@@ -40,6 +40,16 @@ struct srapi_image {
     uint64_t gpu_size;
 };
 
+struct srapi_image_view {
+    srapi_image_t *image;
+    srapi_backend_t backend;
+    uint32_t x;
+    uint32_t y;
+    uint32_t width;
+    uint32_t height;
+    int mapped;
+};
+
 struct srapi_queue {
     srapi_device_t *device;
     srapi_backend_t backend;
@@ -53,6 +63,14 @@ struct srapi_framebuffer {
     uint32_t *pixels;
     int owns_pixels;
     srapi_backend_t backend;
+};
+
+struct srapi_fbdev_display {
+    int fd;
+    uint64_t map_size;
+    void *map;
+    srapi_framebuffer_t fb;
+    char device_path[64];
 };
 
 struct srapi_cmd_buffer {
@@ -98,6 +116,7 @@ srapi_result_t srapi_gpu_create_image(
     srapi_image_t **out
 );
 srapi_result_t srapi_gpu_create_queue(const srapi_queue_desc_t *desc, srapi_queue_t **out);
+srapi_result_t srapi_fbdev_probe(srapi_device_info_t *out);
 
 void srapi_render_clear(srapi_framebuffer_t *fb, srapi_color_t color);
 void srapi_render_fill_rect(
@@ -134,10 +153,33 @@ void srapi_render_shade_rect(
     uint32_t height,
     srapi_shader_t *shader
 );
+void srapi_render_draw_vertices(
+    srapi_framebuffer_t *fb,
+    srapi_primitive_topology_t topology,
+    const srapi_vertex_t *vertices,
+    size_t vertex_count,
+    const uint32_t *indices,
+    size_t index_count
+);
+void srapi_render_draw_vertices_transformed(
+    srapi_framebuffer_t *fb,
+    srapi_primitive_topology_t topology,
+    const srapi_vertex_t *vertices,
+    size_t vertex_count,
+    const uint32_t *indices,
+    size_t index_count,
+    const float *positions
+);
 
 srapi_result_t srapi_vm_run_fragment(
     srapi_shader_t *shader,
     const float inputs[6],
+    srapi_color_t *out_color
+);
+srapi_result_t srapi_vm_run_vertex(
+    srapi_shader_t *shader,
+    const float inputs[7],
+    float out_position[2],
     srapi_color_t *out_color
 );
 

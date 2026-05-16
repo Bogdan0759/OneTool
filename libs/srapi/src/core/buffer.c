@@ -16,15 +16,19 @@ srapi_result_t srapi_create_buffer(
 ) {
     srapi_buffer_t *buffer;
 
+    if (out != NULL) {
+        *out = NULL;
+    }
     if (device == NULL || desc == NULL || out == NULL || desc->size == 0) {
+        srapi_set_error("buffer: bad create args");
         return SRAPI_ERROR_BAD_ARG;
     }
-    *out = NULL;
 
     if (device->backend == SRAPI_BACKEND_GPU) {
         return srapi_gpu_create_buffer(device, desc, out);
     }
     if (device->backend != SRAPI_BACKEND_CPU) {
+        srapi_set_error("buffer: unsupported backend=%s", srapi_backend_name(device->backend));
         return SRAPI_ERROR_BAD_ARG;
     }
 
@@ -90,6 +94,7 @@ srapi_backend_t srapi_buffer_backend(const srapi_buffer_t *buffer) {
 
 srapi_result_t srapi_buffer_write(srapi_buffer_t *buffer, size_t offset, const void *data, size_t size) {
     if (buffer == NULL || data == NULL || !range_ok(buffer->size, offset, size)) {
+        srapi_set_error("buffer: bad write args offset=%zu size=%zu", offset, size);
         return SRAPI_ERROR_BAD_ARG;
     }
     if (buffer->backend != SRAPI_BACKEND_CPU && buffer->backend != SRAPI_BACKEND_GPU) {
@@ -104,6 +109,7 @@ srapi_result_t srapi_buffer_write(srapi_buffer_t *buffer, size_t offset, const v
 
 srapi_result_t srapi_buffer_read(const srapi_buffer_t *buffer, size_t offset, void *out, size_t size) {
     if (buffer == NULL || out == NULL || !range_ok(buffer->size, offset, size)) {
+        srapi_set_error("buffer: bad read args offset=%zu size=%zu", offset, size);
         return SRAPI_ERROR_BAD_ARG;
     }
     if (buffer->backend != SRAPI_BACKEND_CPU && buffer->backend != SRAPI_BACKEND_GPU) {
@@ -118,6 +124,7 @@ srapi_result_t srapi_buffer_read(const srapi_buffer_t *buffer, size_t offset, vo
 
 srapi_result_t srapi_buffer_map(srapi_buffer_t *buffer, void **out) {
     if (buffer == NULL || out == NULL) {
+        srapi_set_error("buffer: bad map args");
         return SRAPI_ERROR_BAD_ARG;
     }
     if (buffer->backend != SRAPI_BACKEND_CPU && buffer->backend != SRAPI_BACKEND_GPU) {

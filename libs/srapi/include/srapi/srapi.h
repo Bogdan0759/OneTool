@@ -8,10 +8,12 @@ typedef struct srapi_context srapi_context_t;
 typedef struct srapi_device srapi_device_t;
 typedef struct srapi_buffer srapi_buffer_t;
 typedef struct srapi_image srapi_image_t;
+typedef struct srapi_image_view srapi_image_view_t;
 typedef struct srapi_queue srapi_queue_t;
 typedef struct srapi_framebuffer srapi_framebuffer_t;
 typedef struct srapi_cmd_buffer srapi_cmd_buffer_t;
 typedef struct srapi_drm_display srapi_drm_display_t;
+typedef struct srapi_fbdev_display srapi_fbdev_display_t;
 typedef struct srapi_shader srapi_shader_t;
 
 typedef uint32_t srapi_color_t;
@@ -32,6 +34,7 @@ typedef enum {
     SRAPI_BACKEND_AUTO = 0,
     SRAPI_BACKEND_CPU = 1,
     SRAPI_BACKEND_GPU = 2,
+    SRAPI_BACKEND_FBDEV = 3,
 } srapi_backend_t;
 
 typedef enum {
@@ -62,7 +65,14 @@ typedef enum {
     SRAPI_COMMAND_DRAW_LINE = 3,
     SRAPI_COMMAND_FILL_TRIANGLE = 4,
     SRAPI_COMMAND_SHADE_RECT = 5,
+    SRAPI_COMMAND_DRAW_VERTICES = 6,
 } srapi_command_kind_t;
+
+typedef enum {
+    SRAPI_PRIMITIVE_POINTS = 1,
+    SRAPI_PRIMITIVE_LINES = 2,
+    SRAPI_PRIMITIVE_TRIANGLES = 3,
+} srapi_primitive_topology_t;
 
 typedef enum {
     SRAPI_VM_END = 0,
@@ -80,6 +90,7 @@ typedef enum {
     SRAPI_VM_FRACT = 12,
     SRAPI_VM_CLAMP01 = 13,
     SRAPI_VM_MIX = 14,
+    SRAPI_VM_OUT_POSITION = 15,
 } srapi_vm_opcode_t;
 
 enum {
@@ -89,6 +100,13 @@ enum {
     SRAPI_VM_INPUT_V = 3,
     SRAPI_VM_INPUT_WIDTH = 4,
     SRAPI_VM_INPUT_HEIGHT = 5,
+    SRAPI_VM_INPUT_VERTEX_X = 0,
+    SRAPI_VM_INPUT_VERTEX_Y = 1,
+    SRAPI_VM_INPUT_VERTEX_R = 2,
+    SRAPI_VM_INPUT_VERTEX_G = 3,
+    SRAPI_VM_INPUT_VERTEX_B = 4,
+    SRAPI_VM_INPUT_VERTEX_A = 5,
+    SRAPI_VM_INPUT_VERTEX_INDEX = 6,
 };
 
 typedef struct {
@@ -124,6 +142,14 @@ typedef struct {
 } srapi_image_desc_t;
 
 typedef struct {
+    srapi_image_t *image;
+    uint32_t x;
+    uint32_t y;
+    uint32_t width;
+    uint32_t height;
+} srapi_image_view_desc_t;
+
+typedef struct {
     srapi_device_t *device;
     uint32_t family_index;
 } srapi_queue_desc_t;
@@ -142,6 +168,12 @@ typedef struct {
 } srapi_framebuffer_desc_t;
 
 typedef struct {
+    float x;
+    float y;
+    srapi_color_t color;
+} srapi_vertex_t;
+
+typedef struct {
     srapi_command_kind_t kind;
     srapi_color_t color;
     int32_t x0;
@@ -153,6 +185,13 @@ typedef struct {
     uint32_t width;
     uint32_t height;
     srapi_shader_t *shader;
+    srapi_primitive_topology_t topology;
+    srapi_buffer_t *vertex_buffer;
+    srapi_buffer_t *index_buffer;
+    size_t vertex_offset;
+    size_t vertex_count;
+    size_t index_offset;
+    size_t index_count;
 } srapi_command_t;
 
 typedef struct {
@@ -165,6 +204,27 @@ typedef struct {
     uint32_t preferred_height;
     char preferred_mode[32];
 } srapi_display_info_t;
+
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+    uint32_t refresh_millihz;
+    uint32_t flags;
+    uint32_t type;
+    char name[32];
+} srapi_display_mode_t;
+
+typedef struct {
+    const char *device_path;
+    uint32_t connector_id;
+    uint32_t width;
+    uint32_t height;
+    uint32_t refresh_millihz;
+} srapi_drm_display_desc_t;
+
+typedef struct {
+    const char *device_path;
+} srapi_fbdev_display_desc_t;
 
 srapi_color_t srapi_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a);
 
@@ -207,6 +267,20 @@ uint32_t srapi_image_usage(const srapi_image_t *image);
 srapi_backend_t srapi_image_backend(const srapi_image_t *image);
 srapi_result_t srapi_image_map(srapi_image_t *image, void **out, uint32_t *pitch);
 void srapi_image_unmap(srapi_image_t *image);
+
+srapi_result_t srapi_create_image_view(
+    const srapi_image_view_desc_t *desc,
+    srapi_image_view_t **out
+);
+void srapi_destroy_image_view(srapi_image_view_t *view);
+srapi_image_t *srapi_image_view_image(srapi_image_view_t *view);
+uint32_t srapi_image_view_x(const srapi_image_view_t *view);
+uint32_t srapi_image_view_y(const srapi_image_view_t *view);
+uint32_t srapi_image_view_width(const srapi_image_view_t *view);
+uint32_t srapi_image_view_height(const srapi_image_view_t *view);
+srapi_backend_t srapi_image_view_backend(const srapi_image_view_t *view);
+srapi_result_t srapi_image_view_map(srapi_image_view_t *view, void **out, uint32_t *pitch);
+void srapi_image_view_unmap(srapi_image_view_t *view);
 
 srapi_result_t srapi_create_queue(const srapi_queue_desc_t *desc, srapi_queue_t **out);
 void srapi_destroy_queue(srapi_queue_t *queue);
@@ -279,6 +353,27 @@ srapi_result_t srapi_cmd_shade_rect(
     uint32_t height,
     srapi_shader_t *shader
 );
+srapi_result_t srapi_cmd_draw_vertices(
+    srapi_cmd_buffer_t *cmd,
+    srapi_primitive_topology_t topology,
+    srapi_buffer_t *vertex_buffer,
+    size_t vertex_offset,
+    size_t vertex_count,
+    srapi_buffer_t *index_buffer,
+    size_t index_offset,
+    size_t index_count
+);
+srapi_result_t srapi_cmd_draw_vertices_shader(
+    srapi_cmd_buffer_t *cmd,
+    srapi_primitive_topology_t topology,
+    srapi_buffer_t *vertex_buffer,
+    size_t vertex_offset,
+    size_t vertex_count,
+    srapi_buffer_t *index_buffer,
+    size_t index_offset,
+    size_t index_count,
+    srapi_shader_t *vertex_shader
+);
 
 srapi_result_t srapi_submit(
     srapi_context_t *ctx,
@@ -305,16 +400,48 @@ srapi_result_t srapi_shader_set_uniforms(
 void srapi_destroy_shader(srapi_shader_t *shader);
 
 srapi_result_t srapi_drm_open(const char *device_path, srapi_drm_display_t **out);
+srapi_result_t srapi_drm_open_display(
+    const srapi_drm_display_desc_t *desc,
+    srapi_drm_display_t **out
+);
 void srapi_drm_close(srapi_drm_display_t *display);
 srapi_framebuffer_t *srapi_drm_framebuffer(srapi_drm_display_t *display);
 srapi_framebuffer_t *srapi_drm_backbuffer(srapi_drm_display_t *display);
 srapi_result_t srapi_drm_present(srapi_drm_display_t *display);
 uint32_t srapi_drm_width(const srapi_drm_display_t *display);
 uint32_t srapi_drm_height(const srapi_drm_display_t *display);
+srapi_result_t srapi_drm_current_mode(
+    const srapi_drm_display_t *display,
+    srapi_display_mode_t *out
+);
+srapi_result_t srapi_drm_set_mode(
+    srapi_drm_display_t *display,
+    uint32_t width,
+    uint32_t height,
+    uint32_t refresh_millihz
+);
+
+srapi_result_t srapi_fbdev_open(const char *device_path, srapi_fbdev_display_t **out);
+srapi_result_t srapi_fbdev_open_display(
+    const srapi_fbdev_display_desc_t *desc,
+    srapi_fbdev_display_t **out
+);
+void srapi_fbdev_close(srapi_fbdev_display_t *display);
+srapi_framebuffer_t *srapi_fbdev_framebuffer(srapi_fbdev_display_t *display);
+srapi_result_t srapi_fbdev_present(srapi_fbdev_display_t *display);
+uint32_t srapi_fbdev_width(const srapi_fbdev_display_t *display);
+uint32_t srapi_fbdev_height(const srapi_fbdev_display_t *display);
 
 srapi_result_t srapi_display_probe_drm(
     const char *device_path,
     srapi_display_info_t *out,
+    size_t out_count,
+    size_t *written
+);
+srapi_result_t srapi_display_list_modes_drm(
+    const char *device_path,
+    uint32_t connector_id,
+    srapi_display_mode_t *out,
     size_t out_count,
     size_t *written
 );
