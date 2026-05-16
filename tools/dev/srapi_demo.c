@@ -1158,13 +1158,12 @@ int main(int argc, char *argv[]) {
         }
         if (r != SRAPI_OK) {
             fprintf(stderr, "gpu queue unavailable: %s\n", srapi_last_error());
-            fprintf(stderr, "falling back to direct DRM mapped rendering\n");
             srapi_destroy_queue(gpu_queue);
             srapi_destroy_device(gpu_device);
             gpu_queue = NULL;
             gpu_device = NULL;
             gpu_i915 = 0;
-            use_gpu = 0;
+            goto fail;
         }
     }
     if (use_fbdev) {
@@ -1239,10 +1238,7 @@ int main(int argc, char *argv[]) {
         });
         srapi_cmd_shade_rect(cmd, 0, 0, width, height, shader);
         srapi_cmd_fill_rect(cmd, 40, 40, width / 2, height / 3, srapi_rgba(220, 80, 60, 255));
-        srapi_cmd_set_scissor(cmd, (int32_t)(width / 3), (int32_t)(height / 3), width / 2, height / 3);
-        srapi_cmd_fill_rect(cmd, 0, 0, width, height, srapi_rgba(55, 160, 230, 255));
-        srapi_cmd_set_scissor(cmd, 24, 24, width > 48 ? width - 48 : width, height > 48 ? height - 48 : height);
-        srapi_cmd_fill_rect(cmd, (int32_t)(width / 2), 24, width / 4, height > 80 ? height - 80 : height / 2, srapi_rgba(180, 230, 80, 255));
+        srapi_cmd_fill_rect(cmd, (int32_t)(width / 3), (int32_t)(height / 3), width / 2, height / 3, srapi_rgba(55, 160, 230, 255));
         srapi_cmd_fill_triangle(
             cmd,
             (int32_t)(width / 2), 24,

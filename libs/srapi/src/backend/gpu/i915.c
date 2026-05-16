@@ -1392,9 +1392,99 @@ srapi_result_t srapi_i915_render_framebuffer(
     srapi_framebuffer_t *target,
     const srapi_cmd_buffer_t *cmd
 ) {
+    int scissor_enabled = 0;
+    int32_t scissor_x = 0;
+    int32_t scissor_y = 0;
+    uint32_t scissor_width;
+    uint32_t scissor_height;
+
     if (!i915_device_ok(device) || target == NULL || cmd == NULL ||
         target->gpu_fd < 0 || target->gpu_handle == 0 || target->gpu_size == 0) {
         return SRAPI_ERROR_BAD_ARG;
+    }
+
+    if (!device->i915_tile_cache_enabled) {
+        scissor_width = target->width;
+        scissor_height = target->height;
+        for (size_t i = 0; i < cmd->count; i++) {
+            const srapi_command_t *op = &cmd->items[i];
+            srapi_result_t r;
+            uint32_t x;
+            uint32_t y;
+            uint32_t width;
+            uint32_t height;
+
+            switch (op->kind) {
+                case SRAPI_COMMAND_CLEAR:
+                    if (!clip_to_rect(0, 0, target->width, target->height,
+                                      scissor_enabled ? scissor_x : 0,
+                                      scissor_enabled ? scissor_y : 0,
+                                      scissor_width, scissor_height,
+                                      &x, &y, &width, &height)) {
+                        break;
+                    }
+                    r = srapi_i915_fill_framebuffer_rect(device, target, x, y, width, height, op->color);
+                    if (r != SRAPI_OK) return r;
+                    break;
+                case SRAPI_COMMAND_FILL_RECT:
+                    if (!clip_to_rect(op->x0, op->y0, op->width, op->height,
+                                      scissor_enabled ? scissor_x : 0,
+                                      scissor_enabled ? scissor_y : 0,
+                                      scissor_width, scissor_height,
+                                      &x, &y, &width, &height)) {
+                        break;
+                    }
+                    r = srapi_i915_fill_framebuffer_rect(device, target, x, y, width, height, op->color);
+                    if (r != SRAPI_OK) return r;
+                    break;
+                case SRAPI_COMMAND_SET_SCISSOR:
+                    scissor_enabled = 1;
+                    scissor_x = op->x0;
+                    scissor_y = op->y0;
+                    scissor_width = op->width;
+                    scissor_height = op->height;
+                    break;
+                case SRAPI_COMMAND_SET_VIEWPORT:
+                    break;
+                case SRAPI_COMMAND_SET_BLEND:
+                    if (op->blend_mode != SRAPI_BLEND_NONE) {
+                        srapi_set_error("i915 screen render: alpha blend is not implemented");
+                        return SRAPI_ERROR_UNSUPPORTED;
+                    }
+                    break;
+                case SRAPI_COMMAND_DRAW_LINE:
+                    r = srapi_i915_render3d_line_framebuffer(
+                        device, target, op,
+                        scissor_enabled, scissor_x, scissor_y,
+                        scissor_width, scissor_height
+                    );
+                    if (r != SRAPI_OK) return r;
+                    break;
+                case SRAPI_COMMAND_FILL_TRIANGLE:
+                    r = srapi_i915_render3d_triangle_framebuffer(
+                        device, target, op,
+                        scissor_enabled, scissor_x, scissor_y,
+                        scissor_width, scissor_height
+                    );
+                    if (r != SRAPI_OK) return r;
+                    break;
+                case SRAPI_COMMAND_SHADE_RECT:
+                    r = srapi_i915_render3d_shade_framebuffer(
+                        device, target, op,
+                        scissor_enabled, scissor_x, scissor_y,
+                        scissor_width, scissor_height
+                    );
+                    if (r != SRAPI_OK) return r;
+                    break;
+                default:
+                    srapi_set_error("i915 screen render: command kind %d is not implemented", op->kind);
+                    return SRAPI_ERROR_UNSUPPORTED;
+            }
+        }
+
+        srapi_debugf("i915 render framebuffer ok handle=%u commands=%zu %ux%u tile_cache=0",
+                     target->gpu_handle, cmd->count, target->width, target->height);
+        return SRAPI_OK;
     }
 
     {
@@ -1429,17 +1519,6 @@ srapi_result_t srapi_i915_render_framebuffer(
                     continue;
                 }
                 device->i915_tile_hashes[tile_index] = tile_hash;
-
-                if (srapi_i915_render3d_shade_framebuffer(device, target, &(srapi_command_t){
-                        .kind = SRAPI_COMMAND_CLEAR,
-                        .color = 0,
-                        .x0 = tile_x,
-                        .y0 = tile_y,
-                        .width = cur_w,
-                        .height = cur_h,
-                    }, 0, tile_x, tile_y, cur_w, cur_h) == SRAPI_ERROR_BAD_ARG) {
-                    ; /* no-op */
-                }
                 if (i915_render_tile(device, target, cmd, tile_x, tile_y, cur_w, cur_h) != SRAPI_OK) {
                     return SRAPI_ERROR;
                 }
