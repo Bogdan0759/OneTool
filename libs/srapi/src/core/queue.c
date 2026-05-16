@@ -9,8 +9,9 @@ static int copy_region_ok(
     const srapi_image_t *image,
     const srapi_buffer_image_copy_t *region
 ) {
-    uint64_t row_bytes;
-    uint64_t buffer_need;
+    size_t row_bytes;
+    size_t copy_bytes;
+    size_t buffer_need;
 
     if (buffer == NULL || image == NULL || region == NULL ||
         region->width == 0 || region->height == 0) {
@@ -24,9 +25,22 @@ static int copy_region_ok(
         return 0;
     }
 
-    row_bytes = (uint64_t)region->width * sizeof(uint32_t);
-    buffer_need = (uint64_t)region->buffer_offset + row_bytes * region->height;
-    if (row_bytes > SIZE_MAX || buffer_need > buffer->size) {
+    if ((size_t)region->width > SIZE_MAX / sizeof(uint32_t)) {
+        srapi_set_error("queue copy: row size overflow");
+        return 0;
+    }
+    row_bytes = (size_t)region->width * sizeof(uint32_t);
+    if (region->height > SIZE_MAX / row_bytes) {
+        srapi_set_error("queue copy: copy size overflow");
+        return 0;
+    }
+    copy_bytes = row_bytes * (size_t)region->height;
+    if (region->buffer_offset > SIZE_MAX - copy_bytes) {
+        srapi_set_error("queue copy: buffer offset overflow");
+        return 0;
+    }
+    buffer_need = region->buffer_offset + copy_bytes;
+    if (buffer_need > buffer->size) {
         srapi_set_error("queue copy: region outside buffer");
         return 0;
     }

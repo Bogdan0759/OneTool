@@ -67,6 +67,7 @@ static int low_level_smoke(void) {
     srapi_context_t *ctx = NULL;
     srapi_framebuffer_t *fb = NULL;
     srapi_cmd_buffer_t *cmd = NULL;
+    srapi_shader_t *vertex_shader = NULL;
     uint32_t value = 0x12345678u;
     uint32_t upload_pixels[16];
     srapi_vertex_t triangle_vertices[3] = {
@@ -260,9 +261,52 @@ static int low_level_smoke(void) {
         goto fail;
     }
 
+    const uint32_t vertex_shader_code[] = {
+        SRAPI_VM_LOAD_INPUT, 0, SRAPI_VM_INPUT_VERTEX_R,
+        SRAPI_VM_LOAD_INPUT, 1, SRAPI_VM_INPUT_VERTEX_G,
+        SRAPI_VM_LOAD_INPUT, 2, SRAPI_VM_INPUT_VERTEX_B,
+        SRAPI_VM_LOAD_INPUT, 3, SRAPI_VM_INPUT_VERTEX_A,
+        SRAPI_VM_OUT_COLOR, 0, 1, 2, 3,
+        SRAPI_VM_END,
+    };
+    r = srapi_create_shader(
+        vertex_shader_code,
+        sizeof(vertex_shader_code) / sizeof(vertex_shader_code[0]),
+        NULL,
+        0,
+        &vertex_shader
+    );
+    if (r != SRAPI_OK) goto fail;
+
+    srapi_vertex_t point = { 1.0f, 1.0f, srapi_rgba(128, 64, 32, 255) };
+    r = srapi_buffer_write(vertex_buffer, 0, &point, sizeof(point));
+    if (r != SRAPI_OK) goto fail;
+    srapi_cmd_reset(cmd);
+    r = srapi_cmd_clear(cmd, srapi_rgba(0, 0, 0, 255));
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_cmd_draw_vertices_shader(
+        cmd,
+        SRAPI_PRIMITIVE_POINTS,
+        vertex_buffer, 0, 1,
+        NULL, 0, 0,
+        vertex_shader
+    );
+    if (r != SRAPI_OK) goto fail;
+    r = srapi_queue_submit(queue, fb, cmd);
+    if (r != SRAPI_OK) goto fail;
+
+    pixels = srapi_framebuffer_pixels(fb);
+    if (pixels == NULL ||
+        pixels[1 + (srapi_framebuffer_pitch(fb) / sizeof(uint32_t))] != point.color) {
+        fprintf(stderr, "low-level vertex shader color failed\n");
+        r = SRAPI_ERROR;
+        goto fail;
+    }
+
     printf("low-level cpu smoke ok: buffer_size=%zu queue_device=%s\n",
            srapi_buffer_size(buffer), srapi_device_path(srapi_queue_device(queue)));
 
+    srapi_destroy_shader(vertex_shader);
     srapi_destroy_cmd_buffer(cmd);
     srapi_destroy_framebuffer(fb);
     srapi_destroy_context(ctx);
@@ -279,6 +323,7 @@ static int low_level_smoke(void) {
 
 fail:
     fprintf(stderr, "low-level smoke failed: %s\n", srapi_last_error());
+    srapi_destroy_shader(vertex_shader);
     srapi_destroy_cmd_buffer(cmd);
     srapi_destroy_framebuffer(fb);
     srapi_destroy_context(ctx);

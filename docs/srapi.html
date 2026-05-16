@@ -90,7 +90,7 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 <p>Buffer usage is specified as a bitfield combining one or more flags: SRAPI_BUFFER_TRANSFER_SRC (1&lt;&lt;0) indicates the buffer will be a source for copy operations, SRAPI_BUFFER_TRANSFER_DST (1&lt;&lt;1) indicates it will be a destination, SRAPI_BUFFER_VERTEX (1&lt;&lt;2) for vertex data, SRAPI_BUFFER_INDEX (1&lt;&lt;3) for index data, SRAPI_BUFFER_UNIFORM (1&lt;&lt;4) for uniform data, and SRAPI_BUFFER_STORAGE (1&lt;&lt;5) for storage buffers.</p>
 
 <h3>2.5 Image Tiling and Usage</h3>
-<p>Image tiling can be SRAPI_IMAGE_LINEAR (1) for CPU-accessible linear layout or SRAPI_IMAGE_OPTIMAL (2) for backend-optimal layout. Image usage flags include SRAPI_IMAGE_TRANSFER_SRC, SRAPI_IMAGE_TRANSFER_DST, SRAPI_IMAGE_SAMPLED, SRAPI_IMAGE_COLOR_TARGET, and SRAPI_IMAGE_PRESENT.</p>
+<p>Image tiling can be SRAPI_IMAGE_LINEAR (1) for host-mappable linear layout or SRAPI_IMAGE_OPTIMAL (2) for backend-optimal layout. OPTIMAL images are not exposed through <code>srapi_image_map()</code> or image-view mapping; use queue transfer operations for uploads/readbacks. Image usage flags include SRAPI_IMAGE_TRANSFER_SRC, SRAPI_IMAGE_TRANSFER_DST, SRAPI_IMAGE_SAMPLED, SRAPI_IMAGE_COLOR_TARGET, and SRAPI_IMAGE_PRESENT.</p>
 
 <h3>2.6 Command Kinds (<code>srapi_command_kind_t</code>)</h3>
 <p>Command buffers support five primitive operations: SRAPI_COMMAND_CLEAR (1) fills the entire framebuffer with a solid color, SRAPI_COMMAND_FILL_RECT (2) fills a rectangle with a color, SRAPI_COMMAND_DRAW_LINE (3) draws a line using Bresenham's algorithm, SRAPI_COMMAND_FILL_TRIANGLE (4) fills a triangle using edge functions, and SRAPI_COMMAND_SHADE_RECT (5) fills a rectangle with a shader.</p>
@@ -202,7 +202,7 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 <p><code>image_size()</code> is a static helper that calculates pitch and total size for an image. Pitch is width * 4 bytes. Total size is pitch * height. Returns 0 on overflow or zero dimensions, 1 on success.</p>
 
 <h3>6.2 Image Creation</h3>
-<p><code>srapi_create_image()</code> creates an image. For GPU backend, delegates to <code>srapi_gpu_create_image()</code>. For CPU backend, validates dimensions and tiling, allocates memory, copies initial pixels if provided. OPTIMAL tiling is not CPU-mappable.</p>
+<p><code>srapi_create_image()</code> creates an image. For GPU backend, delegates to <code>srapi_gpu_create_image()</code>. For CPU backend, validates dimensions and tiling, allocates memory, copies initial pixels if provided. OPTIMAL tiling is internal-transfer capable but not host-mappable.</p>
 
 <h3>6.3 Image Destruction</h3>
 <p><code>srapi_destroy_image()</code> mirrors buffer destruction. For GPU images, calls munmap and destroys the DRM dumb buffer. For CPU images, frees the pixel data.</p>
@@ -211,7 +211,7 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 <p><code>srapi_image_width()</code>, <code>srapi_image_height()</code>, <code>srapi_image_pitch()</code>, <code>srapi_image_tiling()</code>, <code>srapi_image_usage()</code>, <code>srapi_image_backend()</code> all return the respective field or 0/NULL if the image is NULL.</p>
 
 <h3>6.5 Image Mapping</h3>
-<p><code>srapi_image_map()</code> returns mapped pointer and pitch. Only LINEAR tiling is CPU-mappable. Returns SRAPI_ERROR_UNSUPPORTED for OPTIMAL tiling or if data is NULL. Increments mapped count.</p>
+<p><code>srapi_image_map()</code> returns mapped pointer and pitch. Only LINEAR tiling is host-mappable. Returns SRAPI_ERROR_UNSUPPORTED for OPTIMAL tiling or if data is NULL. Increments mapped count.</p>
 
 <h3>6.6 Image Views</h3>
 <p><code>srapi_create_image_view()</code> creates a rectangular view into an existing image. Width or height may be zero to mean the remaining image extent from x/y. <code>srapi_image_view_map()</code> maps LINEAR views and returns a pointer to the first pixel in the view plus the parent image pitch. CPU images and DRM-backed GPU images are supported when the underlying image has mapped storage. Views do not own their image; destroy views before destroying the image they reference.</p>
@@ -316,7 +316,7 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 <p><code>srapi_gpu_create_buffer()</code> creates a 1D dumb buffer large enough for the requested size. Uses DRM_IOCTL_MODE_CREATE_DUMB, DRM_IOCTL_MODE_MAP_DUMB, and mmap for CPU access.</p>
 
 <h3>12.3 GPU Image Creation</h3>
-<p><code>srapi_gpu_create_image()</code> creates a 2D DRM dumb buffer for LINEAR and OPTIMAL images. OPTIMAL keeps the public tiling flag but is still backed by mapped DRM memory in this backend. Uses row-by-row copy for initial pixels. Image views can reference these DRM-backed images; LINEAR views can be mapped to CPU-visible memory.</p>
+<p><code>srapi_gpu_create_image()</code> creates a 2D DRM dumb buffer for LINEAR and OPTIMAL images. OPTIMAL keeps the public tiling flag and is available to internal queue transfer code, but it is not host-mappable through the public map APIs. Uses row-by-row copy for initial pixels. Image views can reference these DRM-backed images; only LINEAR views can be mapped to host-visible memory.</p>
 
 <hr>
 

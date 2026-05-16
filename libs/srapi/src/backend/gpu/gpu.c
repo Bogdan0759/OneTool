@@ -257,7 +257,8 @@ srapi_result_t srapi_gpu_create_image(
     }
 
     *out = image;
-    srapi_debugf("gpu image create linear path=%s handle=%u %ux%u pitch=%u alloc=%llu usage=0x%x",
+    srapi_debugf("gpu image create tiling=%s path=%s handle=%u %ux%u pitch=%u alloc=%llu usage=0x%x",
+                 image->tiling == SRAPI_IMAGE_LINEAR ? "linear" : "optimal",
                  device->path, image->gpu_handle, image->width, image->height,
                  image->pitch, (unsigned long long)image->gpu_size, image->usage);
     return SRAPI_OK;
