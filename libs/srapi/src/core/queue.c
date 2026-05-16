@@ -14,35 +14,52 @@ static int copy_region_ok(
 
     if (buffer == NULL || image == NULL || region == NULL ||
         region->width == 0 || region->height == 0) {
+        srapi_set_error("queue copy: bad region args");
         return 0;
     }
     if (region->image_x > image->width || region->image_y > image->height ||
         region->width > image->width - region->image_x ||
         region->height > image->height - region->image_y) {
+        srapi_set_error("queue copy: region outside image");
         return 0;
     }
 
     row_bytes = (uint64_t)region->width * sizeof(uint32_t);
     buffer_need = (uint64_t)region->buffer_offset + row_bytes * region->height;
-    return row_bytes <= SIZE_MAX && buffer_need <= buffer->size;
+    if (row_bytes > SIZE_MAX || buffer_need > buffer->size) {
+        srapi_set_error("queue copy: region outside buffer");
+        return 0;
+    }
+    return 1;
 }
 
 static srapi_result_t check_copy_args(
     srapi_queue_t *queue,
     srapi_buffer_t *buffer,
     srapi_image_t *image,
-    const srapi_buffer_image_copy_t *region
+    const srapi_buffer_image_copy_t *region,
+    uint32_t buffer_usage,
+    uint32_t image_usage
 ) {
     if (queue == NULL || buffer == NULL || image == NULL || region == NULL) {
+        srapi_set_error("queue copy: bad args");
         return SRAPI_ERROR_BAD_ARG;
     }
     if (buffer->device != queue->device || image->device != queue->device) {
         srapi_set_error("queue copy: resources belong to a different device");
         return SRAPI_ERROR_BAD_ARG;
     }
-    if (image->tiling != SRAPI_IMAGE_LINEAR) {
-        srapi_set_error("queue copy: optimal image copy path is not implemented yet");
+    if (image->data == NULL) {
+        srapi_set_error("queue copy: image has no mapped storage");
         return SRAPI_ERROR_UNSUPPORTED;
+    }
+    if ((buffer->usage & buffer_usage) == 0) {
+        srapi_set_error("queue copy: buffer missing usage 0x%x", buffer_usage);
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if ((image->usage & image_usage) == 0) {
+        srapi_set_error("queue copy: image missing usage 0x%x", image_usage);
+        return SRAPI_ERROR_BAD_ARG;
     }
     if (!copy_region_ok(buffer, image, region)) {
         return SRAPI_ERROR_BAD_ARG;
@@ -102,13 +119,19 @@ srapi_result_t srapi_queue_submit(
     if (queue == NULL || target == NULL || cmd == NULL) {
         return SRAPI_ERROR_BAD_ARG;
     }
-    if (queue->backend != SRAPI_BACKEND_CPU) {
+    if (queue->backend != SRAPI_BACKEND_CPU && queue->backend != SRAPI_BACKEND_GPU) {
         srapi_set_error("queue: submit unsupported for backend=%s", srapi_backend_name(queue->backend));
         return SRAPI_ERROR_UNSUPPORTED;
     }
 
-    srapi_debugf("queue submit backend=cpu family=%u commands=%zu",
-                 queue->family_index, cmd->count);
+    srapi_debugf("queue submit backend=%s family=%u commands=%zu",
+                 srapi_backend_name(queue->backend), queue->family_index, cmd->count);
+    if (target->backend != queue->backend) {
+        srapi_set_error("queue: target backend=%s does not match queue backend=%s",
+                        srapi_backend_name(target->backend), srapi_backend_name(queue->backend));
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
     return srapi_submit(NULL, target, cmd);
 }
 
@@ -118,13 +141,18 @@ srapi_result_t srapi_queue_copy_buffer_to_image(
     srapi_image_t *dst,
     const srapi_buffer_image_copy_t *region
 ) {
-    srapi_result_t r = check_copy_args(queue, src, dst, region);
+    srapi_result_t r = check_copy_args(
+        queue, src, dst, region,
+        SRAPI_BUFFER_TRANSFER_SRC,
+        SRAPI_IMAGE_TRANSFER_DST
+    );
     uint64_t row_bytes;
 
     if (r != SRAPI_OK) {
         return r;
     }
     if (src->data == NULL || dst->data == NULL) {
+        srapi_set_error("queue copy: source or destination has no mapped storage");
         return SRAPI_ERROR_BAD_ARG;
     }
 
@@ -147,13 +175,18 @@ srapi_result_t srapi_queue_copy_image_to_buffer(
     srapi_buffer_t *dst,
     const srapi_buffer_image_copy_t *region
 ) {
-    srapi_result_t r = check_copy_args(queue, dst, src, region);
+    srapi_result_t r = check_copy_args(
+        queue, dst, src, region,
+        SRAPI_BUFFER_TRANSFER_DST,
+        SRAPI_IMAGE_TRANSFER_SRC
+    );
     uint64_t row_bytes;
 
     if (r != SRAPI_OK) {
         return r;
     }
     if (src->data == NULL || dst->data == NULL) {
+        srapi_set_error("queue copy: source or destination has no mapped storage");
         return SRAPI_ERROR_BAD_ARG;
     }
 

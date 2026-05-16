@@ -27,13 +27,17 @@ srapi_result_t srapi_create_image(
     uint32_t pitch;
     size_t size;
 
+    if (out != NULL) {
+        *out = NULL;
+    }
     if (device == NULL || desc == NULL || out == NULL ||
         desc->width == 0 || desc->height == 0) {
+        srapi_set_error("image: bad create args");
         return SRAPI_ERROR_BAD_ARG;
     }
-    *out = NULL;
 
     if (desc->tiling != SRAPI_IMAGE_LINEAR && desc->tiling != SRAPI_IMAGE_OPTIMAL) {
+        srapi_set_error("image: bad tiling=%u", desc->tiling);
         return SRAPI_ERROR_BAD_ARG;
     }
 
@@ -41,9 +45,11 @@ srapi_result_t srapi_create_image(
         return srapi_gpu_create_image(device, desc, out);
     }
     if (device->backend != SRAPI_BACKEND_CPU) {
+        srapi_set_error("image: unsupported backend=%s", srapi_backend_name(device->backend));
         return SRAPI_ERROR_BAD_ARG;
     }
     if (!image_size(desc->width, desc->height, &pitch, &size)) {
+        srapi_set_error("image: size overflow %ux%u", desc->width, desc->height);
         return SRAPI_ERROR_OVERFLOW;
     }
 
@@ -128,6 +134,7 @@ srapi_backend_t srapi_image_backend(const srapi_image_t *image) {
 
 srapi_result_t srapi_image_map(srapi_image_t *image, void **out, uint32_t *pitch) {
     if (image == NULL || out == NULL) {
+        srapi_set_error("image: bad map args");
         return SRAPI_ERROR_BAD_ARG;
     }
     if (image->tiling != SRAPI_IMAGE_LINEAR) {

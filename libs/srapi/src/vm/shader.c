@@ -21,6 +21,7 @@ static const char *vm_op_name(uint8_t op) {
         case SRAPI_VM_FRACT: return "FRACT";
         case SRAPI_VM_CLAMP01: return "CLAMP01";
         case SRAPI_VM_MIX: return "MIX";
+        case SRAPI_VM_OUT_POSITION: return "OUT_POSITION";
         default: return "?";
     }
 }
@@ -136,6 +137,14 @@ static srapi_result_t vm_decode_bytecode(
                 }
                 count++;
                 break;
+            case SRAPI_VM_OUT_POSITION:
+                if (vm_read_arg(bytecode, word_count, &pc, &inst->a) != SRAPI_OK ||
+                    vm_read_arg(bytecode, word_count, &pc, &inst->b) != SRAPI_OK) {
+                    free(insts);
+                    return SRAPI_ERROR_BAD_ARG;
+                }
+                count++;
+                break;
             default:
                 srapi_set_error("shader: unknown opcode %u at word %zu", op, pc - 1);
                 free(insts);
@@ -175,6 +184,10 @@ static void vm_disasm_shader(const srapi_shader_t *shader) {
             case SRAPI_VM_OUT_COLOR:
                 srapi_debugf("shader inst[%zu] %s rgba=%u,%u,%u,%u",
                              i, vm_op_name(inst->op), inst->a, inst->b, inst->c, inst->d);
+                break;
+            case SRAPI_VM_OUT_POSITION:
+                srapi_debugf("shader inst[%zu] %s xy=%u,%u",
+                             i, vm_op_name(inst->op), inst->a, inst->b);
                 break;
             default:
                 srapi_debugf("shader inst[%zu] %s dst=%u a=%u b=%u",

@@ -21,7 +21,7 @@ th{background:#1a1a2e;color:#fff}
 
 <h1>OneTool — SR API (Simple Rendering API) Documentation</h1>
 
-<p>The SR API (Simple Rendering API) is OneTool's most sophisticated and complex library, representing the culmination of the graphics subsystem development. It provides a unified abstraction layer for 2D/3D graphics rendering that spans multiple backends including CPU software rendering, GPU acceleration via Vulkan/OpenGL interoperability, and direct DRM/KMS display control. This documentation provides comprehensive coverage of every aspect of the SR API, from low-level implementation details to high-level usage patterns.</p>
+<p>The SR API (Simple Rendering API) is OneTool's rendering library. It provides a small abstraction layer for 2D graphics rendering across CPU software rendering, DRM/KMS-backed GPU buffers, direct DRM display control, and a secondary fbdev output path for systems without DRM. This documentation covers the public API, internal structures, backends, and demo tool usage.</p>
 
 <hr>
 
@@ -39,6 +39,7 @@ th{background:#1a1a2e;color:#fff}
 <li><a href="#shaders">Shader and Virtual Machine System</a></li>
 <li><a href="#drm">DRM/KMS Display Integration</a></li>
 <li><a href="#gpu-backend">GPU Backend Implementation</a></li>
+<li><a href="#fbdev-backend">fbdev Display Backend</a></li>
 <li><a href="#cpu-renderer">CPU Software Renderer</a></li>
 <li><a href="#debug-system">Debug and Error Handling</a></li>
 <li><a href="#ppm-io">PPM Image Output</a></li>
@@ -54,25 +55,27 @@ th{background:#1a1a2e;color:#fff}
 <p>The SR API was designed with several core principles that guide its architecture and implementation. First, explicit control is paramount - there are no hidden states or implicit synchronizations. Every operation must be explicitly defined by the user, making the system predictable and debuggable. Second, backend agnosticism ensures the same API works across CPU, GPU, and display backends with appropriate fallback behavior. Third, minimal abstraction overhead means thin wrappers around native APIs with zero-cost abstractions where possible. Fourth, explicit resource management follows manual creation/destruction semantics with clear ownership. Fifth, the command buffer pattern enables recording and replaying commands for efficiency.</p>
 
 <h3>1.2 Architecture Layers</h3>
-<p>The SR API consists of several architectural layers that work together. At the top is the public API header (<code>srapi.h</code>) which defines all public interfaces. Below that, the internal header (<code>internal.h</code>) exposes private structures and functions. The core layer implements context, buffer, image, and framebuffer management. The backend layer provides CPU and GPU implementations. The DRM layer handles direct display output. The VM layer executes shader bytecode. Each layer is carefully separated with well-defined interfaces.</p>
+<p>The SR API consists of several architectural layers that work together. At the top is the public API header (<code>srapi.h</code>) which defines all public interfaces. Below that, the internal header (<code>internal.h</code>) exposes private structures and functions. The core layer implements context, buffer, image, and framebuffer management. The backend layer provides CPU, GPU, DRM, and fbdev implementations. The VM layer executes shader bytecode.</p>
 
 <h3>1.3 Backend Support Matrix</h3>
-<p>The SR API supports three backend types. SRAPI_BACKEND_AUTO (0) automatically selects the best available backend. SRAPI_BACKEND_CPU (1) provides software rendering using optimized CPU routines. SRAPI_BACKEND_GPU (2) provides hardware acceleration via DRM/KMS when available. The CPU backend is always available, while the GPU backend requires a compatible DRM device node at <code>/dev/dri/card0</code> through <code>/dev/dri/card7</code> or render nodes at <code>/dev/dri/renderD128</code> through <code>/dev/dri/renderD135</code>.</p>
+<p>The SR API supports four backend types. SRAPI_BACKEND_AUTO (0) currently selects CPU. SRAPI_BACKEND_CPU (1) provides software rendering using CPU memory. SRAPI_BACKEND_GPU (2) uses DRM dumb buffers when available. SRAPI_BACKEND_FBDEV (3) is a second-priority display backend that renders into a mapped Linux framebuffer such as <code>/dev/fb0</code>. Command execution currently uses the SRAPI rasterizer on mapped backend memory. The CPU backend is always available, GPU requires DRM nodes, and fbdev requires a usable 32bpp framebuffer device.</p>
 
 <hr>
 
 <h2 id="api-header">2. Public API Header Reference (<code>srapi.h</code>)</h2>
 
 <h3>2.1 Opaque Types and Color</h3>
-<p>The header defines nine opaque pointer types representing core SR API objects. These are declared as forward struct declarations allowing users to work with pointers without needing to know the internal layout:</p>
+<p>The header defines opaque pointer types representing core SR API objects. These are declared as forward struct declarations allowing users to work with pointers without needing to know the internal layout:</p>
 <pre>typedef struct srapi_context srapi_context_t;
 typedef struct srapi_device srapi_device_t;
 typedef struct srapi_buffer srapi_buffer_t;
 typedef struct srapi_image srapi_image_t;
+typedef struct srapi_image_view srapi_image_view_t;
 typedef struct srapi_queue srapi_queue_t;
 typedef struct srapi_framebuffer srapi_framebuffer_t;
 typedef struct srapi_cmd_buffer srapi_cmd_buffer_t;
 typedef struct srapi_drm_display srapi_drm_display_t;
+typedef struct srapi_fbdev_display srapi_fbdev_display_t;
 typedef struct srapi_shader srapi_shader_t;</pre>
 
 <p><code>srapi_color_t</code> is a 32-bit unsigned integer representing ARGB color format with alpha in the most significant byte, red in bits 23-16, green in bits 15-8, and blue in bits 7-0. The macro <code>srapi_rgba(r, g, b, a)</code> constructs a color from four 8-bit components.</p>
@@ -81,7 +84,7 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 <p>All SR API functions return an <code>srapi_result_t</code> enum value indicating success or failure. The values are: SRAPI_OK (0) for success, SRAPI_ERROR (-1) for generic failure, SRAPI_ERROR_OOM (-2) for out-of-memory conditions, SRAPI_ERROR_BAD_ARG (-3) for invalid arguments, SRAPI_ERROR_OVERFLOW (-4) for arithmetic overflow, and SRAPI_ERROR_UNSUPPORTED (-5) for unsupported features.</p>
 
 <h3>2.3 Backend Enumeration (<code>srapi_backend_t</code>)</h3>
-<p>The backend enumeration defines three values: SRAPI_BACKEND_AUTO (0) for automatic selection, SRAPI_BACKEND_CPU (1) for software rendering, and SRAPI_BACKEND_GPU (2) for hardware acceleration.</p>
+<p>The backend enumeration defines SRAPI_BACKEND_AUTO (0) for automatic selection, SRAPI_BACKEND_CPU (1) for CPU memory rendering, SRAPI_BACKEND_GPU (2) for DRM/KMS-backed resources and display output, and SRAPI_BACKEND_FBDEV (3) for direct Linux framebuffer output.</p>
 
 <h3>2.4 Buffer Usage Flags (<code>srapi_buffer_usage_t</code>)</h3>
 <p>Buffer usage is specified as a bitfield combining one or more flags: SRAPI_BUFFER_TRANSFER_SRC (1&lt;&lt;0) indicates the buffer will be a source for copy operations, SRAPI_BUFFER_TRANSFER_DST (1&lt;&lt;1) indicates it will be a destination, SRAPI_BUFFER_VERTEX (1&lt;&lt;2) for vertex data, SRAPI_BUFFER_INDEX (1&lt;&lt;3) for index data, SRAPI_BUFFER_UNIFORM (1&lt;&lt;4) for uniform data, and SRAPI_BUFFER_STORAGE (1&lt;&lt;5) for storage buffers.</p>
@@ -106,7 +109,7 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 <p>The <code>srapi_context</code> structure contains three fields: width (framebuffer width), height (framebuffer height), and backend (selected backend type). The context is the root object that manages the rendering environment.</p>
 
 <h3>3.2 Device Structure</h3>
-<p>The <code>srapi_device</code> structure contains backend (backend type), path (device path string), and fd (open file descriptor for DRM operations). For CPU backend, fd is always -1.</p>
+<p>The <code>srapi_device</code> structure contains backend (backend type), path (device path string), and fd (open file descriptor for DRM operations). For CPU backend, fd is always -1. fbdev output uses its own display object, not <code>srapi_device_t</code>.</p>
 
 <h3>3.3 Buffer Structure</h3>
 <p>The <code>srapi_buffer</code> structure is comprehensive: device pointer, backend type, size in bytes, usage flags, data pointer (mapped memory), mapped count (for reference counting), gpu_handle (DRM handle for GPU buffers), and gpu_size (allocated size for GPU buffers).</p>
@@ -114,25 +117,31 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 <h3>3.4 Image Structure</h3>
 <p>The <code>srapi_image</code> structure contains device pointer, backend type, width, height, pitch (row stride in bytes), tiling mode, usage flags, data pointer, mapped count, gpu_handle, and gpu_size. The pitch may differ from width * 4 for alignment purposes.</p>
 
-<h3>3.5 Queue Structure</h3>
+<h3>3.5 Image View Structure</h3>
+<p>The <code>srapi_image_view</code> structure references an existing image and stores a rectangular subresource region: x, y, width, height, backend, and map count. The view does not own the image.</p>
+
+<h3>3.6 Queue Structure</h3>
 <p>The <code>srapi_queue</code> structure contains device pointer, backend type, and family_index identifying the queue family.</p>
 
-<h3>3.6 Framebuffer Structure</h3>
+<h3>3.7 Framebuffer Structure</h3>
 <p>The <code>srapi_framebuffer</code> structure contains width, height, pitch, pixels pointer, owns_pixels flag (whether to free pixels on destruction), and backend type.</p>
 
-<h3>3.7 Command Buffer Structure</h3>
+<h3>3.8 Command Buffer Structure</h3>
 <p>The <code>srapi_cmd_buffer</code> structure contains items pointer (array of commands), count (current command count), and capacity (allocated capacity). Commands are stored contiguously.</p>
 
-<h3>3.8 DRM Buffer Structure</h3>
+<h3>3.9 DRM Buffer Structure</h3>
 <p>The internal <code>srapi_drm_buffer</code> structure contains fb_id (DRM framebuffer ID), handle (DRM dumb buffer handle), size, map pointer (mapped memory), and embedded framebuffer.</p>
 
-<h3>3.9 DRM Display Structure</h3>
+<h3>3.10 DRM Display Structure</h3>
 <p>The <code>srapi_drm_display</code> structure contains fd (device file descriptor), connector_id, crtc_id, mode (current display mode), old_crtc (saved CRTC state for restoration), has_old_crtc flag, front (front buffer index), and two buffers for double buffering.</p>
 
-<h3>3.10 VM Instruction Structure</h3>
+<h3>3.11 fbdev Display Structure</h3>
+<p>The <code>srapi_fbdev_display</code> structure stores the framebuffer fd, mmap size, mapped pointer, device path, and an embedded <code>srapi_framebuffer_t</code> that points directly at the mapped framebuffer memory.</p>
+
+<h3>3.12 VM Instruction Structure</h3>
 <p>The <code>srapi_vm_inst_t</code> structure contains op (opcode), dst (destination register), a, b, c, d (source operands), and imm (immediate value). Not all fields are used by every opcode.</p>
 
-<h3>3.11 Shader Structure</h3>
+<h3>3.13 Shader Structure</h3>
 <p>The <code>srapi_shader</code> structure contains bytecode pointer, word_count, insts (decoded instructions), inst_count, uniforms array, uniform_count, and run_count for debugging.</p>
 
 <hr>
@@ -143,7 +152,7 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 <p><code>srapi_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a)</code> constructs a 32-bit ARGB color value. The alpha component is placed in bits 24-31, red in bits 16-23, green in bits 8-15, and blue in bits 0-7. This function is inline and has zero overhead.</p>
 
 <h3>4.2 Backend Name Lookup</h3>
-<p><code>srapi_backend_name(srapi_backend_t backend)</code> returns a human-readable string for a backend type: "auto" for AUTO, "cpu" for CPU, "gpu" for GPU, or "unknown" for invalid values.</p>
+<p><code>srapi_backend_name(srapi_backend_t backend)</code> returns a human-readable string for a backend type: "auto" for AUTO, "cpu" for CPU, "gpu" for GPU, "fbdev" for fbdev, or "unknown" for invalid values.</p>
 
 <h3>4.3 Context Creation</h3>
 <p><code>srapi_create_context(const srapi_context_desc_t *desc, srapi_context_t **out)</code> creates a new context. The desc parameter must not be NULL, and out must not be NULL. Width and height must be non-zero. If backend is AUTO, CPU is selected. The function allocates the context with calloc and initializes all fields. Returns SRAPI_ERROR_BAD_ARG if parameters are invalid, SRAPI_ERROR_OOM on allocation failure, or SRAPI_OK on success.</p>
@@ -155,16 +164,16 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 <p><code>srapi_context_backend(const srapi_context_t *ctx)</code> returns the backend type for a context, or SRAPI_BACKEND_AUTO if ctx is NULL.</p>
 
 <h3>4.6 Device Probing</h3>
-<p><code>srapi_probe_device(srapi_backend_t backend, srapi_device_info_t *out)</code> probes for available devices. For AUTO or CPU backend, it always reports available with path "cpu". For GPU backend, it calls <code>srapi_gpu_probe()</code> which checks for DRM card nodes and render nodes. The info structure receives backend type, availability flag, path string, and status message.</p>
+<p><code>srapi_probe_device(srapi_backend_t backend, srapi_device_info_t *out)</code> probes for available devices. For AUTO or CPU backend, it always reports available with path "cpu". For GPU backend, it calls <code>srapi_gpu_probe()</code> which checks for DRM card nodes and render nodes. For fbdev it checks <code>/dev/fb0</code> and validates 32bpp screen info. The info structure receives backend type, availability flag, path string, and status message.</p>
 
 <h3>4.7 Device Creation</h3>
-<p><code>srapi_create_device(const srapi_device_desc_t *desc, srapi_device_t **out)</code> creates a device object. For GPU backend, it delegates to <code>srapi_gpu_open_device()</code>. For CPU backend, it probes the device and allocates the structure. The device_path from desc is used if provided, otherwise the probed path is used.</p>
+<p><code>srapi_create_device(const srapi_device_desc_t *desc, srapi_device_t **out)</code> creates a device object. For GPU backend, it delegates to <code>srapi_gpu_open_device()</code>. For CPU backend, it probes the device and allocates the structure. fbdev does not create regular SRAPI devices; use <code>srapi_fbdev_open_display()</code> for display output.</p>
 
 <h3>4.8 Device Destruction</h3>
 <p><code>srapi_destroy_device(srapi_device_t *device)</code> destroys a device. For GPU devices, it calls <code>srapi_gpu_close_device()</code>. For all devices, it frees the allocated memory. Safe to call with NULL.</p>
 
 <h3>4.9 Submit Operation</h3>
-<p><code>srapi_submit(srapi_context_t *ctx, srapi_framebuffer_t *target, const srapi_cmd_buffer_t *cmd)</code> submits a command buffer for execution. It validates all parameters, logs the submission details, and iterates through commands, dispatching to the appropriate render functions. For GPU backend with GPU framebuffer, it logs that the GPU/DRI path will write the mapped backbuffer.</p>
+<p><code>srapi_submit(srapi_context_t *ctx, srapi_framebuffer_t *target, const srapi_cmd_buffer_t *cmd)</code> submits a command buffer for execution. It validates all parameters, logs the submission details, and iterates through commands, dispatching to the render functions. GPU/DRM and fbdev display paths render into mapped target memory.</p>
 
 <hr>
 
@@ -203,6 +212,9 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 
 <h3>6.5 Image Mapping</h3>
 <p><code>srapi_image_map()</code> returns mapped pointer and pitch. Only LINEAR tiling is CPU-mappable. Returns SRAPI_ERROR_UNSUPPORTED for OPTIMAL tiling or if data is NULL. Increments mapped count.</p>
+
+<h3>6.6 Image Views</h3>
+<p><code>srapi_create_image_view()</code> creates a rectangular view into an existing image. Width or height may be zero to mean the remaining image extent from x/y. <code>srapi_image_view_map()</code> maps LINEAR views and returns a pointer to the first pixel in the view plus the parent image pitch. CPU images and DRM-backed GPU images are supported when the underlying image has mapped storage. Views do not own their image; destroy views before destroying the image they reference.</p>
 
 <hr>
 
@@ -250,10 +262,10 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 <p><code>srapi_queue_device()</code> returns the device pointer or NULL.</p>
 
 <h3>9.4 Queue Submission</h3>
-<p><code>srapi_queue_submit()</code> validates parameters and dispatches. For CPU backend, calls <code>srapi_submit()</code>. For GPU backend, returns SRAPI_ERROR_UNSUPPORTED.</p>
+<p><code>srapi_queue_submit()</code> validates parameters and dispatches to <code>srapi_submit()</code> for CPU and GPU queues. The target framebuffer backend must match the queue backend.</p>
 
 <h3>9.5 Copy Operations</h3>
-<p><code>srapi_queue_copy_buffer_to_image()</code> and <code>srapi_queue_copy_image_to_buffer()</code> perform row-by-row copies between buffer and image. Validate that device matches, image is LINEAR tiling. Returns SRAPI_ERROR_UNSUPPORTED for optimal images.</p>
+<p><code>srapi_queue_copy_buffer_to_image()</code> and <code>srapi_queue_copy_image_to_buffer()</code> perform row-by-row copies between buffer and image. They validate that resources belong to the queue device and use the image pitch for backend memory layout.</p>
 
 <hr>
 
@@ -304,67 +316,81 @@ typedef struct srapi_shader srapi_shader_t;</pre>
 <p><code>srapi_gpu_create_buffer()</code> creates a 1D dumb buffer large enough for the requested size. Uses DRM_IOCTL_MODE_CREATE_DUMB, DRM_IOCTL_MODE_MAP_DUMB, and mmap for CPU access.</p>
 
 <h3>12.3 GPU Image Creation</h3>
-<p><code>srapi_gpu_create_image()</code> creates a 2D dumb buffer. OPTIMAL tiling returns SRAPI_ERROR_UNSUPPORTED. Uses row-by-row copy for initial pixels.</p>
+<p><code>srapi_gpu_create_image()</code> creates a 2D DRM dumb buffer for LINEAR and OPTIMAL images. OPTIMAL keeps the public tiling flag but is still backed by mapped DRM memory in this backend. Uses row-by-row copy for initial pixels. Image views can reference these DRM-backed images; LINEAR views can be mapped to CPU-visible memory.</p>
 
 <hr>
 
-<h2 id="cpu-renderer">13. CPU Software Renderer</h2>
+<h2 id="fbdev-backend">13. fbdev Display Backend</h2>
 
-<h3>13.1 Pixel Writing</h3>
+<h3>13.1 fbdev Probing</h3>
+<p><code>srapi_fbdev_probe()</code> checks <code>/dev/fb0</code>, reads fixed and variable framebuffer info, and reports availability only for 32bpp framebuffers. This backend is intended as a second-priority fallback for systems where DRM is not available.</p>
+
+<h3>13.2 fbdev Open and Framebuffer</h3>
+<p><code>srapi_fbdev_open()</code> and <code>srapi_fbdev_open_display()</code> open a Linux framebuffer device, mmap its memory, and expose it as an embedded <code>srapi_framebuffer_t</code>. <code>srapi_fbdev_framebuffer()</code> returns that framebuffer so normal SRAPI commands can render directly into it.</p>
+
+<h3>13.3 fbdev Present and Close</h3>
+<p><code>srapi_fbdev_present()</code> currently calls <code>msync()</code> on the mapped framebuffer. <code>srapi_fbdev_close()</code> unmaps memory, closes the fd, and frees the display object. Mode setting, double buffering, non-32bpp conversion, and resource objects are not implemented for fbdev.</p>
+
+<hr>
+
+<h2 id="cpu-renderer">14. CPU Software Renderer</h2>
+
+<h3>14.1 Pixel Writing</h3>
 <p><code>put_pixel()</code> writes a color to the framebuffer with bounds checking.</p>
 
-<h3>13.2 Clear Operation</h3>
+<h3>14.2 Clear Operation</h3>
 <p><code>srapi_render_clear()</code> fills every pixel with the clear color.</p>
 
-<h3>13.3 Rectangle Fill</h3>
+<h3>14.3 Rectangle Fill</h3>
 <p><code>srapi_render_fill_rect()</code> clips and fills a rectangle using a nested loop.</p>
 
-<h3>13.4 Line Drawing</h3>
+<h3>14.4 Line Drawing</h3>
 <p><code>srapi_render_draw_line()</code> uses Bresenham's algorithm for integer line drawing.</p>
 
-<h3>13.5 Triangle Fill</h3>
+<h3>14.5 Triangle Fill</h3>
 <p><code>srapi_render_fill_triangle()</code> computes bounding box, uses edge functions for point-in-triangle testing.</p>
 
-<h3>13.6 Shaded Rectangle</h3>
+<h3>14.6 Shaded Rectangle</h3>
 <p><code>srapi_render_shade_rect()</code> executes the shader for each pixel, passing UV coordinates and dimensions as inputs.</p>
 
 <hr>
 
-<h2 id="debug-system">14. Debug and Error Handling</h2>
+<h2 id="debug-system">15. Debug and Error Handling</h2>
 
-<h3>14.1 Global Debug Flag</h3>
+<h3>15.1 Global Debug Flag</h3>
 <p><code>int srapi = 0</code> is a global flag. When non-zero, debug messages are printed to stderr with "[srapi]" prefix.</p>
 
-<h3>14.2 Error Storage</h3>
+<h3>15.2 Error Storage</h3>
 <p><code>static char srapi_error[256] = "ok"</code> stores the last error message. Initialized to "ok".</p>
 
-<h3>14.3 Error Functions</h3>
+<h3>15.3 Error Functions</h3>
 <p><code>srapi_last_error()</code> returns the current error string. <code>srapi_set_error()</code> formats and stores an error message using vsnprintf.</p>
 
-<h3>14.4 Debug Output</h3>
+<h3>15.4 Debug Output</h3>
 <p><code>srapi_debugf()</code> prints formatted debug messages when srapi flag is set.</p>
 
 <hr>
 
-<h2 id="ppm-io">15. PPM Image Output</h2>
+<h2 id="ppm-io">16. PPM Image Output</h2>
 
-<h3>15.1 Save Function</h3>
+<h3>16.1 Save Function</h3>
 <p><code>srapi_save_ppm()</code> writes a framebuffer to a PPM file. Uses P6 (binary) format. Converts ARGB to RGB by dropping alpha. Returns SRAPI_ERROR_BAD_ARG for invalid parameters, SRAPI_ERROR on file open failure, SRAPI_OK on success.</p>
 
 <hr>
 
-<h2 id="demo-tool">16. Demo Tool Implementation</h2>
+<h2 id="demo-tool">17. Demo Tool Implementation</h2>
 
-<p>The demo tool (<code>srapi_demo.c</code>) demonstrates all SR API features. It supports CPU and GPU rendering, DRM display output, various command types, and shader execution. Key functions include <code>low_level_smoke()</code> testing buffers, images, queues; <code>gpu_smoke()</code> testing GPU path; and the main function handling CLI arguments and rendering loops.</p>
+<p>The demo tool (<code>srapi_demo.c</code>) demonstrates SR API features. It supports CPU rendering to PPM, GPU resource smoke tests, DRM display output, fbdev display output, command primitives, and shader execution. Key test flags include <code>--smoke-low</code>, <code>--smoke-gpu</code>, <code>--smoke-fbdev</code>, <code>--probe-gpu</code>, and <code>--probe-fbdev</code>. Use <code>--fbdev [/dev/fbN]</code> to render directly to a Linux framebuffer.</p>
 
 <hr>
 
-<h2 id="limitations">17. Current Limitations and Future Work</h2>
+<h2 id="limitations">18. Current Limitations and Future Work</h2>
 <ul>
 <li>Only supports 2D rendering operations</li>
 <li>No 3D graphics pipeline (depth/stencil buffers, 3D shaders)</li>
 <li>No descriptor set/resource binding system</li>
 <li>DRM backend requires direct hardware access (no Wayland/X11)</li>
+<li>fbdev backend only supports mapped 32bpp output and no mode setting</li>
 <li>No validation layers or extensive error checking</li>
 <li>Single-threaded design</li>
 <li>No async command submission</li>

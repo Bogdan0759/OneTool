@@ -13,6 +13,7 @@ const char *srapi_backend_name(srapi_backend_t backend) {
         case SRAPI_BACKEND_AUTO: return "auto";
         case SRAPI_BACKEND_CPU: return "cpu";
         case SRAPI_BACKEND_GPU: return "gpu";
+        case SRAPI_BACKEND_FBDEV: return "fbdev";
         default: return "unknown";
     }
 }
@@ -29,7 +30,7 @@ srapi_result_t srapi_create_context(const srapi_context_desc_t *desc, srapi_cont
     backend = desc->backend;
     if (backend == SRAPI_BACKEND_AUTO) {
         backend = SRAPI_BACKEND_CPU;
-    } else if (backend != SRAPI_BACKEND_CPU && backend != SRAPI_BACKEND_GPU) {
+    } else if (backend != SRAPI_BACKEND_CPU && backend != SRAPI_BACKEND_GPU && backend != SRAPI_BACKEND_FBDEV) {
         return SRAPI_ERROR_BAD_ARG;
     }
 
@@ -44,7 +45,9 @@ srapi_result_t srapi_create_context(const srapi_context_desc_t *desc, srapi_cont
     srapi_debugf("context create %ux%u backend=%s",
                  ctx->width, ctx->height, srapi_backend_name(ctx->backend));
     if (ctx->backend == SRAPI_BACKEND_GPU) {
-        srapi_debugf("context gpu mode: DRM target buffers are GPU-backed; command execution still uses cpu interpreter");
+        srapi_debugf("context gpu mode: resources and display targets are DRM-backed");
+    } else if (ctx->backend == SRAPI_BACKEND_FBDEV) {
+        srapi_debugf("context fbdev mode: render directly into mapped linux framebuffer");
     }
     return SRAPI_OK;
 }
@@ -85,6 +88,9 @@ srapi_result_t srapi_probe_device(srapi_backend_t backend, srapi_device_info_t *
     if (backend == SRAPI_BACKEND_GPU) {
         return srapi_gpu_probe(out);
     }
+    if (backend == SRAPI_BACKEND_FBDEV) {
+        return srapi_fbdev_probe(out);
+    }
 
     srapi_set_error("device: unknown backend %d", backend);
     return SRAPI_ERROR_BAD_ARG;
@@ -103,6 +109,10 @@ srapi_result_t srapi_create_device(const srapi_device_desc_t *desc, srapi_device
     backend = desc->backend == SRAPI_BACKEND_AUTO ? SRAPI_BACKEND_CPU : desc->backend;
     if (backend == SRAPI_BACKEND_GPU) {
         return srapi_gpu_open_device(desc, out);
+    }
+    if (backend == SRAPI_BACKEND_FBDEV) {
+        srapi_set_error("device: fbdev backend only supports display/framebuffer output");
+        return SRAPI_ERROR_UNSUPPORTED;
     }
     if (srapi_probe_device(backend, &info) != SRAPI_OK) {
         return SRAPI_ERROR_UNSUPPORTED;
@@ -147,6 +157,129 @@ const char *srapi_device_path(const srapi_device_t *device) {
     return device != NULL ? device->path : "";
 }
 
+static int primitive_group_size(srapi_primitive_topology_t topology) {
+    switch (topology) {
+        case SRAPI_PRIMITIVE_POINTS: return 1;
+        case SRAPI_PRIMITIVE_LINES: return 2;
+        case SRAPI_PRIMITIVE_TRIANGLES: return 3;
+        default: return 0;
+    }
+}
+
+static srapi_result_t submit_draw_vertices(srapi_framebuffer_t *target, const srapi_command_t *op) {
+    const srapi_vertex_t *vertices;
+    const uint32_t *indices = NULL;
+    srapi_vertex_t *transformed = NULL;
+    float *positions = NULL;
+    size_t total_vertices;
+    size_t total_indices;
+    size_t draw_count;
+    int group_size;
+
+    if (op->vertex_buffer == NULL || op->vertex_buffer->data == NULL || op->vertex_count == 0) {
+        srapi_set_error("draw: missing vertex buffer");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if ((op->vertex_buffer->usage & SRAPI_BUFFER_VERTEX) == 0) {
+        srapi_set_error("draw: buffer missing vertex usage");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    total_vertices = op->vertex_buffer->size / sizeof(*vertices);
+    if (op->vertex_offset > total_vertices || op->vertex_count > total_vertices - op->vertex_offset) {
+        srapi_set_error("draw: vertex range outside buffer");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    vertices = (const srapi_vertex_t *)op->vertex_buffer->data + op->vertex_offset;
+
+    draw_count = op->vertex_count;
+    if (op->index_buffer != NULL) {
+        if (op->index_buffer->data == NULL || op->index_count == 0) {
+            srapi_set_error("draw: missing index buffer");
+            return SRAPI_ERROR_BAD_ARG;
+        }
+        if ((op->index_buffer->usage & SRAPI_BUFFER_INDEX) == 0) {
+            srapi_set_error("draw: buffer missing index usage");
+            return SRAPI_ERROR_BAD_ARG;
+        }
+
+        total_indices = op->index_buffer->size / sizeof(*indices);
+        if (op->index_offset > total_indices || op->index_count > total_indices - op->index_offset) {
+            srapi_set_error("draw: index range outside buffer");
+            return SRAPI_ERROR_BAD_ARG;
+        }
+
+        indices = (const uint32_t *)op->index_buffer->data + op->index_offset;
+        draw_count = op->index_count;
+        for (size_t i = 0; i < op->index_count; i++) {
+            if (indices[i] >= op->vertex_count) {
+                srapi_set_error("draw: index %u outside vertex range", indices[i]);
+                return SRAPI_ERROR_BAD_ARG;
+            }
+        }
+    }
+
+    group_size = primitive_group_size(op->topology);
+    if (group_size == 0 || draw_count == 0 || draw_count % (size_t)group_size != 0) {
+        srapi_set_error("draw: bad primitive topology/count");
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    if (op->shader != NULL) {
+        transformed = calloc(op->vertex_count, sizeof(*transformed));
+        positions = calloc(op->vertex_count * 2, sizeof(*positions));
+        if (transformed == NULL || positions == NULL) {
+            free(transformed);
+            free(positions);
+            return SRAPI_ERROR_OOM;
+        }
+
+        for (size_t i = 0; i < op->vertex_count; i++) {
+            float inputs[7];
+            float out_pos[2];
+            srapi_color_t out_color;
+            srapi_result_t r;
+
+            inputs[SRAPI_VM_INPUT_VERTEX_X] = vertices[i].x;
+            inputs[SRAPI_VM_INPUT_VERTEX_Y] = vertices[i].y;
+            inputs[SRAPI_VM_INPUT_VERTEX_R] = (float)((vertices[i].color >> 16) & 0xff);
+            inputs[SRAPI_VM_INPUT_VERTEX_G] = (float)((vertices[i].color >> 8) & 0xff);
+            inputs[SRAPI_VM_INPUT_VERTEX_B] = (float)(vertices[i].color & 0xff);
+            inputs[SRAPI_VM_INPUT_VERTEX_A] = (float)((vertices[i].color >> 24) & 0xff);
+            inputs[SRAPI_VM_INPUT_VERTEX_INDEX] = (float)i;
+
+            r = srapi_vm_run_vertex(op->shader, inputs, out_pos, &out_color);
+            if (r != SRAPI_OK) {
+                free(transformed);
+                free(positions);
+                return r;
+            }
+
+            transformed[i] = vertices[i];
+            transformed[i].x = out_pos[0];
+            transformed[i].y = out_pos[1];
+            transformed[i].color = out_color;
+            positions[i * 2 + 0] = out_pos[0];
+            positions[i * 2 + 1] = out_pos[1];
+        }
+
+        srapi_render_draw_vertices_transformed(
+            target,
+            op->topology,
+            transformed,
+            op->vertex_count,
+            indices,
+            op->index_count,
+            positions
+        );
+        free(transformed);
+        free(positions);
+    } else {
+        srapi_render_draw_vertices(target, op->topology, vertices, op->vertex_count, indices, op->index_count);
+    }
+    return SRAPI_OK;
+}
+
 srapi_result_t srapi_submit(
     srapi_context_t *ctx,
     srapi_framebuffer_t *target,
@@ -163,8 +296,10 @@ srapi_result_t srapi_submit(
                  ctx != NULL ? srapi_backend_name(ctx->backend) : "none",
                  srapi_backend_name(target->backend),
                  target->width, target->height, target->pitch);
-    if (ctx != NULL && ctx->backend == SRAPI_BACKEND_GPU && target->backend == SRAPI_BACKEND_GPU) {
-        srapi_debugf("submit gpu/drm path: writing mapped DRM backbuffer, present handled by drm backend");
+    if (ctx != NULL && target->backend == ctx->backend &&
+        (ctx->backend == SRAPI_BACKEND_GPU || ctx->backend == SRAPI_BACKEND_FBDEV)) {
+        srapi_debugf("submit %s display path: rendering into mapped target",
+                     srapi_backend_name(ctx->backend));
     }
 
     for (size_t i = 0; i < cmd->count; i++) {
@@ -194,6 +329,16 @@ srapi_result_t srapi_submit(
                 srapi_debugf("cmd[%zu] shade_rect x=%d y=%d w=%u h=%u shader=%p",
                              i, op->x0, op->y0, op->width, op->height, (void *)op->shader);
                 srapi_render_shade_rect(target, op->x0, op->y0, op->width, op->height, op->shader);
+                break;
+            case SRAPI_COMMAND_DRAW_VERTICES:
+                srapi_debugf("cmd[%zu] draw_vertices topology=%d vertices=%zu indices=%zu",
+                             i, op->topology, op->vertex_count, op->index_count);
+                {
+                    srapi_result_t r = submit_draw_vertices(target, op);
+                    if (r != SRAPI_OK) {
+                        return r;
+                    }
+                }
                 break;
             default:
                 return SRAPI_ERROR;

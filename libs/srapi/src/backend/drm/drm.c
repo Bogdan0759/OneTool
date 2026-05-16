@@ -11,11 +11,14 @@
 
 #define SRAPI_DRM_CONNECTED 1
 
-static int open_card(const char *device_path) {
+static int open_card(const char *device_path, char *resolved, size_t resolved_size) {
     char path[64];
     int fd;
 
     if (device_path != NULL) {
+        if (resolved != NULL) {
+            snprintf(resolved, resolved_size, "%s", device_path);
+        }
         srapi_debugf("drm open card %s", device_path);
         fd = open(device_path, O_RDWR | O_CLOEXEC);
         if (fd < 0) {
@@ -29,12 +32,42 @@ static int open_card(const char *device_path) {
         srapi_debugf("drm probe card %s", path);
         fd = open(path, O_RDWR | O_CLOEXEC);
         if (fd >= 0) {
+            if (resolved != NULL) {
+                snprintf(resolved, resolved_size, "%s", path);
+            }
             srapi_debugf("drm card opened %s", path);
             return fd;
         }
     }
     srapi_set_error("drm: no /dev/dri/card0..7 could be opened: %s", strerror(errno));
     return -1;
+}
+
+static uint32_t mode_refresh_millihz(const struct drm_mode_modeinfo *mode) {
+    uint64_t denom;
+    uint64_t refresh;
+
+    if (mode == NULL || mode->htotal == 0 || mode->vtotal == 0) {
+        return 0;
+    }
+
+    denom = (uint64_t)mode->htotal * mode->vtotal;
+    refresh = (uint64_t)mode->clock * 1000000u / denom;
+    return refresh > UINT32_MAX ? UINT32_MAX : (uint32_t)refresh;
+}
+
+static void fill_public_mode(const struct drm_mode_modeinfo *mode, srapi_display_mode_t *out) {
+    if (mode == NULL || out == NULL) {
+        return;
+    }
+
+    memset(out, 0, sizeof(*out));
+    out->width = mode->hdisplay;
+    out->height = mode->vdisplay;
+    out->refresh_millihz = mode_refresh_millihz(mode);
+    out->flags = mode->flags;
+    out->type = mode->type;
+    snprintf(out->name, sizeof(out->name), "%s", mode->name);
 }
 
 static void free_resources(uint32_t *connectors, uint32_t *crtcs, uint32_t *encoders) {
@@ -123,13 +156,32 @@ static int choose_crtc(int fd, const struct drm_mode_card_res *res, const uint32
                        uint32_t *out_crtc) {
     struct drm_mode_get_encoder enc;
 
+    if (res == NULL || crtcs == NULL || conn == NULL || encoders == NULL ||
+        out_crtc == NULL || res->count_crtcs == 0) {
+        srapi_set_error("drm: bad crtc selection args");
+        return 0;
+    }
+
     if (conn->encoder_id != 0) {
         memset(&enc, 0, sizeof(enc));
         enc.encoder_id = conn->encoder_id;
-        if (srapi_drm_ioctl(fd, DRM_IOCTL_MODE_GETENCODER, &enc) == 0 && enc.crtc_id != 0) {
-            *out_crtc = enc.crtc_id;
-            srapi_debugf("drm choose current crtc=%u from encoder=%u", *out_crtc, enc.encoder_id);
-            return 1;
+        if (srapi_drm_ioctl(fd, DRM_IOCTL_MODE_GETENCODER, &enc) == 0) {
+            srapi_debugf("drm current encoder=%u crtc=%u possible=0x%x",
+                         enc.encoder_id, enc.crtc_id, enc.possible_crtcs);
+            if (enc.crtc_id != 0) {
+                for (uint32_t i = 0; i < res->count_crtcs; i++) {
+                    if (crtcs[i] == enc.crtc_id) {
+                        *out_crtc = enc.crtc_id;
+                        srapi_debugf("drm choose current crtc=%u from encoder=%u",
+                                     *out_crtc, enc.encoder_id);
+                        return 1;
+                    }
+                }
+                srapi_debugf("drm current crtc=%u is not in resource crtc list", enc.crtc_id);
+            }
+        } else {
+            srapi_debugf("drm current encoder %u get failed: %s",
+                         conn->encoder_id, strerror(errno));
         }
     }
 
@@ -137,10 +189,18 @@ static int choose_crtc(int fd, const struct drm_mode_card_res *res, const uint32
         memset(&enc, 0, sizeof(enc));
         enc.encoder_id = encoders[i];
         if (srapi_drm_ioctl(fd, DRM_IOCTL_MODE_GETENCODER, &enc) != 0) {
+            srapi_debugf("drm encoder %u get failed: %s", encoders[i], strerror(errno));
             continue;
         }
+        srapi_debugf("drm encoder[%u]=%u crtc=%u possible=0x%x",
+                     i, enc.encoder_id, enc.crtc_id, enc.possible_crtcs);
         for (uint32_t crtc_index = 0; crtc_index < res->count_crtcs; crtc_index++) {
-            if (enc.possible_crtcs & (1u << crtc_index)) {
+            uint32_t bit = crtc_index < 32 ? (1u << crtc_index) : 0;
+
+            srapi_debugf("drm crtc[%u]=%u bit=0x%x allowed=%u",
+                         crtc_index, crtcs[crtc_index], bit,
+                         bit != 0 && (enc.possible_crtcs & bit) != 0);
+            if (bit != 0 && (enc.possible_crtcs & bit) != 0) {
                 *out_crtc = crtcs[crtc_index];
                 srapi_debugf("drm choose crtc=%u from encoder=%u possible=0x%x",
                              *out_crtc, enc.encoder_id, enc.possible_crtcs);
@@ -149,10 +209,80 @@ static int choose_crtc(int fd, const struct drm_mode_card_res *res, const uint32
         }
     }
 
+    if (res->count_crtcs > 0) {
+        *out_crtc = crtcs[0];
+        srapi_debugf("drm fallback choose first resource crtc=%u", *out_crtc);
+        return 1;
+    }
+
+    srapi_set_error("drm: no usable crtc found for connector=%u encoders=%u",
+                    conn->connector_id, conn->count_encoders);
     return 0;
 }
 
-static int find_output(int fd, uint32_t *connector_id, uint32_t *crtc_id, struct drm_mode_modeinfo *mode) {
+static int mode_matches(
+    const struct drm_mode_modeinfo *mode,
+    uint32_t width,
+    uint32_t height,
+    uint32_t refresh_millihz
+) {
+    uint32_t mode_refresh;
+
+    if (mode == NULL) {
+        return 0;
+    }
+    if (width != 0 && mode->hdisplay != width) {
+        return 0;
+    }
+    if (height != 0 && mode->vdisplay != height) {
+        return 0;
+    }
+    if (refresh_millihz == 0) {
+        return 1;
+    }
+
+    mode_refresh = mode_refresh_millihz(mode);
+    return mode_refresh + 500 >= refresh_millihz && refresh_millihz + 500 >= mode_refresh;
+}
+
+static const struct drm_mode_modeinfo *choose_mode(
+    const struct drm_mode_modeinfo *modes,
+    uint32_t mode_count,
+    uint32_t width,
+    uint32_t height,
+    uint32_t refresh_millihz
+) {
+    const struct drm_mode_modeinfo *preferred = NULL;
+
+    if (modes == NULL || mode_count == 0) {
+        return NULL;
+    }
+
+    for (uint32_t i = 0; i < mode_count; i++) {
+        if (mode_matches(&modes[i], width, height, refresh_millihz)) {
+            return &modes[i];
+        }
+        if (preferred == NULL && (modes[i].type & DRM_MODE_TYPE_PREFERRED) != 0) {
+            preferred = &modes[i];
+        }
+    }
+
+    if (width == 0 && height == 0 && refresh_millihz == 0) {
+        return preferred != NULL ? preferred : &modes[0];
+    }
+    return NULL;
+}
+
+static int find_output(
+    int fd,
+    uint32_t wanted_connector_id,
+    uint32_t wanted_width,
+    uint32_t wanted_height,
+    uint32_t wanted_refresh,
+    uint32_t *connector_id,
+    uint32_t *crtc_id,
+    struct drm_mode_modeinfo *mode
+) {
     struct drm_mode_card_res res;
     uint32_t *connectors = NULL;
     uint32_t *crtcs = NULL;
@@ -174,12 +304,33 @@ static int find_output(int fd, uint32_t *connector_id, uint32_t *crtc_id, struct
             free(encoders);
             continue;
         }
-        if (conn.connection == SRAPI_DRM_CONNECTED && conn.count_modes > 0 &&
+        const struct drm_mode_modeinfo *chosen = choose_mode(
+            modes,
+            conn.count_modes,
+            wanted_width,
+            wanted_height,
+            wanted_refresh
+        );
+
+        if (wanted_connector_id != 0 && conn.connector_id != wanted_connector_id) {
+            free(modes);
+            free(encoders);
+            continue;
+        }
+        if (conn.connection != SRAPI_DRM_CONNECTED) {
+            srapi_debugf("drm connector=%u skipped: not connected connection=%u",
+                         conn.connector_id, conn.connection);
+        } else if (chosen == NULL) {
+            srapi_debugf("drm connector=%u skipped: no mode matching %ux%u refresh=%u",
+                         conn.connector_id, wanted_width, wanted_height, wanted_refresh);
+        }
+        if (conn.connection == SRAPI_DRM_CONNECTED && chosen != NULL &&
             choose_crtc(fd, &res, crtcs, &conn, encoders, crtc_id)) {
             *connector_id = conn.connector_id;
-            *mode = modes[0];
-            srapi_debugf("drm output connector=%u crtc=%u mode=%s %ux%u",
-                         *connector_id, *crtc_id, mode->name, mode->hdisplay, mode->vdisplay);
+            *mode = *chosen;
+            srapi_debugf("drm output connector=%u crtc=%u mode=%s %ux%u refresh=%u",
+                         *connector_id, *crtc_id, mode->name, mode->hdisplay,
+                         mode->vdisplay, mode_refresh_millihz(mode));
             ok = 1;
         }
         free(modes);
@@ -194,9 +345,46 @@ static int find_output(int fd, uint32_t *connector_id, uint32_t *crtc_id, struct
 }
 
 srapi_result_t srapi_drm_open(const char *device_path, srapi_drm_display_t **out) {
+    srapi_drm_display_desc_t desc;
+
+    memset(&desc, 0, sizeof(desc));
+    desc.device_path = device_path;
+    return srapi_drm_open_display(&desc, out);
+}
+
+static srapi_result_t drm_set_crtc(
+    srapi_drm_display_t *display,
+    const struct drm_mode_modeinfo *mode,
+    uint32_t fb_id
+) {
+    uint64_t connector_ptr;
+    struct drm_mode_crtc set;
+
+    connector_ptr = (uint64_t)(uintptr_t)&display->connector_id;
+    memset(&set, 0, sizeof(set));
+    set.set_connectors_ptr = connector_ptr;
+    set.count_connectors = 1;
+    set.crtc_id = display->crtc_id;
+    set.fb_id = fb_id;
+    set.mode_valid = 1;
+    set.mode = *mode;
+
+    if (srapi_drm_ioctl(display->fd, DRM_IOCTL_MODE_SETCRTC, &set) != 0) {
+        srapi_set_error("drm: SETCRTC crtc=%u connector=%u fb=%u mode=%ux%u failed: %s",
+                        display->crtc_id, display->connector_id, fb_id,
+                        mode->hdisplay, mode->vdisplay, strerror(errno));
+        return SRAPI_ERROR;
+    }
+    return SRAPI_OK;
+}
+
+srapi_result_t srapi_drm_open_display(
+    const srapi_drm_display_desc_t *desc,
+    srapi_drm_display_t **out
+) {
     struct srapi_drm_display *display;
     struct drm_mode_modeinfo mode;
-    uint64_t connector_ptr;
+    char resolved[64];
     int fd;
 
     if (out == NULL) {
@@ -204,7 +392,12 @@ srapi_result_t srapi_drm_open(const char *device_path, srapi_drm_display_t **out
     }
     *out = NULL;
 
-    fd = open_card(device_path);
+    if (desc == NULL) {
+        static const srapi_drm_display_desc_t default_desc;
+        desc = &default_desc;
+    }
+
+    fd = open_card(desc->device_path, resolved, sizeof(resolved));
     if (fd < 0) {
         return SRAPI_ERROR;
     }
@@ -216,8 +409,10 @@ srapi_result_t srapi_drm_open(const char *device_path, srapi_drm_display_t **out
         return SRAPI_ERROR_OOM;
     }
     display->fd = fd;
+    snprintf(display->device_path, sizeof(display->device_path), "%s", resolved);
 
-    if (!find_output(fd, &display->connector_id, &display->crtc_id, &mode)) {
+    if (!find_output(fd, desc->connector_id, desc->width, desc->height, desc->refresh_millihz,
+                     &display->connector_id, &display->crtc_id, &mode)) {
         srapi_drm_close(display);
         return SRAPI_ERROR;
     }
@@ -237,18 +432,7 @@ srapi_result_t srapi_drm_open(const char *device_path, srapi_drm_display_t **out
         srapi_debugf("drm saved old crtc=%u fb=%u", display->old_crtc.crtc_id, display->old_crtc.fb_id);
     }
 
-    connector_ptr = (uint64_t)(uintptr_t)&display->connector_id;
-    struct drm_mode_crtc set = {
-        .set_connectors_ptr = connector_ptr,
-        .count_connectors = 1,
-        .crtc_id = display->crtc_id,
-        .fb_id = display->buffers[display->front].fb_id,
-        .mode_valid = 1,
-        .mode = mode,
-    };
-    if (srapi_drm_ioctl(fd, DRM_IOCTL_MODE_SETCRTC, &set) != 0) {
-        srapi_set_error("drm: SETCRTC crtc=%u connector=%u fb=%u failed: %s",
-                        display->crtc_id, display->connector_id, display->buffers[display->front].fb_id, strerror(errno));
+    if (drm_set_crtc(display, &mode, display->buffers[display->front].fb_id) != SRAPI_OK) {
         srapi_drm_close(display);
         return SRAPI_ERROR;
     }
@@ -379,4 +563,64 @@ uint32_t srapi_drm_width(const srapi_drm_display_t *display) {
 
 uint32_t srapi_drm_height(const srapi_drm_display_t *display) {
     return display ? display->buffers[display->front].fb.height : 0;
+}
+
+srapi_result_t srapi_drm_current_mode(
+    const srapi_drm_display_t *display,
+    srapi_display_mode_t *out
+) {
+    if (display == NULL || out == NULL) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    fill_public_mode(&display->mode, out);
+    return SRAPI_OK;
+}
+
+srapi_result_t srapi_drm_set_mode(
+    srapi_drm_display_t *display,
+    uint32_t width,
+    uint32_t height,
+    uint32_t refresh_millihz
+) {
+    struct drm_mode_modeinfo mode;
+    uint32_t connector_id;
+    uint32_t crtc_id;
+    srapi_drm_buffer_t new_buffers[2];
+
+    if (display == NULL || width == 0 || height == 0) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    if (!find_output(display->fd, display->connector_id, width, height, refresh_millihz,
+                     &connector_id, &crtc_id, &mode)) {
+        return SRAPI_ERROR_UNSUPPORTED;
+    }
+
+    memset(new_buffers, 0, sizeof(new_buffers));
+    if (srapi_drm_create_buffer(display->fd, &mode, &new_buffers[0]) != SRAPI_OK ||
+        srapi_drm_create_buffer(display->fd, &mode, &new_buffers[1]) != SRAPI_OK) {
+        srapi_drm_destroy_buffer(display->fd, &new_buffers[0]);
+        srapi_drm_destroy_buffer(display->fd, &new_buffers[1]);
+        return SRAPI_ERROR;
+    }
+
+    display->crtc_id = crtc_id;
+    if (drm_set_crtc(display, &mode, new_buffers[0].fb_id) != SRAPI_OK) {
+        srapi_drm_destroy_buffer(display->fd, &new_buffers[0]);
+        srapi_drm_destroy_buffer(display->fd, &new_buffers[1]);
+        return SRAPI_ERROR;
+    }
+
+    srapi_drm_destroy_buffer(display->fd, &display->buffers[0]);
+    srapi_drm_destroy_buffer(display->fd, &display->buffers[1]);
+    display->buffers[0] = new_buffers[0];
+    display->buffers[1] = new_buffers[1];
+    display->mode = mode;
+    display->front = 0;
+    srapi_debugf("drm mode set connector=%u crtc=%u mode=%s %ux%u refresh=%u",
+                 display->connector_id, display->crtc_id, display->mode.name,
+                 display->mode.hdisplay, display->mode.vdisplay,
+                 mode_refresh_millihz(&display->mode));
+    return SRAPI_OK;
 }
