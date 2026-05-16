@@ -7,8 +7,8 @@
 
 static void help(const char *tool) {
     printf("srapi_demo - render a test frame or simple animation with SRAPI\n");
-    printf("usage: %s [-o output.ppm] [-w width] [-h height] [--frames n] [--gpu] [--probe-gpu] [--probe-i915 [node]] [--probe-fbdev] [--smoke-low] [--smoke-gpu] [--smoke-i915 [node]] [--smoke-fbdev] [--drm [card]] [--fbdev [fb]] [--hold seconds] [--debug] [--list-displays] [--list-modes [connector]]\n", tool);
-    printf("i915 screen rendering: %s --gpu --drm [/dev/dri/cardN]\n", tool);
+    printf("usage: %s [-o output.ppm] [-w width] [-h height] [--frames n] [--gpu] [--tile-cache] [--probe-gpu] [--probe-i915 [node]] [--probe-fbdev] [--smoke-low] [--smoke-gpu] [--smoke-i915 [node]] [--smoke-fbdev] [--drm [card]] [--fbdev [fb]] [--hold seconds] [--debug] [--list-displays] [--list-modes [connector]]\n", tool);
+    printf("i915 screen rendering: %s --gpu --drm [/dev/dri/cardN] [--tile-cache]\n", tool);
 }
 
 static int parse_u32(const char *text, uint32_t *out) {
@@ -879,6 +879,7 @@ int main(int argc, char *argv[]) {
     int smoke_fbdev = 0;
     int use_drm = 0;
     int use_fbdev = 0;
+    int use_i915_tile_cache = 0;
     int list_displays = 0;
     int list_modes = 0;
     uint32_t list_modes_connector = 0;
@@ -921,6 +922,8 @@ int main(int argc, char *argv[]) {
             }
         } else if (strcmp(argv[i], "--gpu") == 0) {
             use_gpu = 1;
+        } else if (strcmp(argv[i], "--tile-cache") == 0) {
+            use_i915_tile_cache = 1;
         } else if (strcmp(argv[i], "--probe-gpu") == 0) {
             probe_gpu = 1;
         } else if (strcmp(argv[i], "--probe-i915") == 0) {
@@ -1093,6 +1096,10 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "--drm and --fbdev cannot be used together\n");
         return 1;
     }
+    if (use_i915_tile_cache && (!use_gpu || !use_drm)) {
+        fprintf(stderr, "--tile-cache requires --gpu --drm\n");
+        return 1;
+    }
 
     if ((use_drm || use_fbdev) && frames == 1) {
         frames = (uint32_t)hold_seconds * 30;
@@ -1133,6 +1140,17 @@ int main(int argc, char *argv[]) {
                        gpu_i915_info.has_gem &&
                        gpu_i915_info.has_execbuf2 &&
                        gpu_i915_info.has_blt;
+            if (use_i915_tile_cache) {
+                if (!gpu_i915) {
+                    fprintf(stderr, "--tile-cache requires i915 with GEM/EXECBUF2/BLT\n");
+                    goto fail;
+                }
+                r = srapi_i915_set_tile_cache_enabled(gpu_device, 1);
+                if (r != SRAPI_OK) {
+                    fprintf(stderr, "tile cache enable failed: %s\n", srapi_last_error());
+                    goto fail;
+                }
+            }
             r = srapi_create_queue(&(srapi_queue_desc_t){
                 .device = gpu_device,
                 .family_index = 0,
@@ -1215,12 +1233,25 @@ int main(int argc, char *argv[]) {
     if (r != SRAPI_OK) goto fail;
 
     if (gpu_i915) {
-        srapi_cmd_clear(cmd, srapi_rgba(10, 12, 16, 255));
+        srapi_cmd_emit(cmd, &(srapi_command_t){
+            .kind = SRAPI_COMMAND_CLEAR,
+            .color = srapi_rgba(10, 12, 16, 255),
+        });
+        srapi_cmd_shade_rect(cmd, 0, 0, width, height, shader);
         srapi_cmd_fill_rect(cmd, 40, 40, width / 2, height / 3, srapi_rgba(220, 80, 60, 255));
         srapi_cmd_set_scissor(cmd, (int32_t)(width / 3), (int32_t)(height / 3), width / 2, height / 3);
         srapi_cmd_fill_rect(cmd, 0, 0, width, height, srapi_rgba(55, 160, 230, 255));
         srapi_cmd_set_scissor(cmd, 24, 24, width > 48 ? width - 48 : width, height > 48 ? height - 48 : height);
         srapi_cmd_fill_rect(cmd, (int32_t)(width / 2), 24, width / 4, height > 80 ? height - 80 : height / 2, srapi_rgba(180, 230, 80, 255));
+        srapi_cmd_fill_triangle(
+            cmd,
+            (int32_t)(width / 2), 24,
+            32, (int32_t)height - 32,
+            (int32_t)width - 32, (int32_t)height - 48,
+            srapi_rgba(180, 230, 80, 255)
+        );
+        srapi_cmd_draw_line(cmd, 0, 0, (int32_t)width - 1, (int32_t)height - 1, srapi_rgba(245, 220, 90, 255));
+        srapi_cmd_draw_line(cmd, 0, (int32_t)height - 1, (int32_t)width - 1, 0, srapi_rgba(90, 245, 170, 255));
     } else {
         srapi_cmd_emit(cmd, &(srapi_command_t){
             .kind = SRAPI_COMMAND_CLEAR,

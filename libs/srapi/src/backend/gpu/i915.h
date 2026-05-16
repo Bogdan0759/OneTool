@@ -27,6 +27,8 @@ srapi_result_t srapi_i915_create_image(
     const srapi_image_desc_t *desc,
     srapi_image_t **out
 );
+srapi_result_t srapi_i915_set_tile_cache_enabled(srapi_device_t *device, uint32_t enabled);
+uint32_t srapi_i915_tile_cache_enabled(const srapi_device_t *device);
 srapi_result_t srapi_i915_submit_noop(srapi_device_t *device);
 srapi_result_t srapi_i915_fill_buffer(
     srapi_device_t *device,
@@ -48,6 +50,15 @@ srapi_result_t srapi_i915_fill_rect_image(
     uint32_t color
 );
 srapi_result_t srapi_i915_fill_image(srapi_device_t *device, srapi_image_t *image, uint32_t color);
+srapi_result_t srapi_i915_fill_framebuffer_rect(
+    srapi_device_t *device,
+    srapi_framebuffer_t *target,
+    uint32_t x,
+    uint32_t y,
+    uint32_t width,
+    uint32_t height,
+    uint32_t color
+);
 srapi_result_t srapi_i915_render_image(
     srapi_device_t *device,
     srapi_image_t *target,
