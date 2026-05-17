@@ -112,7 +112,7 @@ srapi_result_t srapi_i915_set_tile_cache_enabled(srapi_device_t *device, uint32_
 
     device->tile_cache_enabled = enabled != 0 ? 1u : 0u;
     if (!device->tile_cache_enabled) {
-        memset(device->tile_hashes, 0, sizeof(device->tile_hashes));
+        memset(device->tile_hashes, 0, device->tile_hashes_capacity * sizeof(uint64_t));
     }
     srapi_debugf("i915 tile cache %s", device->tile_cache_enabled ? "enabled" : "disabled");
     return SRAPI_OK;

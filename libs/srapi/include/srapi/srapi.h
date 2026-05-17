@@ -116,6 +116,11 @@ typedef enum {
     SRAPI_VM_CLAMP01 = 13,
     SRAPI_VM_MIX = 14,
     SRAPI_VM_OUT_POSITION = 15,
+    SRAPI_VM_SIN = 16,
+    SRAPI_VM_COS = 17,
+    SRAPI_VM_ABS = 18,
+    SRAPI_VM_SQRT = 19,
+    SRAPI_VM_POW = 20,
 } srapi_vm_opcode_t;
 
 enum {

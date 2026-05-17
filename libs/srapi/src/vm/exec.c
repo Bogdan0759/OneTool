@@ -1,6 +1,7 @@
 #include "internal.h"
 
 #include <string.h>
+#include <math.h>
 
 #define SRAPI_VM_REG_COUNT 16
 #define SRAPI_VM_INPUT_COUNT 6
@@ -82,6 +83,7 @@ srapi_result_t srapi_vm_run_fragment(
             case SRAPI_VM_DIV:
             case SRAPI_VM_MIN:
             case SRAPI_VM_MAX:
+            case SRAPI_VM_POW:
                 if (inst->dst >= SRAPI_VM_REG_COUNT) break;
                 if (op == SRAPI_VM_ADD) regs[inst->dst] = vm_get_reg(regs, inst->a) + vm_get_reg(regs, inst->b);
                 else if (op == SRAPI_VM_SUB) regs[inst->dst] = vm_get_reg(regs, inst->a) - vm_get_reg(regs, inst->b);
@@ -89,6 +91,7 @@ srapi_result_t srapi_vm_run_fragment(
                 else if (op == SRAPI_VM_DIV) regs[inst->dst] = vm_get_reg(regs, inst->b) != 0.0f ? vm_get_reg(regs, inst->a) / vm_get_reg(regs, inst->b) : 0.0f;
                 else if (op == SRAPI_VM_MIN) regs[inst->dst] = vm_get_reg(regs, inst->a) < vm_get_reg(regs, inst->b) ? vm_get_reg(regs, inst->a) : vm_get_reg(regs, inst->b);
                 else if (op == SRAPI_VM_MAX) regs[inst->dst] = vm_get_reg(regs, inst->a) > vm_get_reg(regs, inst->b) ? vm_get_reg(regs, inst->a) : vm_get_reg(regs, inst->b);
+                else if (op == SRAPI_VM_POW) regs[inst->dst] = powf(vm_get_reg(regs, inst->a), vm_get_reg(regs, inst->b));
                 break;
             case SRAPI_VM_LOAD_INPUT:
                 if (inst->dst < SRAPI_VM_REG_COUNT && inst->a < SRAPI_VM_INPUT_COUNT) {
@@ -113,6 +116,27 @@ srapi_result_t srapi_vm_run_fragment(
             case SRAPI_VM_CLAMP01:
                 if (inst->dst < SRAPI_VM_REG_COUNT) {
                     regs[inst->dst] = vm_clamp01(vm_get_reg(regs, inst->a));
+                }
+                break;
+            case SRAPI_VM_SIN:
+                if (inst->dst < SRAPI_VM_REG_COUNT) {
+                    regs[inst->dst] = sinf(vm_get_reg(regs, inst->a));
+                }
+                break;
+            case SRAPI_VM_COS:
+                if (inst->dst < SRAPI_VM_REG_COUNT) {
+                    regs[inst->dst] = cosf(vm_get_reg(regs, inst->a));
+                }
+                break;
+            case SRAPI_VM_ABS:
+                if (inst->dst < SRAPI_VM_REG_COUNT) {
+                    regs[inst->dst] = fabsf(vm_get_reg(regs, inst->a));
+                }
+                break;
+            case SRAPI_VM_SQRT:
+                if (inst->dst < SRAPI_VM_REG_COUNT) {
+                    float val = vm_get_reg(regs, inst->a);
+                    regs[inst->dst] = val >= 0.0f ? sqrtf(val) : 0.0f;
                 }
                 break;
             case SRAPI_VM_MIX:
@@ -197,6 +221,7 @@ srapi_result_t srapi_vm_run_vertex(
             case SRAPI_VM_DIV:
             case SRAPI_VM_MIN:
             case SRAPI_VM_MAX:
+            case SRAPI_VM_POW:
                 if (inst->dst >= SRAPI_VM_REG_COUNT) break;
                 if (op == SRAPI_VM_ADD) regs[inst->dst] = vm_get_reg(regs, inst->a) + vm_get_reg(regs, inst->b);
                 else if (op == SRAPI_VM_SUB) regs[inst->dst] = vm_get_reg(regs, inst->a) - vm_get_reg(regs, inst->b);
@@ -204,6 +229,7 @@ srapi_result_t srapi_vm_run_vertex(
                 else if (op == SRAPI_VM_DIV) regs[inst->dst] = vm_get_reg(regs, inst->b) != 0.0f ? vm_get_reg(regs, inst->a) / vm_get_reg(regs, inst->b) : 0.0f;
                 else if (op == SRAPI_VM_MIN) regs[inst->dst] = vm_get_reg(regs, inst->a) < vm_get_reg(regs, inst->b) ? vm_get_reg(regs, inst->a) : vm_get_reg(regs, inst->b);
                 else if (op == SRAPI_VM_MAX) regs[inst->dst] = vm_get_reg(regs, inst->a) > vm_get_reg(regs, inst->b) ? vm_get_reg(regs, inst->a) : vm_get_reg(regs, inst->b);
+                else if (op == SRAPI_VM_POW) regs[inst->dst] = powf(vm_get_reg(regs, inst->a), vm_get_reg(regs, inst->b));
                 break;
             case SRAPI_VM_LOAD_INPUT:
                 if (inst->dst < SRAPI_VM_REG_COUNT && inst->a < SRAPI_VM_VERTEX_INPUT_COUNT) {
@@ -228,6 +254,27 @@ srapi_result_t srapi_vm_run_vertex(
             case SRAPI_VM_CLAMP01:
                 if (inst->dst < SRAPI_VM_REG_COUNT) {
                     regs[inst->dst] = vm_clamp01(vm_get_reg(regs, inst->a));
+                }
+                break;
+            case SRAPI_VM_SIN:
+                if (inst->dst < SRAPI_VM_REG_COUNT) {
+                    regs[inst->dst] = sinf(vm_get_reg(regs, inst->a));
+                }
+                break;
+            case SRAPI_VM_COS:
+                if (inst->dst < SRAPI_VM_REG_COUNT) {
+                    regs[inst->dst] = cosf(vm_get_reg(regs, inst->a));
+                }
+                break;
+            case SRAPI_VM_ABS:
+                if (inst->dst < SRAPI_VM_REG_COUNT) {
+                    regs[inst->dst] = fabsf(vm_get_reg(regs, inst->a));
+                }
+                break;
+            case SRAPI_VM_SQRT:
+                if (inst->dst < SRAPI_VM_REG_COUNT) {
+                    float val = vm_get_reg(regs, inst->a);
+                    regs[inst->dst] = val >= 0.0f ? sqrtf(val) : 0.0f;
                 }
                 break;
             case SRAPI_VM_MIX:
