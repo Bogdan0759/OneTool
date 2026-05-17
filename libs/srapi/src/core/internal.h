@@ -17,7 +17,10 @@ struct srapi_device {
     int gpu_driver;
     uint32_t chipset_id;
     uint32_t tile_cache_enabled;
-    uint64_t tile_hashes[16];
+    uint32_t tile_cols;
+    uint32_t tile_rows;
+    uint64_t *tile_hashes;
+    uint32_t tile_hashes_capacity;
 };
 
 struct srapi_buffer {

@@ -4,10 +4,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#define TILE_COLS 4u
-#define TILE_ROWS 4u
-    #define TILE_COUNT (TILE_COLS * TILE_ROWS)
-
 static uint64_t tc_hash_u64(uint64_t h, uint64_t v) {
     h ^= v;
     h *= 1099511628211ull;
@@ -245,8 +241,8 @@ srapi_result_t srapi_tile_cache_submit_framebuffer(
     srapi_framebuffer_t *target,
     const srapi_cmd_buffer_t *cmd
 ) {
-    const uint32_t cols = TILE_COLS;
-    const uint32_t rows = TILE_ROWS;
+    const uint32_t cols = device->tile_cols;
+    const uint32_t rows = device->tile_rows;
     uint32_t tile_w = (target->width  + cols - 1) / cols;
     uint32_t tile_h = (target->height + rows - 1) / rows;
 
