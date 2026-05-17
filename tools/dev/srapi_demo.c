@@ -1096,8 +1096,8 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "--drm and --fbdev cannot be used together\n");
         return 1;
     }
-    if (use_i915_tile_cache && (!use_gpu || !use_drm)) {
-        fprintf(stderr, "--tile-cache requires --gpu --drm\n");
+    if (use_i915_tile_cache && !use_fbdev && (!use_gpu || !use_drm)) {
+        fprintf(stderr, "--tile-cache requires --gpu --drm or --fbdev\n");
         return 1;
     }
 
@@ -1178,6 +1178,13 @@ int main(int argc, char *argv[]) {
         width = srapi_fbdev_width(fbdev);
         height = srapi_fbdev_height(fbdev);
         fb = srapi_fbdev_framebuffer(fbdev);
+        if (use_i915_tile_cache) {
+            r = srapi_fbdev_set_tile_cache_enabled(fbdev, 1);
+            if (r != SRAPI_OK) {
+                fprintf(stderr, "fbdev tile cache enable failed: %s\n", srapi_last_error());
+                goto fail;
+            }
+        }
     }
 
     if (use_drm) {
