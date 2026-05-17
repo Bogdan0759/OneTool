@@ -1174,6 +1174,22 @@ static uint64_t i915_tile_hash(
     return h;
 }
 
+static void i915_fill_rect_pixels(
+    srapi_framebuffer_t *target,
+    uint32_t x,
+    uint32_t y,
+    uint32_t width,
+    uint32_t height,
+    uint32_t color
+) {
+    for (uint32_t row = y; row < y + height; row++) {
+        uint32_t *pixels = (uint32_t *)((uint8_t *)target->pixels + (size_t)row * target->pitch);
+        for (uint32_t col = x; col < x + width; col++) {
+            pixels[col] = color;
+        }
+    }
+}
+
 static srapi_result_t i915_render_tile(
     srapi_device_t *device,
     srapi_framebuffer_t *target,
@@ -1225,8 +1241,7 @@ static srapi_result_t i915_render_tile(
                                   &x, &y, &width, &height)) {
                     break;
                 }
-                r = srapi_i915_fill_framebuffer_rect(device, target, x, y, width, height, op->color);
-                if (r != SRAPI_OK) return r;
+                i915_fill_rect_pixels(target, x, y, width, height, op->color);
                 break;
             case SRAPI_COMMAND_FILL_RECT:
                 if (!clip_to_rect(op->x0, op->y0, op->width, op->height,
@@ -1234,8 +1249,7 @@ static srapi_result_t i915_render_tile(
                                   &x, &y, &width, &height)) {
                     break;
                 }
-                r = srapi_i915_fill_framebuffer_rect(device, target, x, y, width, height, op->color);
-                if (r != SRAPI_OK) return r;
+                i915_fill_rect_pixels(target, x, y, width, height, op->color);
                 break;
             case SRAPI_COMMAND_SET_SCISSOR:
                 scissor_enabled = 1;
@@ -1256,10 +1270,7 @@ static srapi_result_t i915_render_tile(
                 r = srapi_i915_render3d_line_framebuffer(
                     device, target, op,
                     1,
-                    scissor_enabled ? scissor_x : clip_x,
-                    scissor_enabled ? scissor_y : clip_y,
-                    scissor_enabled ? scissor_width : clip_width,
-                    scissor_enabled ? scissor_height : clip_height
+                    clip_x, clip_y, clip_width, clip_height
                 );
                 if (r != SRAPI_OK) return r;
                 break;
@@ -1267,21 +1278,15 @@ static srapi_result_t i915_render_tile(
                 r = srapi_i915_render3d_triangle_framebuffer(
                     device, target, op,
                     1,
-                    scissor_enabled ? scissor_x : clip_x,
-                    scissor_enabled ? scissor_y : clip_y,
-                    scissor_enabled ? scissor_width : clip_width,
-                    scissor_enabled ? scissor_height : clip_height
+                    clip_x, clip_y, clip_width, clip_height
                 );
                 if (r != SRAPI_OK) return r;
                 break;
             case SRAPI_COMMAND_SHADE_RECT:
                 r = srapi_i915_render3d_shade_framebuffer(
                     device, target, op,
-                    scissor_enabled ? 1 : 0,
-                    scissor_enabled ? scissor_x : clip_x,
-                    scissor_enabled ? scissor_y : clip_y,
-                    scissor_enabled ? scissor_width : clip_width,
-                    scissor_enabled ? scissor_height : clip_height
+                    1,
+                    clip_x, clip_y, clip_width, clip_height
                 );
                 if (r != SRAPI_OK) return r;
                 break;
