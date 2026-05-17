@@ -159,7 +159,13 @@ srapi_result_t srapi_queue_submit(
         return srapi_i915_render_framebuffer(queue->device, target, cmd);
     }
 
+    if (queue->device != NULL && queue->device->tile_cache_enabled &&
+        target->pixels != NULL) {
+        return srapi_tile_cache_submit_framebuffer(queue->device, target, cmd);
+    }
+
     return srapi_submit(NULL, target, cmd);
+
 }
 
 srapi_result_t srapi_queue_submit_image(

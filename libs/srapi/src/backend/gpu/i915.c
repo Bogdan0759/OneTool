@@ -110,11 +110,11 @@ srapi_result_t srapi_i915_set_tile_cache_enabled(srapi_device_t *device, uint32_
         return SRAPI_ERROR_BAD_ARG;
     }
 
-    device->i915_tile_cache_enabled = enabled != 0 ? 1u : 0u;
-    if (!device->i915_tile_cache_enabled) {
-        memset(device->i915_tile_hashes, 0, sizeof(device->i915_tile_hashes));
+    device->tile_cache_enabled = enabled != 0 ? 1u : 0u;
+    if (!device->tile_cache_enabled) {
+        memset(device->tile_hashes, 0, sizeof(device->tile_hashes));
     }
-    srapi_debugf("i915 tile cache %s", device->i915_tile_cache_enabled ? "enabled" : "disabled");
+    srapi_debugf("i915 tile cache %s", device->tile_cache_enabled ? "enabled" : "disabled");
     return SRAPI_OK;
 }
 
@@ -123,7 +123,7 @@ uint32_t srapi_i915_tile_cache_enabled(const srapi_device_t *device) {
         return 0;
     }
 
-    return device->i915_tile_cache_enabled;
+    return device->tile_cache_enabled;
 }
 
 static int get_param(int fd, int param, int *out) {
@@ -992,187 +992,7 @@ static int clip_to_rect(
     return 1;
 }
 
-static uint64_t hash_mix_u64(uint64_t h, uint64_t v) {
-    h ^= v;
-    h *= 1099511628211ull;
-    return h;
-}
 
-static uint64_t hash_mix_bytes(uint64_t h, const void *data, size_t len) {
-    const uint8_t *bytes = (const uint8_t *)data;
-
-    for (size_t i = 0; i < len; i++) {
-        h = hash_mix_u64(h, bytes[i]);
-    }
-    return h;
-}
-
-static uint64_t i915_shader_hash(const srapi_shader_t *shader) {
-    uint64_t h = 1469598103934665603ull;
-
-    if (shader == NULL) {
-        return 0;
-    }
-
-    h = hash_mix_u64(h, (uint64_t)shader->word_count);
-    h = hash_mix_u64(h, (uint64_t)shader->inst_count);
-    h = hash_mix_u64(h, (uint64_t)shader->uniform_count);
-    h = hash_mix_bytes(h, shader->bytecode, shader->word_count * sizeof(uint32_t));
-    h = hash_mix_bytes(h, shader->uniforms, shader->uniform_count * sizeof(float));
-    return h;
-}
-
-static uint64_t i915_tile_command_hash(
-    const srapi_command_t *op,
-    int scissor_enabled,
-    int32_t scissor_x,
-    int32_t scissor_y,
-    uint32_t scissor_width,
-    uint32_t scissor_height,
-    int32_t tile_x,
-    int32_t tile_y,
-    uint32_t tile_width,
-    uint32_t tile_height
-) {
-    uint32_t x;
-    uint32_t y;
-    uint32_t width;
-    uint32_t height;
-    uint64_t h = 1469598103934665603ull;
-
-    switch (op->kind) {
-        case SRAPI_COMMAND_CLEAR:
-        case SRAPI_COMMAND_FILL_RECT:
-        case SRAPI_COMMAND_SHADE_RECT:
-            if (!clip_to_rect(op->x0, op->y0, op->width, op->height,
-                              scissor_enabled ? scissor_x : tile_x,
-                              scissor_enabled ? scissor_y : tile_y,
-                              scissor_enabled ? scissor_width : tile_width,
-                              scissor_enabled ? scissor_height : tile_height,
-                              &x, &y, &width, &height)) {
-                return 0;
-            }
-            h = hash_mix_u64(h, (uint64_t)op->kind);
-            h = hash_mix_u64(h, x);
-            h = hash_mix_u64(h, y);
-            h = hash_mix_u64(h, width);
-            h = hash_mix_u64(h, height);
-            h = hash_mix_u64(h, op->color);
-            if (op->kind == SRAPI_COMMAND_SHADE_RECT) {
-                h = hash_mix_u64(h, i915_shader_hash(op->shader));
-            }
-            return h;
-        case SRAPI_COMMAND_DRAW_LINE: {
-            int32_t min_x = op->x0 < op->x1 ? op->x0 : op->x1;
-            int32_t max_x = op->x0 > op->x1 ? op->x0 : op->x1;
-            int32_t min_y = op->y0 < op->y1 ? op->y0 : op->y1;
-            int32_t max_y = op->y0 > op->y1 ? op->y0 : op->y1;
-
-            if (!clip_to_rect(min_x, min_y, (uint32_t)(max_x - min_x + 1), (uint32_t)(max_y - min_y + 1),
-                              scissor_enabled ? scissor_x : tile_x,
-                              scissor_enabled ? scissor_y : tile_y,
-                              scissor_enabled ? scissor_width : tile_width,
-                              scissor_enabled ? scissor_height : tile_height,
-                              &x, &y, &width, &height)) {
-                return 0;
-            }
-            h = hash_mix_u64(h, (uint64_t)op->kind);
-            h = hash_mix_u64(h, op->x0);
-            h = hash_mix_u64(h, op->y0);
-            h = hash_mix_u64(h, op->x1);
-            h = hash_mix_u64(h, op->y1);
-            h = hash_mix_u64(h, op->color);
-            return h;
-        }
-        case SRAPI_COMMAND_FILL_TRIANGLE: {
-            int32_t min_x = op->x0 < op->x1 ? op->x0 : op->x1;
-            int32_t max_x = op->x0 > op->x1 ? op->x0 : op->x1;
-            int32_t min_y = op->y0 < op->y1 ? op->y0 : op->y1;
-            int32_t max_y = op->y0 > op->y1 ? op->y0 : op->y1;
-
-            if (op->x2 < min_x) min_x = op->x2;
-            if (op->x2 > max_x) max_x = op->x2;
-            if (op->y2 < min_y) min_y = op->y2;
-            if (op->y2 > max_y) max_y = op->y2;
-            if (!clip_to_rect(min_x, min_y, (uint32_t)(max_x - min_x + 1), (uint32_t)(max_y - min_y + 1),
-                              scissor_enabled ? scissor_x : tile_x,
-                              scissor_enabled ? scissor_y : tile_y,
-                              scissor_enabled ? scissor_width : tile_width,
-                              scissor_enabled ? scissor_height : tile_height,
-                              &x, &y, &width, &height)) {
-                return 0;
-            }
-            h = hash_mix_u64(h, (uint64_t)op->kind);
-            h = hash_mix_u64(h, op->x0);
-            h = hash_mix_u64(h, op->y0);
-            h = hash_mix_u64(h, op->x1);
-            h = hash_mix_u64(h, op->y1);
-            h = hash_mix_u64(h, op->x2);
-            h = hash_mix_u64(h, op->y2);
-            h = hash_mix_u64(h, op->color);
-            return h;
-        }
-        case SRAPI_COMMAND_SET_SCISSOR:
-            return hash_mix_u64(hash_mix_u64(hash_mix_u64(hash_mix_u64(h, op->kind), op->x0), op->y0), op->width ^ ((uint64_t)op->height << 32));
-        case SRAPI_COMMAND_SET_VIEWPORT:
-            return hash_mix_u64(hash_mix_u64(hash_mix_u64(hash_mix_u64(h, op->kind), op->x0), op->y0), op->width ^ ((uint64_t)op->height << 32));
-        case SRAPI_COMMAND_SET_BLEND:
-            return hash_mix_u64(hash_mix_u64(h, op->kind), (uint64_t)op->blend_mode);
-        default:
-            return hash_mix_u64(h, (uint64_t)op->kind);
-    }
-}
-
-static uint64_t i915_tile_hash(
-    const srapi_cmd_buffer_t *cmd,
-    int32_t tile_x,
-    int32_t tile_y,
-    uint32_t tile_width,
-    uint32_t tile_height,
-    uint32_t target_width,
-    uint32_t target_height
-) {
-    int scissor_enabled = 0;
-    int32_t scissor_x = 0;
-    int32_t scissor_y = 0;
-    uint32_t scissor_width = target_width;
-    uint32_t scissor_height = target_height;
-    uint64_t h = 1469598103934665603ull;
-
-    for (size_t i = 0; i < cmd->count; i++) {
-        const srapi_command_t *op = &cmd->items[i];
-        uint64_t ch = i915_tile_command_hash(
-            op,
-            scissor_enabled,
-            scissor_x,
-            scissor_y,
-            scissor_width,
-            scissor_height,
-            tile_x,
-            tile_y,
-            tile_width,
-            tile_height
-        );
-
-        switch (op->kind) {
-            case SRAPI_COMMAND_SET_SCISSOR:
-                scissor_enabled = 1;
-                scissor_x = op->x0;
-                scissor_y = op->y0;
-                scissor_width = op->width;
-                scissor_height = op->height;
-                break;
-            case SRAPI_COMMAND_SET_VIEWPORT:
-            case SRAPI_COMMAND_SET_BLEND:
-                break;
-            default:
-                break;
-        }
-
-        h = hash_mix_u64(h, ch);
-    }
-    return h;
-}
 
 static void i915_fill_rect_pixels(
     srapi_framebuffer_t *target,
@@ -1190,7 +1010,7 @@ static void i915_fill_rect_pixels(
     }
 }
 
-static srapi_result_t i915_render_tile(
+srapi_result_t srapi_i915_render_tile_region(
     srapi_device_t *device,
     srapi_framebuffer_t *target,
     const srapi_cmd_buffer_t *cmd,
@@ -1408,7 +1228,7 @@ srapi_result_t srapi_i915_render_framebuffer(
         return SRAPI_ERROR_BAD_ARG;
     }
 
-    if (!device->i915_tile_cache_enabled) {
+    if (!device->tile_cache_enabled) {
         scissor_width = target->width;
         scissor_height = target->height;
         for (size_t i = 0; i < cmd->count; i++) {
@@ -1491,50 +1311,7 @@ srapi_result_t srapi_i915_render_framebuffer(
                      target->gpu_handle, cmd->count, target->width, target->height);
         return SRAPI_OK;
     }
-
-    {
-        const uint32_t cols = 4;
-        const uint32_t rows = 4;
-        uint32_t tile_w = (target->width + cols - 1) / cols;
-        uint32_t tile_h = (target->height + rows - 1) / rows;
-
-        if (tile_w == 0) tile_w = target->width;
-        if (tile_h == 0) tile_h = target->height;
-
-        for (uint32_t ty = 0; ty < rows; ty++) {
-            for (uint32_t tx = 0; tx < cols; tx++) {
-                uint32_t tile_index = ty * cols + tx;
-                int32_t tile_x = (int32_t)(tx * tile_w);
-                int32_t tile_y = (int32_t)(ty * tile_h);
-                uint32_t cur_w = tile_w;
-                uint32_t cur_h = tile_h;
-                uint64_t tile_hash;
-
-                if (tile_x >= (int32_t)target->width || tile_y >= (int32_t)target->height) {
-                    continue;
-                }
-                if (tile_x + cur_w > target->width) cur_w = target->width - (uint32_t)tile_x;
-                if (tile_y + cur_h > target->height) cur_h = target->height - (uint32_t)tile_y;
-                if (cur_w == 0 || cur_h == 0) {
-                    continue;
-                }
-
-                tile_hash = i915_tile_hash(cmd, tile_x, tile_y, cur_w, cur_h, target->width, target->height);
-                if (device->i915_tile_cache_enabled && device->i915_tile_hashes[tile_index] == tile_hash) {
-                    continue;
-                }
-                device->i915_tile_hashes[tile_index] = tile_hash;
-                if (i915_render_tile(device, target, cmd, tile_x, tile_y, cur_w, cur_h) != SRAPI_OK) {
-                    return SRAPI_ERROR;
-                }
-            }
-        }
-    }
-
-    srapi_debugf("i915 render framebuffer ok handle=%u commands=%zu %ux%u tile_cache=%u",
-                 target->gpu_handle, cmd->count, target->width, target->height,
-                 device->i915_tile_cache_enabled);
-    return SRAPI_OK;
+    return srapi_tile_cache_submit_framebuffer(device, target, cmd);
 }
 
 void srapi_i915_destroy_gem(int fd, uint32_t handle) {

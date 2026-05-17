@@ -202,6 +202,24 @@ const char *srapi_device_path(const srapi_device_t *device) {
     return device != NULL ? device->path : "";
 }
 
+srapi_result_t srapi_device_set_tile_cache_enabled(srapi_device_t *device, uint32_t enabled) {
+    if (device == NULL) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    device->tile_cache_enabled = enabled != 0 ? 1u : 0u;
+    if (!device->tile_cache_enabled) {
+        memset(device->tile_hashes, 0, sizeof(device->tile_hashes));
+    }
+    srapi_debugf("device tile cache %s backend=%s",
+                 device->tile_cache_enabled ? "enabled" : "disabled",
+                 srapi_backend_name(device->backend));
+    return SRAPI_OK;
+}
+
+uint32_t srapi_device_tile_cache_enabled(const srapi_device_t *device) {
+    return device != NULL ? device->tile_cache_enabled : 0;
+}
+
 static int primitive_group_size(srapi_primitive_topology_t topology) {
     switch (topology) {
         case SRAPI_PRIMITIVE_POINTS: return 1;
