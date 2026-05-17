@@ -126,13 +126,8 @@ srapi_result_t srapi_gpu_open_device(const srapi_device_desc_t *desc, srapi_devi
     if (srapi_i915_query_fd(fd, path, &i915) == SRAPI_OK) {
         device->gpu_driver = 915;
         device->chipset_id = i915.chipset_id;
-        device->i915_tile_cache_enabled = 0;
-        memset(device->i915_tile_hashes, 0, sizeof(device->i915_tile_hashes));
-        device->i915_tile_shadow = NULL;
-        device->i915_tile_shadow_size = 0;
-        device->i915_tile_shadow_pitch = 0;
-        device->i915_tile_shadow_width = 0;
-        device->i915_tile_shadow_height = 0;
+        device->tile_cache_enabled = 0;
+        memset(device->tile_hashes, 0, sizeof(device->tile_hashes));
     }
     *out = device;
     srapi_debugf("gpu device open path=%s fd=%d driver=%s chipset=0x%x",
@@ -183,7 +178,6 @@ void srapi_gpu_close_device(srapi_device_t *device) {
         close(device->fd);
         device->fd = -1;
     }
-    free(device->i915_tile_shadow);
     free(device);
 }
 

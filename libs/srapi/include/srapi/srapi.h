@@ -355,6 +355,8 @@ srapi_result_t srapi_i915_set_domain(
 srapi_result_t srapi_i915_wait(srapi_device_t *device, srapi_buffer_t *buffer, int64_t timeout_ns);
 srapi_result_t srapi_i915_exec(srapi_device_t *device, const srapi_i915_exec_desc_t *desc);
 srapi_result_t srapi_i915_submit_noop(srapi_device_t *device);
+srapi_result_t srapi_device_set_tile_cache_enabled(srapi_device_t *device, uint32_t enabled);
+uint32_t srapi_device_tile_cache_enabled(const srapi_device_t *device);
 srapi_result_t srapi_i915_set_tile_cache_enabled(srapi_device_t *device, uint32_t enabled);
 uint32_t srapi_i915_tile_cache_enabled(const srapi_device_t *device);
 srapi_result_t srapi_i915_fill_buffer(

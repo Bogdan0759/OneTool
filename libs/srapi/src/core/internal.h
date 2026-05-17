@@ -16,13 +16,8 @@ struct srapi_device {
     int fd;
     int gpu_driver;
     uint32_t chipset_id;
-    uint32_t i915_tile_cache_enabled;
-    uint64_t i915_tile_hashes[16];
-    uint8_t *i915_tile_shadow;
-    uint64_t i915_tile_shadow_size;
-    uint32_t i915_tile_shadow_pitch;
-    uint32_t i915_tile_shadow_width;
-    uint32_t i915_tile_shadow_height;
+    uint32_t tile_cache_enabled;
+    uint64_t tile_hashes[16];
 };
 
 struct srapi_buffer {
@@ -163,6 +158,20 @@ srapi_result_t srapi_i915_render_image(
     const srapi_cmd_buffer_t *cmd
 );
 srapi_result_t srapi_i915_render_framebuffer(
+    srapi_device_t *device,
+    srapi_framebuffer_t *target,
+    const srapi_cmd_buffer_t *cmd
+);
+srapi_result_t srapi_i915_render_tile_region(
+    srapi_device_t *device,
+    srapi_framebuffer_t *target,
+    const srapi_cmd_buffer_t *cmd,
+    int32_t tile_x,
+    int32_t tile_y,
+    uint32_t tile_width,
+    uint32_t tile_height
+);
+srapi_result_t srapi_tile_cache_submit_framebuffer(
     srapi_device_t *device,
     srapi_framebuffer_t *target,
     const srapi_cmd_buffer_t *cmd
