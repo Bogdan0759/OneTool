@@ -154,7 +154,17 @@ srapi_result_t srapi_fbdev_open_display(
     snprintf(display->device->path, sizeof(display->device->path), "%s", path);
     display->device->fd = fd;
     display->device->tile_cache_enabled = 0;
-    memset(display->device->tile_hashes, 0, sizeof(display->device->tile_hashes));
+    display->device->tile_cols = 4;
+    display->device->tile_rows = 4;
+    display->device->tile_hashes = calloc(16, sizeof(uint64_t));
+    if (display->device->tile_hashes == NULL) {
+        free(display->device);
+        munmap(display->map, fix.smem_len);
+        free(display);
+        close(fd);
+        return SRAPI_ERROR_OOM;
+    }
+    display->device->tile_hashes_capacity = 16;
 
     display->fb.device = display->device;
 
@@ -177,6 +187,9 @@ void srapi_fbdev_close(srapi_fbdev_display_t *display) {
         close(display->fd);
     }
     if (display->device != NULL) {
+        if (display->device->tile_hashes != NULL) {
+            free(display->device->tile_hashes);
+        }
         free(display->device);
     }
     free(display);
@@ -217,4 +230,18 @@ uint32_t srapi_fbdev_tile_cache_enabled(const srapi_fbdev_display_t *display) {
         return 0;
     }
     return srapi_device_tile_cache_enabled(display->device);
+}
+
+srapi_result_t srapi_fbdev_set_tile_cache_config(srapi_fbdev_display_t *display, uint32_t cols, uint32_t rows) {
+    if (display == NULL || display->device == NULL) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    return srapi_device_set_tile_cache_config(display->device, cols, rows);
+}
+
+srapi_result_t srapi_fbdev_get_tile_cache_config(const srapi_fbdev_display_t *display, uint32_t *out_cols, uint32_t *out_rows) {
+    if (display == NULL || display->device == NULL) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    return srapi_device_get_tile_cache_config(display->device, out_cols, out_rows);
 }

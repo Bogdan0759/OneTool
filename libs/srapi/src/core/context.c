@@ -176,6 +176,15 @@ srapi_result_t srapi_create_device(const srapi_device_desc_t *desc, srapi_device
         snprintf(device->path, sizeof(device->path), "%s", info.path);
     }
 
+    device->tile_cols = 4;
+    device->tile_rows = 4;
+    device->tile_hashes = calloc(16, sizeof(uint64_t));
+    if (device->tile_hashes == NULL) {
+        free(device);
+        return SRAPI_ERROR_OOM;
+    }
+    device->tile_hashes_capacity = 16;
+
     *out = device;
     srapi_debugf("device create backend=%s path=%s",
                  srapi_backend_name(device->backend), device->path);
@@ -186,6 +195,10 @@ void srapi_destroy_device(srapi_device_t *device) {
     if (device != NULL) {
         srapi_debugf("device destroy backend=%s path=%s",
                      srapi_backend_name(device->backend), device->path);
+        if (device->tile_hashes != NULL) {
+            free(device->tile_hashes);
+            device->tile_hashes = NULL;
+        }
         if (device->backend == SRAPI_BACKEND_GPU) {
             srapi_gpu_close_device(device);
             return;
@@ -208,7 +221,9 @@ srapi_result_t srapi_device_set_tile_cache_enabled(srapi_device_t *device, uint3
     }
     device->tile_cache_enabled = enabled != 0 ? 1u : 0u;
     if (!device->tile_cache_enabled) {
-        memset(device->tile_hashes, 0, sizeof(device->tile_hashes));
+        if (device->tile_hashes != NULL) {
+            memset(device->tile_hashes, 0, device->tile_hashes_capacity * sizeof(uint64_t));
+        }
     }
     srapi_debugf("device tile cache %s backend=%s",
                  device->tile_cache_enabled ? "enabled" : "disabled",
@@ -218,6 +233,39 @@ srapi_result_t srapi_device_set_tile_cache_enabled(srapi_device_t *device, uint3
 
 uint32_t srapi_device_tile_cache_enabled(const srapi_device_t *device) {
     return device != NULL ? device->tile_cache_enabled : 0;
+}
+
+srapi_result_t srapi_device_set_tile_cache_config(srapi_device_t *device, uint32_t cols, uint32_t rows) {
+    if (device == NULL || cols == 0 || rows == 0) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    if (cols > 256 || rows > 256) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    uint32_t required = cols * rows;
+    if (required > device->tile_hashes_capacity) {
+        uint64_t *new_hashes = realloc(device->tile_hashes, required * sizeof(uint64_t));
+        if (new_hashes == NULL) {
+            return SRAPI_ERROR_OOM;
+        }
+        device->tile_hashes = new_hashes;
+        device->tile_hashes_capacity = required;
+    }
+    device->tile_cols = cols;
+    device->tile_rows = rows;
+    memset(device->tile_hashes, 0, required * sizeof(uint64_t));
+    srapi_debugf("device tile cache config set to %ux%u backend=%s",
+                 cols, rows, srapi_backend_name(device->backend));
+    return SRAPI_OK;
+}
+
+srapi_result_t srapi_device_get_tile_cache_config(const srapi_device_t *device, uint32_t *out_cols, uint32_t *out_rows) {
+    if (device == NULL || out_cols == NULL || out_rows == NULL) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    *out_cols = device->tile_cols;
+    *out_rows = device->tile_rows;
+    return SRAPI_OK;
 }
 
 static int primitive_group_size(srapi_primitive_topology_t topology) {

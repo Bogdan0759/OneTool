@@ -357,6 +357,8 @@ srapi_result_t srapi_i915_exec(srapi_device_t *device, const srapi_i915_exec_des
 srapi_result_t srapi_i915_submit_noop(srapi_device_t *device);
 srapi_result_t srapi_device_set_tile_cache_enabled(srapi_device_t *device, uint32_t enabled);
 uint32_t srapi_device_tile_cache_enabled(const srapi_device_t *device);
+srapi_result_t srapi_device_set_tile_cache_config(srapi_device_t *device, uint32_t cols, uint32_t rows);
+srapi_result_t srapi_device_get_tile_cache_config(const srapi_device_t *device, uint32_t *out_cols, uint32_t *out_rows);
 srapi_result_t srapi_i915_set_tile_cache_enabled(srapi_device_t *device, uint32_t enabled);
 uint32_t srapi_i915_tile_cache_enabled(const srapi_device_t *device);
 srapi_result_t srapi_i915_fill_buffer(
@@ -596,6 +598,8 @@ uint32_t srapi_fbdev_width(const srapi_fbdev_display_t *display);
 uint32_t srapi_fbdev_height(const srapi_fbdev_display_t *display);
 srapi_result_t srapi_fbdev_set_tile_cache_enabled(srapi_fbdev_display_t *display, uint32_t enabled);
 uint32_t srapi_fbdev_tile_cache_enabled(const srapi_fbdev_display_t *display);
+srapi_result_t srapi_fbdev_set_tile_cache_config(srapi_fbdev_display_t *display, uint32_t cols, uint32_t rows);
+srapi_result_t srapi_fbdev_get_tile_cache_config(const srapi_fbdev_display_t *display, uint32_t *out_cols, uint32_t *out_rows);
 
 srapi_result_t srapi_display_probe_drm(
     const char *device_path,

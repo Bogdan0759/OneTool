@@ -880,6 +880,8 @@ int main(int argc, char *argv[]) {
     int use_drm = 0;
     int use_fbdev = 0;
     int use_i915_tile_cache = 0;
+    uint32_t tile_cols = 4;
+    uint32_t tile_rows = 4;
     int list_displays = 0;
     int list_modes = 0;
     uint32_t list_modes_connector = 0;
@@ -924,6 +926,16 @@ int main(int argc, char *argv[]) {
             use_gpu = 1;
         } else if (strcmp(argv[i], "--tile-cache") == 0) {
             use_i915_tile_cache = 1;
+        } else if (strcmp(argv[i], "--tile-cols") == 0 && i + 1 < argc) {
+            if (!parse_u32(argv[++i], &tile_cols)) {
+                fprintf(stderr, "bad tile cols\n");
+                return 1;
+            }
+        } else if (strcmp(argv[i], "--tile-rows") == 0 && i + 1 < argc) {
+            if (!parse_u32(argv[++i], &tile_rows)) {
+                fprintf(stderr, "bad tile rows\n");
+                return 1;
+            }
         } else if (strcmp(argv[i], "--probe-gpu") == 0) {
             probe_gpu = 1;
         } else if (strcmp(argv[i], "--probe-i915") == 0) {
@@ -1145,6 +1157,11 @@ int main(int argc, char *argv[]) {
                     fprintf(stderr, "--tile-cache requires i915 with GEM/EXECBUF2/BLT\n");
                     goto fail;
                 }
+                r = srapi_device_set_tile_cache_config(gpu_device, tile_cols, tile_rows);
+                if (r != SRAPI_OK) {
+                    fprintf(stderr, "tile cache config failed: %s\n", srapi_last_error());
+                    goto fail;
+                }
                 r = srapi_i915_set_tile_cache_enabled(gpu_device, 1);
                 if (r != SRAPI_OK) {
                     fprintf(stderr, "tile cache enable failed: %s\n", srapi_last_error());
@@ -1179,6 +1196,11 @@ int main(int argc, char *argv[]) {
         height = srapi_fbdev_height(fbdev);
         fb = srapi_fbdev_framebuffer(fbdev);
         if (use_i915_tile_cache) {
+            r = srapi_fbdev_set_tile_cache_config(fbdev, tile_cols, tile_rows);
+            if (r != SRAPI_OK) {
+                fprintf(stderr, "fbdev tile cache config failed: %s\n", srapi_last_error());
+                goto fail;
+            }
             r = srapi_fbdev_set_tile_cache_enabled(fbdev, 1);
             if (r != SRAPI_OK) {
                 fprintf(stderr, "fbdev tile cache enable failed: %s\n", srapi_last_error());
