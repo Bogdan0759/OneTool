@@ -143,6 +143,21 @@ srapi_result_t srapi_fbdev_open_display(
     display->fb.owns_pixels = 0;
     display->fb.backend = SRAPI_BACKEND_FBDEV;
 
+    display->device = calloc(1, sizeof(srapi_device_t));
+    if (display->device == NULL) {
+        munmap(display->map, fix.smem_len);
+        free(display);
+        close(fd);
+        return SRAPI_ERROR_OOM;
+    }
+    display->device->backend = SRAPI_BACKEND_FBDEV;
+    snprintf(display->device->path, sizeof(display->device->path), "%s", path);
+    display->device->fd = fd;
+    display->device->tile_cache_enabled = 0;
+    memset(display->device->tile_hashes, 0, sizeof(display->device->tile_hashes));
+
+    display->fb.device = display->device;
+
     *out = display;
     srapi_debugf("fbdev open path=%s %ux%u pitch=%u size=%llu",
                  display->device_path, display->fb.width, display->fb.height,
@@ -160,6 +175,9 @@ void srapi_fbdev_close(srapi_fbdev_display_t *display) {
     }
     if (display->fd >= 0) {
         close(display->fd);
+    }
+    if (display->device != NULL) {
+        free(display->device);
     }
     free(display);
 }
@@ -185,4 +203,18 @@ uint32_t srapi_fbdev_width(const srapi_fbdev_display_t *display) {
 
 uint32_t srapi_fbdev_height(const srapi_fbdev_display_t *display) {
     return display != NULL ? display->fb.height : 0;
+}
+
+srapi_result_t srapi_fbdev_set_tile_cache_enabled(srapi_fbdev_display_t *display, uint32_t enabled) {
+    if (display == NULL || display->device == NULL) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    return srapi_device_set_tile_cache_enabled(display->device, enabled);
+}
+
+uint32_t srapi_fbdev_tile_cache_enabled(const srapi_fbdev_display_t *display) {
+    if (display == NULL || display->device == NULL) {
+        return 0;
+    }
+    return srapi_device_tile_cache_enabled(display->device);
 }

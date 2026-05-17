@@ -85,6 +85,7 @@ struct srapi_fbdev_display {
     void *map;
     srapi_framebuffer_t fb;
     char device_path[64];
+    srapi_device_t *device;
 };
 
 struct srapi_cmd_buffer {

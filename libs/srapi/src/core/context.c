@@ -368,6 +368,11 @@ srapi_result_t srapi_submit(
         return SRAPI_ERROR_BAD_ARG;
     }
 
+    if (target->device != NULL && target->device->tile_cache_enabled &&
+        target->pixels != NULL) {
+        return srapi_tile_cache_submit_framebuffer(target->device, target, cmd);
+    }
+
     if (ctx != NULL &&
         (ctx->backend_checks & SRAPI_BACKEND_CHECK_BACKEND_MATCH) != 0 &&
         target->backend != ctx->backend) {

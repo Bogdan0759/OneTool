@@ -594,6 +594,8 @@ srapi_framebuffer_t *srapi_fbdev_framebuffer(srapi_fbdev_display_t *display);
 srapi_result_t srapi_fbdev_present(srapi_fbdev_display_t *display);
 uint32_t srapi_fbdev_width(const srapi_fbdev_display_t *display);
 uint32_t srapi_fbdev_height(const srapi_fbdev_display_t *display);
+srapi_result_t srapi_fbdev_set_tile_cache_enabled(srapi_fbdev_display_t *display, uint32_t enabled);
+uint32_t srapi_fbdev_tile_cache_enabled(const srapi_fbdev_display_t *display);
 
 srapi_result_t srapi_display_probe_drm(
     const char *device_path,
