@@ -1,6 +1,7 @@
 #include "vm.h"
 
 #include <string.h>
+#include <math.h>
 
 #define SRAPI_I915_VM_REG_COUNT 16
 
@@ -88,6 +89,11 @@ static srapi_result_t run_fragment_gpu_vm(
                     regs[inst->dst] = a > b ? a : b;
                 }
                 break;
+            case SRAPI_VM_POW:
+                if (inst->dst < SRAPI_I915_VM_REG_COUNT) {
+                    regs[inst->dst] = powf(reg_get(regs, inst->a), reg_get(regs, inst->b));
+                }
+                break;
             case SRAPI_VM_LOAD_INPUT:
                 if (inst->dst < SRAPI_I915_VM_REG_COUNT && inst->a < 6) {
                     regs[inst->dst] = inputs[inst->a];
@@ -111,6 +117,27 @@ static srapi_result_t run_fragment_gpu_vm(
             case SRAPI_VM_CLAMP01:
                 if (inst->dst < SRAPI_I915_VM_REG_COUNT) {
                     regs[inst->dst] = clamp01(reg_get(regs, inst->a));
+                }
+                break;
+            case SRAPI_VM_SIN:
+                if (inst->dst < SRAPI_I915_VM_REG_COUNT) {
+                    regs[inst->dst] = sinf(reg_get(regs, inst->a));
+                }
+                break;
+            case SRAPI_VM_COS:
+                if (inst->dst < SRAPI_I915_VM_REG_COUNT) {
+                    regs[inst->dst] = cosf(reg_get(regs, inst->a));
+                }
+                break;
+            case SRAPI_VM_ABS:
+                if (inst->dst < SRAPI_I915_VM_REG_COUNT) {
+                    regs[inst->dst] = fabsf(reg_get(regs, inst->a));
+                }
+                break;
+            case SRAPI_VM_SQRT:
+                if (inst->dst < SRAPI_I915_VM_REG_COUNT) {
+                    float val = reg_get(regs, inst->a);
+                    regs[inst->dst] = val >= 0.0f ? sqrtf(val) : 0.0f;
                 }
                 break;
             case SRAPI_VM_MIX:

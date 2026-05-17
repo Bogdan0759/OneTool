@@ -1,7 +1,7 @@
 string CC = "clang";
 string CFLAGS = "-O3 -flto";
 string LDFLAGS = "-static";
-string LDLIBS = "-lssl -lcrypto -lz -lzstd -ldl -pthread -lncursesw -ltinfo";
+string LDLIBS = "-lssl -lcrypto -lz -lzstd -ldl -pthread -lncursesw -ltinfo -lm";
 
 string TARGET = "onetool";
 string MAIN_SRC = "main.c";

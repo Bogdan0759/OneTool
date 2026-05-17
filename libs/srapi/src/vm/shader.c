@@ -22,6 +22,11 @@ static const char *vm_op_name(uint8_t op) {
         case SRAPI_VM_CLAMP01: return "CLAMP01";
         case SRAPI_VM_MIX: return "MIX";
         case SRAPI_VM_OUT_POSITION: return "OUT_POSITION";
+        case SRAPI_VM_SIN: return "SIN";
+        case SRAPI_VM_COS: return "COS";
+        case SRAPI_VM_ABS: return "ABS";
+        case SRAPI_VM_SQRT: return "SQRT";
+        case SRAPI_VM_POW: return "POW";
         default: return "?";
     }
 }
@@ -84,6 +89,10 @@ static srapi_result_t vm_decode_bytecode(
             case SRAPI_VM_LOAD_UNIFORM:
             case SRAPI_VM_FRACT:
             case SRAPI_VM_CLAMP01:
+            case SRAPI_VM_SIN:
+            case SRAPI_VM_COS:
+            case SRAPI_VM_ABS:
+            case SRAPI_VM_SQRT:
                 if (vm_read_arg(bytecode, word_count, &pc, &inst->dst) != SRAPI_OK ||
                     vm_read_arg(bytecode, word_count, &pc, &inst->a) != SRAPI_OK) {
                     free(insts);
@@ -109,6 +118,7 @@ static srapi_result_t vm_decode_bytecode(
             case SRAPI_VM_DIV:
             case SRAPI_VM_MIN:
             case SRAPI_VM_MAX:
+            case SRAPI_VM_POW:
                 if (vm_read_arg(bytecode, word_count, &pc, &inst->dst) != SRAPI_OK ||
                     vm_read_arg(bytecode, word_count, &pc, &inst->a) != SRAPI_OK ||
                     vm_read_arg(bytecode, word_count, &pc, &inst->b) != SRAPI_OK) {
@@ -170,6 +180,10 @@ static void vm_disasm_shader(const srapi_shader_t *shader) {
             case SRAPI_VM_LOAD_UNIFORM:
             case SRAPI_VM_FRACT:
             case SRAPI_VM_CLAMP01:
+            case SRAPI_VM_SIN:
+            case SRAPI_VM_COS:
+            case SRAPI_VM_ABS:
+            case SRAPI_VM_SQRT:
                 srapi_debugf("shader inst[%zu] %s dst=%u a=%u",
                              i, vm_op_name(inst->op), inst->dst, inst->a);
                 break;
