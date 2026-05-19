@@ -1,5 +1,7 @@
 #include "render3d.h"
 #include "vm.h"
+#include "compiler.h"
+#include <stdlib.h>
 
 static int clip_rect(
     int32_t x,
@@ -273,7 +275,28 @@ srapi_result_t srapi_i915_render3d_shade_image(
         return SRAPI_OK;
     }
 
-    srapi_debugf("i915 render3d shade_rect gpu-vm mapped target=image %u,%u %ux%u",
+    srapi_debugf("i915 render3d shade_rect native-gpu target=image %u,%u %ux%u",
+                 x, y, width, height);
+
+    srapi_buffer_t *compiled = op->shader->compiled_gpu_buffer;
+    if (compiled == NULL) {
+        srapi_result_t compile_res = srapi_i915_compile_shader(device, op->shader, &compiled);
+        if (compile_res == SRAPI_OK && compiled != NULL) {
+            op->shader->compiled_gpu_buffer = compiled;
+        }
+    }
+
+    if (compiled != NULL) {
+        srapi_result_t r = srapi_i915_run_shader_gpu(
+            device, compiled, op->shader, op, x, y, width, height,
+            target->gpu_handle, target->gpu_size, target->pitch
+        );
+        if (r == SRAPI_OK) {
+            return SRAPI_OK;
+        }
+    }
+
+    srapi_debugf("i915 render3d shade_rect gpu-vm mapped fallback target=image %u,%u %ux%u",
                  x, y, width, height);
     return srapi_i915_vm_shade_image(device, target, op, x, y, width, height);
 }
@@ -306,7 +329,28 @@ srapi_result_t srapi_i915_render3d_shade_framebuffer(
         return SRAPI_OK;
     }
 
-    srapi_debugf("i915 render3d shade_rect gpu-vm mapped target=framebuffer %u,%u %ux%u",
+    srapi_debugf("i915 render3d shade_rect native-gpu target=framebuffer %u,%u %ux%u",
+                 x, y, width, height);
+
+    srapi_buffer_t *compiled = op->shader->compiled_gpu_buffer;
+    if (compiled == NULL) {
+        srapi_result_t compile_res = srapi_i915_compile_shader(device, op->shader, &compiled);
+        if (compile_res == SRAPI_OK && compiled != NULL) {
+            op->shader->compiled_gpu_buffer = compiled;
+        }
+    }
+
+    if (compiled != NULL) {
+        srapi_result_t r = srapi_i915_run_shader_gpu(
+            device, compiled, op->shader, op, x, y, width, height,
+            target->gpu_handle, target->gpu_size, target->pitch
+        );
+        if (r == SRAPI_OK) {
+            return SRAPI_OK;
+        }
+    }
+
+    srapi_debugf("i915 render3d shade_rect gpu-vm mapped fallback target=framebuffer %u,%u %ux%u",
                  x, y, width, height);
     return srapi_i915_vm_shade_framebuffer(device, target, op, x, y, width, height);
 }

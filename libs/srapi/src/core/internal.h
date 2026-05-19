@@ -115,6 +115,7 @@ struct srapi_shader {
     float *uniforms;
     size_t uniform_count;
     size_t run_count;
+    srapi_buffer_t *compiled_gpu_buffer;
 };
 
 typedef struct {
