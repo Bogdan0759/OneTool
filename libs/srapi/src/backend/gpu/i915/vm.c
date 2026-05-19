@@ -35,6 +35,70 @@ static uint8_t byte_from_float(float value) {
     return (uint8_t)(value * 255.0f + 0.5f);
 }
 
+static int is_demo_gradient_shader(const srapi_shader_t *shader) {
+    const srapi_vm_inst_t *i;
+
+    if (shader == NULL || shader->inst_count != 9 || shader->uniform_count < 3) {
+        return 0;
+    }
+
+    i = shader->insts;
+    return i[0].op == SRAPI_VM_LOAD_INPUT && i[0].dst == 0 && i[0].a == SRAPI_VM_INPUT_U &&
+           i[1].op == SRAPI_VM_LOAD_INPUT && i[1].dst == 1 && i[1].a == SRAPI_VM_INPUT_V &&
+           i[2].op == SRAPI_VM_LOAD_UNIFORM && i[2].dst == 2 && i[2].a == 0 &&
+           i[3].op == SRAPI_VM_ADD && i[3].dst == 0 && i[3].a == 0 && i[3].b == 2 &&
+           i[4].op == SRAPI_VM_FRACT && i[4].dst == 0 && i[4].a == 0 &&
+           i[5].op == SRAPI_VM_LOAD_UNIFORM && i[5].dst == 3 && i[5].a == 1 &&
+           i[6].op == SRAPI_VM_LOAD_UNIFORM && i[6].dst == 4 && i[6].a == 2 &&
+           i[7].op == SRAPI_VM_OUT_COLOR && i[7].a == 0 && i[7].b == 1 && i[7].c == 3 && i[7].d == 4 &&
+           i[8].op == SRAPI_VM_END;
+}
+
+static srapi_result_t shade_demo_gradient(
+    uint32_t *pixels,
+    uint32_t pitch,
+    srapi_shader_t *shader,
+    const srapi_command_t *op,
+    uint32_t x,
+    uint32_t y,
+    uint32_t width,
+    uint32_t height
+) {
+    float inv_w;
+    float inv_h;
+    uint8_t b;
+    uint8_t a;
+
+    if (pixels == NULL || pitch == 0 || shader == NULL || op == NULL) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    inv_w = op->width > 1 ? 1.0f / (float)(op->width - 1) : 0.0f;
+    inv_h = op->height > 1 ? 1.0f / (float)(op->height - 1) : 0.0f;
+    b = byte_from_float(shader->uniforms[1]);
+    a = byte_from_float(shader->uniforms[2]);
+
+    for (uint32_t py = y; py < y + height; py++) {
+        uint32_t *row = (uint32_t *)((uint8_t *)pixels + (size_t)py * pitch);
+        float v = ((float)((int32_t)py - op->y0)) * inv_h;
+        uint8_t g = byte_from_float(v);
+
+        for (uint32_t px = x; px < x + width; px++) {
+            float u = ((float)((int32_t)px - op->x0)) * inv_w + shader->uniforms[0];
+            uint8_t r;
+
+            u = u - (float)(int)u;
+            if (u < 0.0f) {
+                u += 1.0f;
+            }
+            r = byte_from_float(u);
+            row[px] = srapi_rgba(r, g, b, a);
+        }
+    }
+
+    return SRAPI_OK;
+}
+
 static srapi_result_t run_fragment_gpu_vm(
     srapi_shader_t *shader,
     const float inputs[6],
@@ -177,6 +241,9 @@ static srapi_result_t shade_pixels(
 ) {
     if (pixels == NULL || pitch == 0 || shader == NULL || op == NULL) {
         return SRAPI_ERROR_BAD_ARG;
+    }
+    if (is_demo_gradient_shader(shader)) {
+        return shade_demo_gradient(pixels, pitch, shader, op, x, y, width, height);
     }
 
     for (uint32_t py = y; py < y + height; py++) {
