@@ -488,28 +488,18 @@ void srapi_render_shade_rect(
     int32_t x1;
     int32_t y1;
 
-    if (shader == NULL || !clip_rect(fb, x, y, width, height, &x0, &y0, &x1, &y1)) {
+    if (shader == NULL || fb == NULL || fb->pixels == NULL ||
+        !clip_rect(fb, x, y, width, height, &x0, &y0, &x1, &y1)) {
         return;
     }
 
     srapi_debugf("cpu shade_rect clipped x=%d y=%d w=%d h=%d shader_insts=%zu",
                  x0, y0, x1 - x0, y1 - y0, shader->inst_count);
 
-    for (int32_t py = y0; py < y1; py++) {
-        for (int32_t px = x0; px < x1; px++) {
-            srapi_color_t color;
-            float inputs[6];
-
-            inputs[SRAPI_VM_INPUT_X] = (float)px;
-            inputs[SRAPI_VM_INPUT_Y] = (float)py;
-            inputs[SRAPI_VM_INPUT_U] = width > 1 ? (float)(px - x) / (float)(width - 1) : 0.0f;
-            inputs[SRAPI_VM_INPUT_V] = height > 1 ? (float)(py - y) / (float)(height - 1) : 0.0f;
-            inputs[SRAPI_VM_INPUT_WIDTH] = (float)width;
-            inputs[SRAPI_VM_INPUT_HEIGHT] = (float)height;
-
-            if (srapi_vm_run_fragment(shader, inputs, &color) == SRAPI_OK) {
-                put_pixel(fb, px, py, color);
-            }
-        }
-    }
+    srapi_vm_shade_rect(
+        fb->pixels, fb->pitch, shader,
+        x, y, width, height,
+        (uint32_t)x0, (uint32_t)y0,
+        (uint32_t)(x1 - x0), (uint32_t)(y1 - y0)
+    );
 }

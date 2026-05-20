@@ -270,9 +270,6 @@ void srapi_destroy_shader(srapi_shader_t *shader) {
     }
     srapi_debugf("shader destroy words=%zu insts=%zu uniforms=%zu runs=%zu",
                  shader->word_count, shader->inst_count, shader->uniform_count, shader->run_count);
-    if (shader->compiled_gpu_buffer != NULL) {
-        srapi_destroy_buffer(shader->compiled_gpu_buffer);
-    }
     free(shader->insts);
     free(shader->bytecode);
     free(shader->uniforms);

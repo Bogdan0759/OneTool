@@ -347,6 +347,14 @@ srapi_result_t srapi_context_set_backend_config(
 );
 uint32_t srapi_context_enabled_checks(const srapi_context_t *ctx);
 
+typedef struct {
+    int simd_enabled;
+    int threads_enabled;
+} srapi_shade_config_t;
+
+void srapi_set_shade_config(const srapi_shade_config_t *config);
+srapi_shade_config_t srapi_get_shade_config(void);
+
 srapi_result_t srapi_probe_device(srapi_backend_t backend, srapi_device_info_t *out);
 srapi_result_t srapi_probe_i915(const char *device_path, srapi_i915_info_t *out);
 srapi_result_t srapi_i915_buffer_handle(const srapi_buffer_t *buffer, uint32_t *out);

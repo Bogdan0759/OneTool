@@ -115,7 +115,6 @@ struct srapi_shader {
     float *uniforms;
     size_t uniform_count;
     size_t run_count;
-    srapi_buffer_t *compiled_gpu_buffer;
 };
 
 typedef struct {
@@ -245,6 +244,20 @@ srapi_result_t srapi_vm_run_vertex(
     const float inputs[7],
     float out_position[2],
     srapi_color_t *out_color
+);
+
+srapi_result_t srapi_vm_shade_rect(
+    uint32_t *pixels,
+    uint32_t pitch_bytes,
+    srapi_shader_t *shader,
+    int32_t rect_x0,
+    int32_t rect_y0,
+    uint32_t rect_width,
+    uint32_t rect_height,
+    uint32_t x,
+    uint32_t y,
+    uint32_t width,
+    uint32_t height
 );
 
 #endif
