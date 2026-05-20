@@ -1,5 +1,6 @@
 #include "internal.h"
 
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -7,6 +8,27 @@
 
 srapi_color_t srapi_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
     return ((uint32_t)a << 24) | ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
+}
+
+static atomic_int g_shade_simd_enabled = 1;
+static atomic_int g_shade_threads_enabled = 1;
+
+void srapi_set_shade_config(const srapi_shade_config_t *config) {
+    if (config == NULL) {
+        return;
+    }
+    atomic_store_explicit(&g_shade_simd_enabled, config->simd_enabled ? 1 : 0, memory_order_relaxed);
+    atomic_store_explicit(&g_shade_threads_enabled, config->threads_enabled ? 1 : 0, memory_order_relaxed);
+    srapi_debugf("shade config: simd=%d threads=%d",
+                 atomic_load_explicit(&g_shade_simd_enabled, memory_order_relaxed),
+                 atomic_load_explicit(&g_shade_threads_enabled, memory_order_relaxed));
+}
+
+srapi_shade_config_t srapi_get_shade_config(void) {
+    srapi_shade_config_t out;
+    out.simd_enabled = atomic_load_explicit(&g_shade_simd_enabled, memory_order_relaxed);
+    out.threads_enabled = atomic_load_explicit(&g_shade_threads_enabled, memory_order_relaxed);
+    return out;
 }
 
 const char *srapi_backend_name(srapi_backend_t backend) {
