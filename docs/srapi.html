@@ -949,68 +949,322 @@ srapi_result_t srapi_queue_copy_image_to_buffer(
 
 <hr>
 
-<h2 id="shader">12. Shader and Virtual Machine</h2>
+<h2 id="shader">12. Shader Virtual Machine — Specification</h2>
 
-<p>The SRAPI shader system uses a custom bytecode VM with 16 general-purpose registers (32-bit float). Shaders can be used as fragment shaders (per-pixel) or vertex shaders (per-vertex).</p>
+<p>The SRAPI shader system is a custom stackless register VM with 16 scalar float32 registers, a fixed-length decoded instruction format, and a variable-length bytecode encoding. It supports two execution modes: fragment (per-pixel) and vertex (per-vertex).</p>
 
-<h3>12.1 Shader Creation</h3>
-<pre>srapi_result_t srapi_create_shader(
-    const uint32_t *bytecode,
-    size_t word_count,
-    const float *uniforms,     // may be NULL
-    size_t uniform_count,      // may be 0
-    srapi_shader_t **out
-);</pre>
-<ul>
-<li>Copies bytecode, decodes instructions via <code>vm_decode_bytecode()</code></li>
-<li>Each bytecode word is <code>uint32_t</code>. Instruction format is variable-length:</li>
-</ul>
+<hr>
+
+<h3>12.1 Bytecode Encoding Specification</h3>
+
+<p>A shader program is an array of <code>uint32_t</code> words. The first word of each instruction is the opcode (uint8, must be ≤ 255). Following words are arguments encoded as uint8 values (must be ≤ 255), except for <code>LOAD_CONST</code> which takes a full <code>uint32_t</code> immediate.</p>
+
+<h4>12.1.1 Instruction Encoding Table</h4>
+
 <table>
-<tr><th>Args</th><th>Opcodes</th></tr>
-<tr><td>0 args</td><td>END</td></tr>
-<tr><td>2 args (dst, a)</td><td>MOV, LOAD_INPUT, LOAD_UNIFORM, FRACT, CLAMP01, SIN, COS, ABS, SQRT</td></tr>
-<tr><td>1 arg + immediate</td><td>LOAD_CONST (dst, imm32)</td></tr>
-<tr><td>3 args (dst, a, b)</td><td>ADD, SUB, MUL, DIV, MIN, MAX, POW</td></tr>
-<tr><td>4 args (dst, a, b, c)</td><td>MIX</td></tr>
-<tr><td>4 args (a, b, c, d)</td><td>OUT_COLOR (RGBA registers)</td></tr>
-<tr><td>2 args (a, b)</td><td>OUT_POSITION (x, y registers)</td></tr>
+<tr><th>Opcode</th><th>Value</th><th>Word Count</th><th>Wire Format</th></tr>
+<tr><td><code>END</code></td><td>0</td><td>1</td><td><code>[op]</code></td></tr>
+<tr><td><code>MOV</code></td><td>1</td><td>3</td><td><code>[op, dst, a]</code></td></tr>
+<tr><td><code>ADD</code></td><td>2</td><td>4</td><td><code>[op, dst, a, b]</code></td></tr>
+<tr><td><code>SUB</code></td><td>3</td><td>4</td><td><code>[op, dst, a, b]</code></td></tr>
+<tr><td><code>MUL</code></td><td>4</td><td>4</td><td><code>[op, dst, a, b]</code></td></tr>
+<tr><td><code>DIV</code></td><td>5</td><td>4</td><td><code>[op, dst, a, b]</code></td></tr>
+<tr><td><code>MIN</code></td><td>6</td><td>4</td><td><code>[op, dst, a, b]</code></td></tr>
+<tr><td><code>MAX</code></td><td>7</td><td>4</td><td><code>[op, dst, a, b]</code></td></tr>
+<tr><td><code>LOAD_INPUT</code></td><td>8</td><td>3</td><td><code>[op, dst, input_index]</code></td></tr>
+<tr><td><code>LOAD_UNIFORM</code></td><td>9</td><td>3</td><td><code>[op, dst, uniform_index]</code></td></tr>
+<tr><td><code>OUT_COLOR</code></td><td>10</td><td>5</td><td><code>[op, reg_r, reg_g, reg_b, reg_a]</code></td></tr>
+<tr><td><code>LOAD_CONST</code></td><td>11</td><td>3</td><td><code>[op, dst, imm32]</code> — imm32 is a full uint32_t word</td></tr>
+<tr><td><code>FRACT</code></td><td>12</td><td>3</td><td><code>[op, dst, a]</code></td></tr>
+<tr><td><code>CLAMP01</code></td><td>13</td><td>3</td><td><code>[op, dst, a]</code></td></tr>
+<tr><td><code>MIX</code></td><td>14</td><td>5</td><td><code>[op, dst, a, b, c]</code></td></tr>
+<tr><td><code>OUT_POSITION</code></td><td>15</td><td>3</td><td><code>[op, reg_x, reg_y]</code></td></tr>
+<tr><td><code>SIN</code></td><td>16</td><td>3</td><td><code>[op, dst, a]</code></td></tr>
+<tr><td><code>COS</code></td><td>17</td><td>3</td><td><code>[op, dst, a]</code></td></tr>
+<tr><td><code>ABS</code></td><td>18</td><td>3</td><td><code>[op, dst, a]</code></td></tr>
+<tr><td><code>SQRT</code></td><td>19</td><td>3</td><td><code>[op, dst, a]</code></td></tr>
+<tr><td><code>POW</code></td><td>20</td><td>4</td><td><code>[op, dst, a, b]</code></td></tr>
 </table>
 
-<h3>12.2 Uniform Management</h3>
-<pre>srapi_result_t srapi_shader_set_uniform(srapi_shader_t *shader, size_t index, float value);
-srapi_result_t srapi_shader_set_uniforms(srapi_shader_t *shader, size_t first,
-                                          const float *values, size_t count);</pre>
+<p>Total opcodes: 21 (values 0–20). Any opcode value outside this range causes <code>SRAPI_ERROR_BAD_ARG</code> at creation time.</p>
 
-<h3>12.3 Fragment Shader Execution</h3>
-<pre>srapi_result_t srapi_vm_run_fragment(
-    srapi_shader_t *shader,
-    const float inputs[6],       // X, Y, U, V, WIDTH, HEIGHT
-    srapi_color_t *out_color
-);</pre>
+<h4>12.1.2 Bytecode Validation</h4>
 <ul>
-<li>16 registers initialized to 0.0</li>
-<li>Default output: magenta (255, 0, 255, 255) if <code>OUT_COLOR</code> is never executed</li>
-<li>Shaders with <code>OUT_POSITION</code> ignore the position output in fragment mode</li>
-<li>Debug trace for the first 2 runs (when global <code>srapi</code> flag is set)</li>
+<li>Each argument word is validated at decode time: <code>word ≤ UINT8_MAX</code> (except the immediate of <code>LOAD_CONST</code>)</li>
+<li><code>END</code> may appear anywhere; decoding stops at <code>END</code> and the remaining words (if any) are ignored</li>
+<li>If <code>END</code> is not present, execution proceeds through all instructions and exits after the last one</li>
+<li>Opcodes <code>OUT_COLOR</code> and <code>OUT_POSITION</code> are valid in any position and quantity; the last executed instance determines the output</li>
+<li>Unknown opcodes cause <code>SRAPI_ERROR_BAD_ARG</code> at creation time</li>
 </ul>
 
-<h3>12.4 Vertex Shader Execution</h3>
+<hr>
+
+<h3>12.2 Decoded Instruction Format (<code>srapi_vm_inst_t</code>)</h3>
+
+<pre>typedef struct {
+    uint8_t op;      // opcode (0–20)
+    uint8_t dst;     // destination register index (0–15)
+    uint8_t a, b, c, d;  // source operand register indices (0–15)
+    uint32_t imm;    // immediate value (LOAD_CONST only)
+} srapi_vm_inst_t;</pre>
+
+<p>Size: 9 bytes (may be padded by compiler to 12 or 16). Decoded from bytecode by <code>vm_decode_bytecode()</code> in <code>shader.c</code>.</p>
+
+<hr>
+
+<h3>12.3 Register File</h3>
+
+<table>
+<tr><th>Property</th><th>Value</th></tr>
+<tr><td>Register count</td><td>16 (<code>SRAPI_VM_REG_COUNT</code>)</td></tr>
+<tr><td>Register width</td><td>32-bit IEEE 754 single-precision float</td></tr>
+<tr><td>Initial state (all modes)</td><td>All 16 registers set to <code>0.0f</code></td></tr>
+<tr><td>Out-of-bounds read</td><td>Returns <code>0.0f</code> (clamped by <code>vm_get_reg()</code>)</td></tr>
+<tr><td>Out-of-bounds write</td><td>Silently discarded (guarded by <code>dst &lt; SRAPI_VM_REG_COUNT</code>)</td></tr>
+</table>
+
+<hr>
+
+<h3>12.4 Fragment Shader Execution — <code>srapi_vm_run_fragment()</code></h3>
+
+<pre>srapi_result_t srapi_vm_run_fragment(
+    srapi_shader_t *shader,
+    const float inputs[6],
+    srapi_color_t *out_color
+);</pre>
+
+<h4>12.4.1 Input Slot Mapping</h4>
+
+<table>
+<tr><th>Index</th><th>Constant</th><th>Source</th></tr>
+<tr><td>0</td><td><code>SRAPI_VM_INPUT_X</code></td><td>Pixel X coordinate in screen space (float)</td></tr>
+<tr><td>1</td><td><code>SRAPI_VM_INPUT_Y</code></td><td>Pixel Y coordinate in screen space (float)</td></tr>
+<tr><td>2</td><td><code>SRAPI_VM_INPUT_U</code></td><td>Normalized U coordinate: <code>(pixel_x - rect_x0) / (rect_width - 1)</code>; 0 if width ≤ 1</td></tr>
+<tr><td>3</td><td><code>SRAPI_VM_INPUT_V</code></td><td>Normalized V coordinate: <code>(pixel_y - rect_y0) / (rect_height - 1)</code>; 0 if height ≤ 1</td></tr>
+<tr><td>4</td><td><code>SRAPI_VM_INPUT_WIDTH</code></td><td>Primitive width in pixels (float)</td></tr>
+<tr><td>5</td><td><code>SRAPI_VM_INPUT_HEIGHT</code></td><td>Primitive height in pixels (float)</td></tr>
+</table>
+
+<p>Input count: 6 (<code>SRAPI_VM_INPUT_COUNT</code>). Out-of-range <code>LOAD_INPUT</code> indices return <code>0.0f</code>.</p>
+
+<h4>12.4.2 Execution Pipeline</h4>
+
+<ol>
+<li>Validate <code>shader</code>, <code>shader-&gt;insts</code>, <code>out_color</code> — return <code>SRAPI_ERROR_BAD_ARG</code> if any is NULL</li>
+<li>Zero all 16 registers (<code>memset(regs, 0, sizeof(regs))</code>)</li>
+<li>Set default output color to magenta: <code>srapi_rgba(255, 0, 255, 255)</code></li>
+<li>Increment <code>shader-&gt;run_count</code></li>
+<li>If <code>shader-&gt;run_count ≤ 2</code> and global <code>srapi</code> flag is non-zero: trace the 6 input values to stderr</li>
+<li>Execute instructions sequentially from <code>insts[0]</code> to <code>insts[inst_count - 1]</code>:
+    <ul>
+    <li><code>END</code>: return <code>SRAPI_OK</code> immediately (do not execute further instructions)</li>
+    <li><code>OUT_COLOR</code>: writes <code>srapi_rgba(clamp_byte(r), clamp_byte(g), clamp_byte(b), clamp_byte(a))</code> to <code>*out_color</code>. Does NOT terminate execution.</li>
+    <li><code>OUT_POSITION</code>: silently ignored in fragment mode</li>
+    <li>All other opcodes: compute result into <code>regs[dst]</code> if <code>dst &lt; 16</code></li>
+    <li>Unknown opcode: calls <code>srapi_set_error()</code> and returns <code>SRAPI_ERROR_BAD_ARG</code></li>
+    </ul>
+</li>
+<li>If execution completes without encountering <code>END</code>, return <code>SRAPI_OK</code></li>
+</ol>
+
+<h4>12.4.3 Arithmetic Semantics</h4>
+
+<table>
+<tr><th>Opcode</th><th>Formula</th><th>Edge Cases</th></tr>
+<tr><td><code>MOV</code></td><td><code>dst = a</code></td><td>—</td></tr>
+<tr><td><code>ADD</code></td><td><code>dst = a + b</code></td><td>Standard IEEE 754 addition</td></tr>
+<tr><td><code>SUB</code></td><td><code>dst = a - b</code></td><td>Standard IEEE 754 subtraction</td></tr>
+<tr><td><code>MUL</code></td><td><code>dst = a × b</code></td><td>Standard IEEE 754 multiplication</td></tr>
+<tr><td><code>DIV</code></td><td><code>dst = a / b</code> if <code>b ≠ 0</code>, else <code>0.0f</code></td><td>Division by zero returns 0, not Inf/NaN</td></tr>
+<tr><td><code>MIN</code></td><td><code>dst = a &lt; b ? a : b</code></td><td>—</td></tr>
+<tr><td><code>MAX</code></td><td><code>dst = a &gt; b ? a : b</code></td><td>—</td></tr>
+<tr><td><code>FRACT</code></td><td><code>dst = a - floor(a)</code></td><td>Negative values: e.g. <code>FRACT(-1.3) = 0.7</code></td></tr>
+<tr><td><code>CLAMP01</code></td><td><code>dst = min(max(a, 0), 1)</code></td><td><code>if a ≤ 0 → 0; if a ≥ 1 → 1</code></td></tr>
+<tr><td><code>MIX</code></td><td><code>dst = a + (b - a) × clamp01(c)</code></td><td><code>c</code> is clamped to [0,1] before interpolation</td></tr>
+<tr><td><code>SIN</code></td><td><code>dst = sinf(a)</code></td><td>Standard libm <code>sinf</code></td></tr>
+<tr><td><code>COS</code></td><td><code>dst = cosf(a)</code></td><td>Standard libm <code>cosf</code></td></tr>
+<tr><td><code>ABS</code></td><td><code>dst = fabsf(a)</code></td><td>—</td></tr>
+<tr><td><code>SQRT</code></td><td><code>dst = sqrtf(max(a, 0))</code></td><td>Negative inputs clamped to 0 before sqrt</td></tr>
+<tr><td><code>POW</code></td><td><code>dst = powf(a, b)</code></td><td>Standard libm <code>powf</code></td></tr>
+</table>
+
+<h4>12.4.4 Color Output Encoding</h4>
+
+<pre>static uint8_t clamp_byte(float value) {
+    if (value &lt;= 0.0f) return 0;
+    if (value &gt;= 1.0f) return 255;
+    return (uint8_t)(value * 255.0f + 0.5f);
+}</pre>
+
+<p><code>OUT_COLOR</code> reads four registers (a=R, b=G, c=B, d=A), converts each through <code>clamp_byte()</code>, and packs into <code>srapi_color_t</code> (ARGB layout) via <code>srapi_rgba()</code>.</p>
+
+<p>Pixel value range mapping:</p>
+<ul>
+<li>Float [0.0, 1.0] → uint8 [0, 255] via <code>value × 255 + 0.5</code> (round-half-up)</li>
+<li>Values &lt; 0.0 → 0</li>
+<li>Values &gt; 1.0 → 255</li>
+</ul>
+
+<h4>12.4.5 Default Output</h4>
+<p>If no <code>OUT_COLOR</code> instruction is executed (or the shader has no instructions), the output color is magenta: <code>ARGB = 0xFFFF00FF</code> (A=255, R=255, G=0, B=255).</p>
+
+<hr>
+
+<h3>12.5 Vertex Shader Execution — <code>srapi_vm_run_vertex()</code></h3>
+
 <pre>srapi_result_t srapi_vm_run_vertex(
     srapi_shader_t *shader,
-    const float inputs[7],       // VERTEX_X, Y, R, G, B, A, INDEX
+    const float inputs[7],
     float out_position[2],
     srapi_color_t *out_color
 );</pre>
+
+<h4>12.5.1 Input Slot Mapping</h4>
+
+<table>
+<tr><th>Index</th><th>Constant</th><th>Source</th></tr>
+<tr><td>0</td><td><code>SRAPI_VM_INPUT_VERTEX_X</code></td><td>Vertex X coordinate from vertex buffer (<code>srapi_vertex_t.x</code>)</td></tr>
+<tr><td>1</td><td><code>SRAPI_VM_INPUT_VERTEX_Y</code></td><td>Vertex Y coordinate from vertex buffer (<code>srapi_vertex_t.y</code>)</td></tr>
+<tr><td>2</td><td><code>SRAPI_VM_INPUT_VERTEX_R</code></td><td>Red channel from vertex color</td></tr>
+<tr><td>3</td><td><code>SRAPI_VM_INPUT_VERTEX_G</code></td><td>Green channel from vertex color</td></tr>
+<tr><td>4</td><td><code>SRAPI_VM_INPUT_VERTEX_B</code></td><td>Blue channel from vertex color</td></tr>
+<tr><td>5</td><td><code>SRAPI_VM_INPUT_VERTEX_A</code></td><td>Alpha channel from vertex color</td></tr>
+<tr><td>6</td><td><code>SRAPI_VM_INPUT_VERTEX_INDEX</code></td><td>Vertex index within the draw call (0-based)</td></tr>
+</table>
+
+<p>Input count: 7 (<code>SRAPI_VM_VERTEX_INPUT_COUNT</code>).</p>
+
+<h4>12.5.2 Execution Pipeline</h4>
+
+<ol>
+<li>Validate arguments — return <code>SRAPI_ERROR_BAD_ARG</code> if any output pointer is NULL</li>
+<li>Zero all 16 registers</li>
+<li>Initialize default <code>out_position</code> from <code>inputs[VERTEX_X]</code> and <code>inputs[VERTEX_Y]</code></li>
+<li>Initialize default <code>out_color</code> from <code>inputs[VERTEX_R/G/B/A]</code> via <code>srapi_rgba(clamp_byte(r), ...)</code></li>
+<li>Increment <code>shader-&gt;run_count</code></li>
+<li>Execute instructions sequentially (same opcode set as fragment):</li>
+</ol>
+
+<h4>12.5.3 Vertex-Specific Opcodes</h4>
+
+<table>
+<tr><th>Opcode</th><th>Behavior in Vertex Mode</th></tr>
+<tr><td><code>OUT_POSITION</code></td><td>Writes <code>out_position[0] = regs[a]</code>, <code>out_position[1] = regs[b]</code></td></tr>
+<tr><td><code>OUT_COLOR</code></td><td>Same as fragment: writes <code>srapi_rgba(clamp_byte(a), ...)</code> to <code>*out_color</code></td></tr>
+</table>
+
+<p><code>OUT_POSITION</code> does not terminate execution; multiple <code>OUT_POSITION</code> instructions may execute, with the last one winning.</p>
+
+<hr>
+
+<h3>12.6 Load Operations</h3>
+
+<h4>LOAD_INPUT</h4>
+<p>Copies <code>inputs[inst-&gt;a]</code> to <code>regs[inst-&gt;dst]</code>. If <code>a ≥ input_count</code> for the execution mode, the register is set to <code>0.0f</code>.</p>
+
+<h4>LOAD_UNIFORM</h4>
+<p>Copies <code>shader-&gt;uniforms[inst-&gt;a]</code> to <code>regs[inst-&gt;dst]</code>. If <code>a ≥ shader-&gt;uniform_count</code>, the register is set to <code>0.0f</code>.</p>
+
+<h4>LOAD_CONST</h4>
+<p>Copies the bit pattern of <code>inst-&gt;imm</code> (uint32_t) into the float register via <code>memcpy</code> (no conversion):</p>
+<pre>static float vm_u32_to_float(uint32_t bits) {
+    float value;
+    memcpy(&amp;value, &amp;bits, sizeof(value));
+    return value;
+}</pre>
+<p>This allows loading arbitrary float bit patterns including NaN, Inf, and denormals. Example: <code>LOAD_CONST r0, 0x3F800000</code> loads <code>1.0f</code>.</p>
+
+<hr>
+
+<h3>12.7 Shader Creation — <code>srapi_create_shader()</code></h3>
+
+<pre>srapi_result_t srapi_create_shader(
+    const uint32_t *bytecode,
+    size_t word_count,
+    const float *uniforms,
+    size_t uniform_count,
+    srapi_shader_t **out
+);</pre>
+
+<h4>12.7.1 Allocation</h4>
 <ul>
-<li>Same opcodes as fragment shader</li>
-<li><code>OUT_POSITION</code> writes to <code>out_position[0]</code> (x) and <code>out_position[1]</code> (y)</li>
-<li><code>OUT_COLOR</code> writes to <code>out_color</code></li>
-<li>Initial position and color are loaded from <code>inputs[VERTEX_X/Y]</code> and <code>inputs[VERTEX_R/G/B/A]</code></li>
+<li>Allocates <code>srapi_shader_t</code> with <code>calloc(1, sizeof)</code></li>
+<li>Copies the bytecode array: <code>calloc(word_count) + memcpy</code></li>
+<li>Decodes all instructions via <code>vm_decode_bytecode()</code>:
+    <ul>
+    <li>Allocates <code>word_count</code> instruction slots (worst case: 1 word per instruction)</li>
+    <li>Returns <code>SRAPI_ERROR_BAD_ARG</code> on any decode failure (unknown opcode, argument overflow, truncated stream)</li>
+    </ul>
+</li>
+<li>If <code>uniform_count &gt; 0</code>: allocates uniform array with <code>calloc</code>, copies initial values if <code>uniforms</code> is non-NULL</li>
+<li>On any OOM: frees all partial allocations and returns <code>SRAPI_ERROR_OOM</code></li>
+<li>On success: calls <code>vm_disasm_shader()</code> for debug trace (when global <code>srapi</code> is set)</li>
 </ul>
 
-<h3>12.5 Shader Destruction</h3>
+<h4>12.7.2 Uniform Management</h4>
+<pre>srapi_result_t srapi_shader_set_uniform(srapi_shader_t *shader, size_t index, float value);
+srapi_result_t srapi_shader_set_uniforms(srapi_shader_t *shader, size_t first,
+                                          const float *values, size_t count);</pre>
+<p>Bounds-checked: returns <code>SRAPI_ERROR_BAD_ARG</code> if <code>index &gt;= uniform_count</code>, or <code>first + count &gt; uniform_count</code>. Does NOT allocate or grow the uniform array.</p>
+
+<hr>
+
+<h3>12.8 Shader Destruction — <code>srapi_destroy_shader()</code></h3>
+
 <pre>void srapi_destroy_shader(srapi_shader_t *shader);</pre>
-<p>Frees bytecode, decoded instructions, uniform array, and the shader struct.</p>
+
+<p>Frees in order: decoded instructions → bytecode → uniforms → shader struct. Safe to call with NULL. Debug-traces the destruction with word/instruction/uniform/run counts.</p>
+
+<hr>
+
+<h3>12.9 Debug and Trace Behavior</h3>
+
+<p>For the first 2 executions (<code>shader-&gt;run_count &lt; 2</code>), when the global <code>srapi</code> flag is non-zero:</p>
+<ul>
+<li>Fragment: prints input vector <code>(X, Y, U, V, WIDTH, HEIGHT)</code> and output color <code>(ARGB hex)</code></li>
+<li>Vertex: prints input <code>(X, Y, R, G, B, A, INDEX)</code> and output position + color</li>
+<li>At creation: disassembles all instructions to stderr with <code>[srapi]</code> prefix</li>
+</ul>
+
+<hr>
+
+<h3>12.10 Error Handling</h3>
+
+<table>
+<tr><th>Condition</th><th>Result</th></tr>
+<tr><td>NULL shader or output pointer</td><td><code>SRAPI_ERROR_BAD_ARG</code></td></tr>
+<tr><td>NULL <code>shader-&gt;insts</code></td><td><code>SRAPI_ERROR_BAD_ARG</code></td></tr>
+<tr><td>Unknown opcode at execution time</td><td><code>SRAPI_ERROR_BAD_ARG</code> + error message via <code>srapi_set_error()</code></td></tr>
+<tr><td>Unknown opcode at creation time</td><td><code>SRAPI_ERROR_BAD_ARG</code></td></tr>
+<tr><td>Out-of-range argument value (>255)</td><td><code>SRAPI_ERROR_BAD_ARG</code></td></tr>
+<tr><td>Truncated bytecode (premature end of stream)</td><td><code>SRAPI_ERROR_BAD_ARG</code></td></tr>
+<tr><td>Register index ≥ 16 for dst</td><td>Instruction is silently skipped (no-op)</td></tr>
+<tr><td>Register index ≥ 16 for source</td><td><code>0.0f</code> is used</td></tr>
+<tr><td>Uniform index ≥ uniform_count</td><td><code>0.0f</code> is loaded</td></tr>
+<tr><td>Input index ≥ input_count</td><td><code>0.0f</code> is used</td></tr>
+<tr><td>Division by zero</td><td>Result is <code>0.0f</code> (not Inf/NaN)</td></tr>
+<tr><td>Square root of negative</td><td>Clamped to 0 before sqrt, result is <code>0.0f</code></td></tr>
+</table>
+
+<hr>
+
+<h3>12.11 Shader Structure (<code>srapi_shader_t</code>)</h3>
+
+<pre>struct srapi_shader {
+    uint32_t *bytecode;        // copy of the original bytecode
+    size_t word_count;         // bytecode length in uint32_t words
+    srapi_vm_inst_t *insts;   // decoded instruction array
+    size_t inst_count;         // number of decoded instructions
+    float *uniforms;           // uniform float array
+    size_t uniform_count;      // number of uniforms
+    size_t run_count;          // total executions across both fragment/vertex modes
+};</pre>
+
+<hr>
+
+<h3>12.12 Integration with SIMD Engine</h3>
+
+<p>The scalar VM described above is the reference implementation. The SIMD engine (<code>exec_simd.c</code>) provides a drop-in replacement for fragment shaders via <code>srapi_vm_shade_rect()</code>, executing the same opcodes on 8-wide <code>__m256</code> vectors. See <a href="#simd">Section 19</a> for the SIMD specification.</p>
 
 <hr>
 
@@ -1352,72 +1606,287 @@ srapi_device_set_tile_cache_config(device, cols, rows);  // tile grid</pre>
 
 <hr>
 
-<h2 id="simd">19. SIMD Shader Execution</h2>
+<h2 id="simd">19. SIMD Shader Execution — Specification</h2>
 
-<p>The SIMD shader execution engine (<code>vm/exec_simd.c</code>) accelerates fragment shaders using AVX (Advanced Vector Extensions), processing 8 pixels simultaneously.</p>
+<p>The SIMD engine (<code>vm/exec_simd.c</code>) provides an AVX-accelerated fragment shader execution path. It processes 8 pixels simultaneously using 256-bit wide SIMD registers, with a scalar fallback and optional multi-threaded tile dispatch.</p>
 
-<h3>19.1 Overview</h3>
-<ul>
-<li>Uses <code>__m256</code> (8-wide single-precision SIMD) registers</li>
-<li>Implements all 21 VM opcodes with SIMD equivalents where possible</li>
-<li>Fallback to scalar for SIN, COS, POW (using <code>scalar_unary8</code> / <code>scalar_binary8</code>)</li>
-<li>Safe division: replaces zero divisors with 1.0 before division, zeros the result where divisor was zero</li>
-</ul>
+<h3>19.1 Architecture</h3>
 
-<h3>19.2 Entry Point</h3>
+<table>
+<tr><th>Component</th><th>Detail</th></tr>
+<tr><td>SIMD width</td><td>8 lanes (<code>__m256</code>, 8 × float32)</td></tr>
+<tr><td>Register count</td><td>16 × <code>__m256</code> (each lane holds one pixel's register value)</td></tr>
+<tr><td>ISA requirement</td><td>AVX (Intel Sandy Bridge / AMD Bulldozer or newer)</td></tr>
+<tr><td>Source file</td><td><code>vm/exec_simd.c</code></td></tr>
+<tr><td>Entry point</td><td><code>srapi_vm_shade_rect()</code></td></tr>
+</table>
+
+<h3>19.2 Entry Point — <code>srapi_vm_shade_rect()</code></h3>
+
 <pre>srapi_result_t srapi_vm_shade_rect(
     uint32_t *pixels,
     uint32_t pitch_bytes,
     srapi_shader_t *shader,
     int32_t rect_x0, int32_t rect_y0,
     uint32_t rect_width, uint32_t rect_height,
-    uint32_t x, uint32_t y,        // clip region
-    uint32_t width, uint32_t height
+    uint32_t x, uint32_t y,        // clip region origin
+    uint32_t width, uint32_t height // clip region extent
 );</pre>
-<p>Decision flow:</p>
-<ol>
-<li>If <code>shade_config.simd_enabled == 0</code>: calls scalar fallback (<code>shade_scalar</code>)</li>
-<li>If <code>shade_config.threads_enabled == 0</code>: calls SIMD directly (<code>shade_tile_rows</code>)</li>
-<li>Otherwise: splits the region into 32-row tiles and dispatches via thread pool</li>
-</ol>
 
-<h3>19.3 SIMD Pixel Pipeline</h3>
-<ol>
-<li><code>shade_tile_rows()</code> iterates rows; for each row, processes 8-pixel chunks</li>
-<li><code>run_chunk()</code> executes all instructions on 8-wide vectors:
-    <ul>
-    <li>Registers: 16 <code>__m256</code> values, all zero-initialized</li>
-    <li>Inputs: X, Y, U, V, WIDTH, HEIGHT as SIMD vectors</li>
-    <li>Uniforms: broadcast to all lanes</li>
-    <li>Constants: broadcast from <code>uint32_t</code> bit pattern</li>
-    </ul>
-</li>
-<li><code>emit_pixels()</code> converts RGBA floats to packed ARGB <code>uint32_t</code>, clamps to [0,1], multiplies by 255, rounds with +0.5, and stores via <code>_mm256_storeu_si256</code> (full 8 pixels) or <code>_mm256_maskstore_epi32</code> (partial last chunk)</li>
-</ol>
+<h4>19.2.1 Dispatch Logic</h4>
+
+<pre>cfg = srapi_get_shade_config();  // atomic load
+
+if cfg.simd_enabled == 0:
+    return shade_scalar(&amp;job)          // pure scalar per-pixel fallback
+
+if cfg.threads_enabled == 0:
+    shade_tile_rows(&amp;job, y, y + height)  // single-threaded SIMD
+
+else:
+    job.tile_rows = 32
+    tile_count = ceil(height / 32)
+    srapi_vm_threadpool_dispatch(tile_count, shade_tile_fn, &amp;job)
+    // calling thread participates as a worker</pre>
+
+<h4>19.2.2 Parameter Validation</h4>
+<ul>
+<li>Returns <code>SRAPI_ERROR_BAD_ARG</code> if <code>pixels == NULL</code>, <code>shader == NULL</code>, or <code>pitch_bytes == 0</code></li>
+<li>Returns <code>SRAPI_OK</code> immediately (no-op) if <code>width == 0 || height == 0</code></li>
+</ul>
+
+<h3>19.3 SIMD Pixel Pipeline — <code>shade_tile_rows()</code></h3>
+
+<h4>19.3.1 UV Coordinate Computation</h4>
+
+<pre>inv_w = (rect_width  &gt; 1) ? 1.0 / (rect_width  - 1) : 0.0
+inv_h = (rect_height &gt; 1) ? 1.0 / (rect_height - 1) : 0.0
+
+u_f = (x_f - rect_x0) * inv_w   // per-pixel normalized U
+v_f = (y_f - rect_y0) * inv_h   // per-pixel normalized V</pre>
+
+<p>For single-pixel primitives (<code>width ≤ 1</code> or <code>height ≤ 1</code>), the corresponding UV component is 0 for all pixels.</p>
+
+<h4>19.3.2 Pixel Chunking</h4>
+
+<pre>for each row py in [clip_y, clip_y + clip_height):
+    row = pixels + py * pitch_bytes
+    for each chunk px in [clip_x, clip_x + clip_width), stride 8:
+        remaining = clip_end - px
+        n_lanes = min(remaining, 8)
+        x_f = broadcast(px) + {0, 1, 2, 3, 4, 5, 6, 7}
+        y_f = broadcast(py)
+        execute shader on n_lanes pixels via run_chunk()
+        emit n_lanes pixels to row[px]</pre>
+
+<h3>19.4 Chunk Execution — <code>run_chunk()</code></h3>
+
+<h4>19.4.1 Register Initialization</h4>
+<p>All 16 <code>__m256</code> registers zeroed via <code>_mm256_setzero_ps()</code>. Default output color: <code>R=1.0, G=0.0, B=1.0, A=1.0</code> (magenta).</p>
+
+<h4>19.4.2 Instruction Loop</h4>
+<p>Iterates <code>shader-&gt;insts[0..inst_count-1]</code>. For each decoded instruction:</p>
+
+<table>
+<tr><th>Opcode</th><th>SIMD Implementation</th></tr>
+<tr><td><code>END</code></td><td><code>break</code> — exit instruction loop</td></tr>
+<tr><td><code>MOV</code></td><td><code>regs[dst] = regs[a]</code></td></tr>
+<tr><td><code>ADD</code></td><td><code>_mm256_add_ps(a, b)</code></td></tr>
+<tr><td><code>SUB</code></td><td><code>_mm256_sub_ps(a, b)</code></td></tr>
+<tr><td><code>MUL</code></td><td><code>_mm256_mul_ps(a, b)</code></td></tr>
+<tr><td><code>DIV</code></td><td><code>_mm256_div_ps(a, safe_b)</code> where <code>safe_b = blend(b, 1.0, cmp_eq(b, 0))</code>; result zeroed where <code>b == 0</code> via <code>_mm256_blendv_ps</code></td></tr>
+<tr><td><code>MIN</code></td><td><code>_mm256_min_ps(a, b)</code></td></tr>
+<tr><td><code>MAX</code></td><td><code>_mm256_max_ps(a, b)</code></td></tr>
+<tr><td><code>LOAD_INPUT</code></td><td>Switch on <code>inst-&gt;a</code>: loads the pre-computed SIMD vector for X, Y, U, V, WIDTH, or HEIGHT</td></tr>
+<tr><td><code>LOAD_UNIFORM</code></td><td><code>_mm256_set1_ps(shader-&gt;uniforms[a])</code> (broadcast scalar)</td></tr>
+<tr><td><code>LOAD_CONST</code></td><td><code>_mm256_set1_ps(u32_to_float(imm))</code> via <code>u32_bits_to_broadcast()</code></td></tr>
+<tr><td><code>FRACT</code></td><td><code>_mm256_sub_ps(v, _mm256_floor_ps(v))</code></td></tr>
+<tr><td><code>CLAMP01</code></td><td><code>_mm256_max_ps(0, _mm256_min_ps(1, v))</code></td></tr>
+<tr><td><code>SIN</code></td><td>Fallback to scalar: extract 8 floats, call <code>sinf</code> per lane, re-pack via <code>scalar_unary8()</code></td></tr>
+<tr><td><code>COS</code></td><td>Same as SIN but via <code>cosf</code></td></tr>
+<tr><td><code>ABS</code></td><td><code>_mm256_and_ps(v, mask_0x7FFFFFFF)</code></td></tr>
+<tr><td><code>SQRT</code></td><td><code>_mm256_sqrt_ps(_mm256_max_ps(0, a))</code></td></tr>
+<tr><td><code>POW</code></td><td>Fallback to scalar: <code>scalar_binary8(a, b, powf)</code></td></tr>
+<tr><td><code>MIX</code></td><td><code>a + (b - a) * clamp01(c)</code> using SIMD arithmetic</td></tr>
+<tr><td><code>OUT_COLOR</code></td><td>Captures <code>final_{r,g,b,a} = regs[inst-&gt;{a,b,c,d}]</code>; does NOT terminate</td></tr>
+<tr><td><code>OUT_POSITION</code></td><td>Silently ignored (no-op in fragment mode)</td></tr>
+</table>
+
+<h4>19.4.3 Safe Division Algorithm</h4>
+
+<pre>zero = _mm256_setzero_ps()
+safe = _mm256_blendv_ps(
+    _mm256_set1_ps(1.0f),
+    b,
+    _mm256_cmp_ps(b, zero, _CMP_NEQ_OQ)
+)
+quotient = _mm256_div_ps(a, safe)
+result = _mm256_blendv_ps(zero, quotient,
+             _mm256_cmp_ps(b, zero, _CMP_NEQ_OQ))</pre>
+
+<p>Lanes where <code>b == 0</code> produce result <code>0.0f</code>; other lanes produce <code>a / b</code>.</p>
+
+<h3>19.5 Pixel Output — <code>emit_pixels()</code></h3>
+
+<pre>static void emit_pixels(uint32_t *dst, int n_lanes,
+    __m256 fr, __m256 fg, __m256 fb, __m256 fa);
+
+1. Clamp each channel to [0, 1]
+2. Multiply by 255.0f, add 0.5f (round-half-up)
+3. Convert to int32 via _mm256_cvttps_epi32
+4. Pack: pixel = (b) | (g &lt;&lt; 8) | (r &lt;&lt; 16) | (a &lt;&lt; 24)
+5. Store:
+   - n_lanes == 8: _mm256_storeu_si256 (unaligned 256-bit store)
+   - n_lanes 1..7: _mm256_maskstore_epi32 (masked store with partial lane mask)</pre>
+
+<p>The store mask for partial chunks is a pre-computed constant array <code>g_store_mask[16]</code> where the first <code>n_lanes</code> entries are <code>-1</code> and the rest are <code>0</code>.</p>
+
+<h3>19.6 Scalar Fallback — <code>shade_scalar()</code></h3>
+
+<p>When SIMD is disabled, <code>shade_scalar()</code> processes one pixel at a time, calling <code>srapi_vm_run_fragment()</code> for each pixel. This is the reference path and produces identical results to the SIMD path (within IEEE 754 rounding differences for operations like <code>powf</code> and <code>sinf</code>).</p>
+
+<h3>19.7 Parallel Dispatch — <code>shade_tile_fn()</code></h3>
+
+<p>Callback for the thread pool:</p>
+<pre>void shade_tile_fn(void *user, uint32_t tile_index) {
+    job = (shade_job_t *)user;
+    row_begin = job-&gt;clip_y + tile_index * job-&gt;tile_rows;
+    row_end   = min(row_begin + job-&gt;tile_rows, job-&gt;clip_y + job-&gt;clip_height);
+    shade_tile_rows(job, row_begin, row_end);
+}</pre>
+
+<h3>19.8 Shade Job Structure</h3>
+
+<pre>typedef struct {
+    uint32_t *pixels;
+    uint32_t pitch_bytes;
+    srapi_shader_t *shader;
+    int32_t rect_x0, rect_y0;
+    uint32_t rect_width, rect_height;
+    uint32_t clip_x, clip_y;
+    uint32_t clip_width, clip_height;
+    uint32_t tile_rows;        // rows per tile for thread dispatch
+} shade_job_t;</pre>
 
 <hr>
 
-<h2 id="threadpool">20. Thread Pool</h2>
+<h2 id="threadpool">20. Thread Pool — Specification</h2>
 
-<p>The thread pool (<code>vm/threadpool.c</code>) enables parallel tile rendering for shaded rectangles.</p>
+<p>The thread pool (<code>vm/threadpool.c</code> + <code>vm/threadpool.h</code>) provides a fire-once parallel dispatch mechanism for shader tile rendering. Workers persist across dispatches and sleep when idle.</p>
 
-<h3>20.1 Design</h3>
+<h3>20.1 Worker Pool Initialization</h3>
+
+<pre>static void init_pool(void);  // called once via pthread_once
+
+1. Query online CPUs: sysconf(_SC_NPROCESSORS_ONLN)
+2. If online ≤ 1: n_workers = 0 (no workers created)
+3. Desired workers = min(online - 1, SRAPI_VM_MAX_WORKERS = 63)
+4. Create desired workers via pthread_create (detached)
+5. On creation failure: stop and use however many succeeded</pre>
+
+<p>Worker lifecycle: detached threads run <code>worker_main()</code> in an infinite loop, sleeping on condition variable <code>cv_go</code> until a job is available.</p>
+
+<h3>20.2 Data Structures</h3>
+
+<pre>typedef struct {
+    srapi_vm_tile_fn_t fn;     // tile processing callback
+    void *user;                 // user context (shade_job_t*)
+    uint32_t total;             // total tile count
+    atomic_uint next;           // next unclaimed tile index
+} pool_job_t;
+
+// Global state:
+static pthread_once_t init_once;     // one-time pool creation
+static pthread_mutex_t mu;           // protects current_job, workers_done, job_seq
+static pthread_cond_t cv_go;         // signals workers to start
+static pthread_cond_t cv_done;       // signals dispatcher that workers are done
+static pool_job_t *current_job;      // pointer to active job (NULL when idle)
+static int workers_done;             // count of workers that finished
+static int n_workers;                // total worker count (0 = no workers)
+static uint64_t job_seq;             // monotonically increasing job counter</pre>
+
+<h3>20.3 Worker Thread — <code>worker_main()</code></h3>
+
+<pre>for (;;):
+    lock(mu)
+    while current_job == NULL OR job_seq == last_seq:
+        pthread_cond_wait(&amp;cv_go, &amp;mu)
+    job = current_job
+    my_seq = job_seq
+    unlock(mu)
+
+    // Claim tiles atomically
+    for (;;):
+        i = atomic_fetch_add(&amp;job-&gt;next, 1, relaxed)
+        if i &gt;= job-&gt;total: break
+        job-&gt;fn(job-&gt;user, i)
+
+    lock(mu)
+    workers_done++
+    if workers_done == n_workers:
+        pthread_cond_signal(&amp;cv_done)   // wake dispatcher
+    last_seq = my_seq
+    unlock(mu)</pre>
+
+<h3>20.4 Dispatch — <code>srapi_vm_threadpool_dispatch()</code></h3>
+
+<pre>void srapi_vm_threadpool_dispatch(uint32_t tile_count,
+    srapi_vm_tile_fn_t fn, void *user);
+
+1. if tile_count == 0 or fn == NULL: return
+2. pthread_once(&amp;init_once, init_pool)
+3. if n_workers == 0 or tile_count == 1:
+       // no parallelism; execute inline
+       for i in 0..tile_count-1: fn(user, i)
+       return
+
+4. Initialize pool_job_t:
+       job.fn = fn
+       job.user = user
+       job.total = tile_count
+       atomic_init(&amp;job.next, 0)
+
+5. Wake workers:
+       lock(mu)
+       current_job = &amp;job
+       workers_done = 0
+       job_seq++
+       pthread_cond_broadcast(&amp;cv_go)   // wake ALL sleeping workers
+       unlock(mu)
+
+6. Dispatcher also processes tiles:
+       for (;;):
+           i = atomic_fetch_add(&amp;job.next, 1, relaxed)
+           if i &gt;= job.total: break
+           fn(user, i)
+
+7. Wait for all workers to finish:
+       lock(mu)
+       while workers_done &lt; n_workers:
+           pthread_cond_wait(&amp;cv_done, &amp;mu)
+       current_job = NULL
+       unlock(mu)</pre>
+
+<h3>20.5 Thread Safety Properties</h3>
 <ul>
-<li>Up to 63 worker threads (<code>SRAPI_VM_MAX_WORKERS</code>)</li>
-<li>Threads are created once via <code>pthread_once</code></li>
-<li>Workers sleep on a <code>pthread_cond_t</code> waiting for work</li>
-<li>Work is dispatched as tiles; workers atomically fetch and increment a tile counter</li>
+<li><code>atomic_uint next</code> ensures each tile is processed exactly once (no mutex contention on tile claiming)</li>
+<li>Condition variables avoid busy-waiting</li>
+<li>The dispatcher thread participates in processing, so at least <code>min(online_cpus, tile_count)</code> tiles run in parallel</li>
+<li>Job sequencing via <code>job_seq</code> guards against spurious wakeups from previous jobs</li>
+<li>Maximum 63 workers limits <code>pthread_cond_broadcast</code> wakeup storms</li>
+<li>No worker cleanup on shutdown (detached threads exit with process)</li>
 </ul>
 
-<h3>20.2 API</h3>
-<pre>typedef void (*srapi_vm_tile_fn_t)(void *user, uint32_t tile_index);
-
-void srapi_vm_threadpool_dispatch(
-    uint32_t tile_count,
-    srapi_vm_tile_fn_t fn,
-    void *user
-);</pre>
-<p>The calling thread participates by processing tiles after waking workers. The function returns when all tiles are complete.</p>
+<h3>20.6 Performance Characteristics</h3>
+<table>
+<tr><th>Metric</th><th>Value</th></tr>
+<tr><td>Max worker threads</td><td>63</td></tr>
+<tr><td>Worker creation</td><td>Once, lazy (<code>pthread_once</code>)</td></tr>
+<tr><td>Tile claiming cost</td><td>1 atomic fetch-add per tile per worker</td></tr>
+<tr><td>Dispatch latency</td><td>1 mutex lock + 1 cond broadcast</td></tr>
+<tr><td>Completion detection</td><td>1 cond wait (dispatcher) + atomic counter</td></tr>
+<tr><td>Worker parking</td><td>Infinite loop on condvar, zero CPU when idle</td></tr>
+</table>
 
 <hr>
 
