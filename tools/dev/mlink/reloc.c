@@ -131,6 +131,13 @@ static size_t reloc_width(uint32_t type) {
     case R_X86_64_32:
     case R_X86_64_32S:
     case R_X86_64_SIZE32:
+    case R_X86_64_GOTPCREL:
+#ifdef R_X86_64_GOTPCRELX
+    case R_X86_64_GOTPCRELX:
+#endif
+#ifdef R_X86_64_REX_GOTPCRELX
+    case R_X86_64_REX_GOTPCRELX:
+#endif
         return 4;
     case R_X86_64_16:
     case R_X86_64_PC16:
@@ -141,6 +148,44 @@ static size_t reloc_width(uint32_t type) {
     default:
         return 0;
     }
+}
+
+static int relax_gotpcrel(ml_context_t *ctx, ml_object_t *obj,
+                          ml_section_t *sec, ml_reloc_t *rel,
+                          uint64_t s, int64_t addend) {
+    unsigned char *where = sec->image + rel->offset;
+    int64_t v;
+    int32_t out;
+
+    if (rel->offset < 2) {
+        ml_error(ctx, "%s: cannot relax %s in %s (no instruction prefix)",
+                 obj->name, ml_reloc_name(rel->type), sec->name);
+        return 1;
+    }
+
+    if (where[-2] == 0x8b) {
+        where[-2] = 0x8d;
+    } else if (where[-2] == 0xff && where[-1] == 0x15) {
+        where[-2] = 0x67;
+        where[-1] = 0xe8;
+    } else if (where[-2] == 0xff && where[-1] == 0x25) {
+        where[-2] = 0x67;
+        where[-1] = 0xe9;
+    } else {
+        ml_error(ctx, "%s: cannot relax %s in %s (opcode %02x %02x)",
+                 obj->name, ml_reloc_name(rel->type), sec->name,
+                 where[-2], where[-1]);
+        return 1;
+    }
+
+    v = (int64_t)s + addend - (int64_t)(sec->out_addr + rel->offset);
+    if (checked_i32(v, &out) != 0) {
+        ml_error(ctx, "%s: %s relax overflow in %s",
+                 obj->name, ml_reloc_name(rel->type), sec->name);
+        return 1;
+    }
+    ml_put32(where, (uint32_t)out);
+    return 0;
 }
 
 static int reloc_fits_section(const ml_section_t *sec, const ml_reloc_t *rel,
@@ -329,6 +374,14 @@ static int patch_reloc(ml_context_t *ctx, ml_object_t *obj,
         }
         ml_put64(where, z + (uint64_t)addend);
         return 0;
+    case R_X86_64_GOTPCREL:
+#ifdef R_X86_64_GOTPCRELX
+    case R_X86_64_GOTPCRELX:
+#endif
+#ifdef R_X86_64_REX_GOTPCRELX
+    case R_X86_64_REX_GOTPCRELX:
+#endif
+        return relax_gotpcrel(ctx, obj, sec, rel, s, addend);
     default:
         ml_error(ctx, "%s: unsupported relocation %s(%u) in %s",
                  obj->name, ml_reloc_name(rel->type), rel->type, sec->name);

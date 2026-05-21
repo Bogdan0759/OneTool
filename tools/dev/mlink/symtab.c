@@ -189,12 +189,76 @@ int ml_resolve_symbols(ml_context_t *ctx) {
         }
     }
 
+    return ctx->error_count != 0;
+}
+
+int ml_inject_defsyms(ml_context_t *ctx) {
+    for (size_t i = 0; i < ctx->defsym_count; i++) {
+        ml_defsym_t *d = &ctx->defsyms[i];
+        ml_global_t *g = intern_global(ctx, d->name);
+        if (g->defined) {
+            ml_error(ctx, "--defsym %s conflicts with definition in %s",
+                     d->name, g->object ? g->object->name : "<input>");
+            return 1;
+        }
+        g->defined = 1;
+        g->absolute = 1;
+        g->common = 0;
+        g->weak = 0;
+        g->object = NULL;
+        g->symbol = NULL;
+        g->value = d->value;
+        g->size = 0;
+    }
+    return 0;
+}
+
+static void define_linker_symbol(ml_context_t *ctx, const char *name, uint64_t value) {
+    ml_global_t *g = ml_find_global(ctx, name);
+    if (g != NULL && g->defined) {
+        return;
+    }
+    if (g == NULL) {
+        g = intern_global(ctx, ml_xstrdup(name));
+    }
+    g->defined = 1;
+    g->absolute = 1;
+    g->common = 0;
+    g->weak = 1;
+    g->object = NULL;
+    g->symbol = NULL;
+    g->value = value;
+    g->size = 0;
+}
+
+void ml_inject_linker_symbols(ml_context_t *ctx) {
+    uint64_t text_end = ctx->base_addr + ctx->rx_filesz;
+    uint64_t data_end_file = ctx->has_rw_segment
+        ? ctx->base_addr + ctx->data_offset + ctx->data_filesz
+        : (ctx->has_rodata_segment
+            ? ctx->base_addr + ctx->ro_offset + ctx->ro_filesz
+            : text_end);
+    uint64_t image_end = ctx->has_rw_segment
+        ? ctx->base_addr + ctx->data_offset + ctx->data_memsz
+        : data_end_file;
+
+    define_linker_symbol(ctx, "__executable_start", ctx->base_addr);
+    define_linker_symbol(ctx, "_etext", text_end);
+    define_linker_symbol(ctx, "etext", text_end);
+    define_linker_symbol(ctx, "_edata", data_end_file);
+    define_linker_symbol(ctx, "edata", data_end_file);
+    define_linker_symbol(ctx, "__bss_start", data_end_file);
+    define_linker_symbol(ctx, "_end", image_end);
+    define_linker_symbol(ctx, "end", image_end);
+    define_linker_symbol(ctx, "_GLOBAL_OFFSET_TABLE_", ctx->base_addr);
+}
+
+int ml_report_undefined(ml_context_t *ctx) {
     for (size_t i = 0; i < ctx->global_count; i++) {
         ml_global_t *g = &ctx->globals[i];
         if (g->referenced && g->strong_ref && !g->defined && !g->common) {
             ml_error(ctx, "undefined symbol: %s", g->name);
         }
     }
-
     return ctx->error_count != 0;
 }
