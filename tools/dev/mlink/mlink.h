@@ -84,6 +84,44 @@ typedef struct {
     uint64_t value;
 } ml_defsym_t;
 
+typedef enum {
+    ML_MACRO_PROVIDE,
+    ML_MACRO_DEFINE,
+    ML_MACRO_ENTRY,
+    ML_MACRO_BASE,
+    ML_MACRO_STACK_EXEC,
+    ML_MACRO_KEEP,
+    ML_MACRO_ASSERT
+} ml_macro_kind_t;
+
+typedef enum {
+    ML_ASSERT_LT,
+    ML_ASSERT_LE,
+    ML_ASSERT_GT,
+    ML_ASSERT_GE,
+    ML_ASSERT_EQ,
+    ML_ASSERT_NE
+} ml_assert_op_t;
+
+typedef struct {
+    char *name;
+    int is_symbol;
+    uint64_t value;
+} ml_macro_term_t;
+
+typedef struct {
+    ml_macro_kind_t kind;
+    struct ml_object *origin;
+    /* PROVIDE/DEFINE: name+value. ENTRY: name. BASE: value. KEEP: name.       */
+    /* ASSERT: lhs, rhs, op, message.                                          */
+    char *name;
+    uint64_t value;
+    ml_macro_term_t lhs;
+    ml_macro_term_t rhs;
+    ml_assert_op_t op;
+    char *message;
+} ml_macro_t;
+
 typedef struct {
     const char *output_path;
     const char *entry_name;
@@ -94,6 +132,9 @@ typedef struct {
     int dry_run;
     int verbose;
     int no_gnu_stack;
+    int stack_exec;
+    int entry_from_cli;
+    int base_from_cli;  
 
     char **inputs;
     size_t input_count;
@@ -114,6 +155,10 @@ typedef struct {
     ml_global_t *globals;
     size_t global_count;
     size_t global_cap;
+
+    ml_macro_t *macros;
+    size_t macro_count;
+    size_t macro_cap;
 
     int error_count;
     uint16_t phnum;
@@ -167,6 +212,12 @@ ml_global_t *ml_find_global(ml_context_t *ctx, const char *name);
 int ml_inject_defsyms(ml_context_t *ctx);
 void ml_inject_linker_symbols(ml_context_t *ctx);
 int ml_report_undefined(ml_context_t *ctx);
+
+int ml_macros_add_from_object(ml_context_t *ctx, ml_object_t *obj,
+                              const unsigned char *data, size_t size);
+void ml_macros_apply_pre_layout(ml_context_t *ctx);
+int ml_macros_inject_symbols(ml_context_t *ctx);
+int ml_macros_apply_post_layout(ml_context_t *ctx);
 
 int ml_layout(ml_context_t *ctx);
 int ml_apply_relocations(ml_context_t *ctx);

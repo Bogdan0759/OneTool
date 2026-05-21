@@ -53,12 +53,20 @@ void ml_context_free(ml_context_t *ctx) {
     for (size_t i = 0; i < ctx->defsym_count; i++) {
         free(ctx->defsyms[i].name);
     }
+    for (size_t i = 0; i < ctx->macro_count; i++) {
+        ml_macro_t *m = &ctx->macros[i];
+        free(m->name);
+        free(m->message);
+        free(m->lhs.name);
+        free(m->rhs.name);
+    }
 
     free(ctx->inputs);
     free(ctx->objects);
     free(ctx->globals);
     free(ctx->lib_paths);
     free(ctx->defsyms);
+    free(ctx->macros);
     memset(ctx, 0, sizeof(*ctx));
 }
 
