@@ -3,21 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-static int section_order(ml_section_kind_t kind) {
-    switch (kind) {
-    case ML_SEC_TEXT:
-        return 0;
-    case ML_SEC_RODATA:
-        return 1;
-    case ML_SEC_DATA:
-        return 2;
-    case ML_SEC_BSS:
-        return 3;
-    default:
-        return 4;
-    }
-}
-
 static uint64_t common_cursor_start(ml_context_t *ctx) {
     uint64_t end = ctx->data_offset + ctx->data_memsz;
     return ml_align_up(end, 16);
@@ -83,7 +68,6 @@ int ml_layout(ml_context_t *ctx) {
     uint64_t ro_cursor;
     uint64_t data_cursor;
     uint64_t bss_cursor;
-    int has_text = 0;
     int has_ro = 0;
     int has_data = 0;
     int has_bss = 0;
@@ -100,9 +84,6 @@ int ml_layout(ml_context_t *ctx) {
                 continue;
             }
             switch (obj->sections[j].kind) {
-            case ML_SEC_TEXT:
-                has_text = 1;
-                break;
             case ML_SEC_RODATA:
                 has_ro = 1;
                 break;
@@ -133,42 +114,21 @@ int ml_layout(ml_context_t *ctx) {
     header_size = sizeof(Elf64_Ehdr) + (uint64_t)ctx->phnum * sizeof(Elf64_Phdr);
     rx_cursor = ml_align_up(header_size, 16);
 
-    for (int order = ML_SEC_TEXT; order <= ML_SEC_BSS; order++) {
-        for (size_t i = 0; i < ctx->object_count; i++) {
-            ml_object_t *obj = ctx->objects[i];
-            if (!obj->selected) {
+    for (size_t i = 0; i < ctx->object_count; i++) {
+        ml_object_t *obj = ctx->objects[i];
+        if (!obj->selected) {
+            continue;
+        }
+        for (size_t j = 0; j < obj->section_count; j++) {
+            ml_section_t *s = &obj->sections[j];
+            if (s->kind != ML_SEC_TEXT || s->size == 0) {
                 continue;
             }
-
-            for (size_t j = 0; j < obj->section_count; j++) {
-                ml_section_t *s = &obj->sections[j];
-                uint64_t *cursor;
-
-                if (section_order(s->kind) != section_order((ml_section_kind_t)order) ||
-                    s->kind == ML_SEC_SKIP || s->size == 0) {
-                    continue;
-                }
-
-                if (s->kind == ML_SEC_TEXT) {
-                    cursor = &rx_cursor;
-                } else if (s->kind == ML_SEC_RODATA) {
-                    continue; /* handled after RX segment size is known */
-                } else if (s->kind == ML_SEC_DATA) {
-                    continue;
-                } else {
-                    continue;
-                }
-
-                *cursor = ml_align_up(*cursor, s->align);
-                s->out_offset = *cursor;
-                s->out_addr = ctx->base_addr + *cursor;
-                *cursor += s->size;
-            }
+            rx_cursor = ml_align_up(rx_cursor, s->align);
+            s->out_offset = rx_cursor;
+            s->out_addr = ctx->base_addr + rx_cursor;
+            rx_cursor += s->size;
         }
-    }
-
-    if (!has_text) {
-        rx_cursor = ml_align_up(header_size, 16);
     }
 
     ctx->rx_filesz = rx_cursor;

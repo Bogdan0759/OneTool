@@ -100,7 +100,7 @@ static int get_symbol_size(ml_context_t *ctx, ml_object_t *obj,
     ml_symbol_t *sym;
 
     if (symbol_index >= obj->symbol_count) {
-        ml_error(ctx, "%s: relocation use bad index %u",
+        ml_error(ctx, "%s: relocation uses bad symbol index %u",
                  obj->name, symbol_index);
         return 1;
     }

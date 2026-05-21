@@ -43,7 +43,7 @@ static void put_phdr(unsigned char *p, uint32_t flags, uint64_t offset,
     ml_put64(p + 48, ML_PAGE_SIZE);
 }
 
-static void copy_sections(ml_context_t *ctx, unsigned char *out, size_t out_size) {
+static int copy_sections(ml_context_t *ctx, unsigned char *out, size_t out_size) {
     for (size_t i = 0; i < ctx->object_count; i++) {
         ml_object_t *obj = ctx->objects[i];
         if (!obj->selected) {
@@ -54,11 +54,14 @@ static void copy_sections(ml_context_t *ctx, unsigned char *out, size_t out_size
             if (s->kind == ML_SEC_SKIP || s->type == SHT_NOBITS || s->file_size == 0) {
                 continue;
             }
-            if (s->out_offset + s->file_size <= out_size) {
-                memcpy(out + s->out_offset, s->image, (size_t)s->file_size);
+            if (s->out_offset > out_size || s->file_size > out_size - s->out_offset) {
+                ml_error(ctx, "%s: section %s overflows output image", obj->name, s->name);
+                return 1;
             }
+            memcpy(out + s->out_offset, s->image, (size_t)s->file_size);
         }
     }
+    return 0;
 }
 
 int ml_emit_output(ml_context_t *ctx) {
@@ -92,7 +95,10 @@ int ml_emit_output(ml_context_t *ctx) {
                  ctx->data_filesz, ctx->data_memsz);
     }
 
-    copy_sections(ctx, out, out_size);
+    if (copy_sections(ctx, out, out_size) != 0) {
+        free(out);
+        return 1;
+    }
 
     if (ml_write_file_mode(ctx->output_path, out, out_size, 0755) != 0) {
         ml_error(ctx, "%s: %s", ctx->output_path, strerror(errno));
