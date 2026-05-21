@@ -172,11 +172,11 @@ yap|mofl/languages/yap/yap.c|YAP language interpreter|tool|
 
 <hr>
 
-<h2>1. TUI Library — <code>libs/TUI/</code></h2>
+<h2 id="tui-lib">1. TUI Library — <code>libs/TUI/</code></h2>
 <p><strong>Files:</strong> <code>tui.h</code> (83 lines), <code>tui.c</code> (460 lines)</p>
 <p>The TUI library is an ncurses-based abstraction layer providing palette management, styled drawing primitives, input handling, and screen framing. It is used by the main TUI (<code>tui.c</code>), the task manager (<code>taskmng</code>), and the user control tool (<code>userc</code>).</p>
 
-<h3>1.1 Color System</h3>
+<h3 id="tui-color">1.1 Color System</h3>
 <p>8-color palette using ncurses <code>COLOR_*</code> constants:</p>
 <table>
 <tr><th>Constant</th><th>Value</th><th>ncurses Mapping</th></tr>
@@ -191,8 +191,8 @@ yap|mofl/languages/yap/yap.c|YAP language interpreter|tool|
 <tr><td><code>TUI_COLOR_WHITE</code></td><td>7</td><td><code>COLOR_WHITE</code></td></tr>
 </table>
 
-<h3>1.2 Style System</h3>
-<p>Each style maps to a ncurses color pair. 7 styles are defined. The mapping function <code>style_to_pair()</code> converts a style enum to a pair ID:</p>
+<h3 id="tui-style">1.2 Style System</h3>
+<p>Each style maps to a ncurses color pair. 7 styles are defined. The mapping function <code><a href="#tui-style">style_to_pair()</a></code> converts a style enum to a pair ID:</p>
 <table>
 <tr><th>Constant</th><th>Value</th><th>Pair ID</th><th>Attribute</th><th>Usage</th></tr>
 <tr><td><code>TUI_STYLE_NORMAL</code></td><td>0</td><td>1</td><td>None</td><td>Default text on background</td></tr>
@@ -204,7 +204,7 @@ yap|mofl/languages/yap/yap.c|YAP language interpreter|tool|
 <tr><td><code>TUI_STYLE_SELECTION</code></td><td>6</td><td>7</td><td><code>A_BOLD</code></td><td>Currently selected item (inverted fg/bg)</td></tr>
 </table>
 
-<h3>1.3 Palette Structure</h3>
+<h3 id="tui-palette">1.3 Palette Structure</h3>
 <p>The <code>tui_palette_t</code> struct defines 7 color slots that control the entire visual appearance:</p>
 <pre>typedef struct {
     int background;  // Terminal background color
@@ -216,9 +216,9 @@ yap|mofl/languages/yap/yap.c|YAP language interpreter|tool|
     int error;       // Error message color
 } tui_palette_t;</pre>
 
-<p><strong>Implementation detail:</strong> When a palette is applied via <code>apply_palette()</code>, the selection style uses the background color as its foreground with the accent color as its background — effectively inverting the accent. <code>init_pair()</code> is called for each of the 7 pair IDs, creating color pairs 1-7 in ncurses.</p>
+<p><strong>Implementation detail:</strong> When a palette is applied via <code><a href="#tui_set_palette">apply_palette()</a></code>, the selection style uses the background color as its foreground with the accent color as its background — effectively inverting the accent. <code>init_pair()</code> is called for each of the 7 pair IDs, creating color pairs 1-7 in ncurses.</p>
 
-<h3>1.4 Built-in Themes</h3>
+<h3 id="tui-themes">1.4 Built-in Themes</h3>
 <p>Five themes are hardcoded in <code>tui.c</code> as an array of <code>onetool_theme_t</code>:</p>
 <table>
 <tr><th>Theme</th><th>background</th><th>panel</th><th>accent</th><th>text</th><th>muted</th><th>success</th><th>error</th></tr>
@@ -229,9 +229,9 @@ yap|mofl/languages/yap/yap.c|YAP language interpreter|tool|
 <tr><td><strong>custom</strong></td><td colspan="7">Editable live, starts as copy of ocean, index 4</td></tr>
 </table>
 
-<h3>1.5 API Functions — Complete Reference</h3>
+<h3 id="tui-api">1.5 API Functions — Complete Reference</h3>
 
-<h4><code>int tui_init(void)</code></h4>
+<h4 id="tui_init"><code>int tui_init(void)</code></h4>
 <p>Initializes the ncurses terminal. Implementation steps:</p>
 <ul>
 <li>Calls <code>newterm(NULL, stdout, stdin)</code> to initialize terminal</li>
@@ -244,22 +244,22 @@ yap|mofl/languages/yap/yap.c|YAP language interpreter|tool|
 <li>Returns 0 on success, 1 on failure</li>
 </ul>
 
-<h4><code>void tui_shutdown(void)</code></h4>
+<h4 id="tui_shutdown"><code>void tui_shutdown(void)</code></h4>
 <p>Restores terminal to its original state via <code>endwin()</code>. Safe to call multiple times — uses a static <code>tui_ready</code> flag.</p>
 
-<h4><code>void tui_begin_frame(void)</code></h4>
+<h4 id="tui_begin_frame"><code>void tui_begin_frame(void)</code></h4>
 <p>Calls <code>clear()</code> to erase the screen at the start of each frame.</p>
 
-<h4><code>void tui_end_frame(void)</code></h4>
+<h4 id="tui_end_frame"><code>void tui_end_frame(void)</code></h4>
 <p>Calls <code>refresh()</code> to flush all pending drawing operations to the terminal.</p>
 
-<h4><code>void tui_clear(int style)</code></h4>
+<h4 id="tui_clear"><code>void tui_clear(int style)</code></h4>
 <p>Fills the entire screen with the background character space (' ') using the given style's color pair. Sets the background character via <code>bkgdset()</code> then clears.</p>
 
-<h4><code>void tui_get_size(int *width, int *height)</code></h4>
+<h4 id="tui_get_size"><code>void tui_get_size(int *width, int *height)</code></h4>
 <p>Uses <code>getmaxyx(stdscr, max_y, max_x)</code> to retrieve terminal dimensions. Sets width and height to 0 if TUI is not initialized.</p>
 
-<h4><code>int tui_poll_event(tui_event_t *event, int timeout_ms)</code></h4>
+<h4 id="tui_poll_event"><code>int tui_poll_event(tui_event_t *event, int timeout_ms)</code></h4>
 <p>Polls for keyboard input:</p>
 <ul>
 <li>Sets <code>timeout(timeout_ms)</code> for non-blocking input</li>
@@ -269,10 +269,10 @@ yap|mofl/languages/yap/yap.c|YAP language interpreter|tool|
 </ul>
 <p><strong>Key translation:</strong> The <code>translate_key()</code> function maps ncurses <code>KEY_*</code> constants to OneTool's <code>TUI_KEY_*</code> enum. It handles: KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_HOME, KEY_END, KEY_PPAGE, KEY_NPAGE, KEY_DC (delete), KEY_BACKSPACE (and 127 and 8), \n \r KEY_ENTER, \t, ESC (27), KEY_RESIZE.</p>
 
-<h4><code>void tui_set_palette(const tui_palette_t *palette)</code></h4>
+<h4 id="tui_set_palette"><code>void tui_set_palette(const tui_palette_t *palette)</code></h4>
 <p>Copies the palette struct into the internal static <code>tui_palette</code>, then calls <code>apply_palette()</code> if colors are available and TUI is initialized. All color pairs are re-initialized with the new colors.</p>
 
-<h4><code>void tui_draw_text(int x, int y, int style, const char *text)</code></h4>
+<h4 id="tui_draw_text"><code>void tui_draw_text(int x, int y, int style, const char *text)</code></h4>
 <p>Draws text at screen position (x, y) using the given style:</p>
 <ul>
 <li>Bounds-checks y against terminal height</li>
@@ -281,17 +281,17 @@ yap|mofl/languages/yap/yap.c|YAP language interpreter|tool|
 <li>Uses <code>mvaddnstr(y, x, text, width)</code> with the style's attribute</li>
 </ul>
 
-<h4><code>void tui_draw_textf(int x, int y, int style, const char *fmt, ...)</code></h4>
+<h4 id="tui_draw_textf"><code>void tui_draw_textf(int x, int y, int style, const char *fmt, ...)</code></h4>
 <p>Formats text with <code>vsnprintf()</code> (1024-byte buffer) then calls <code>tui_draw_text()</code>.</p>
 
-<h4><code>void tui_fill_rect(int x, int y, int width, int height, int style, char fill)</code></h4>
+<h4 id="tui_fill_rect"><code>void tui_fill_rect(int x, int y, int width, int height, int style, char fill)</code></h4>
 <p>Fills a rectangular area with a repeating character:</p>
 <ul>
 <li>Clips rectangle to screen bounds via <code>clip_rect_to_screen()</code></li>
 <li>Uses nested loops with <code>mvaddch()</code> for each cell</li>
 </ul>
 
-<h4><code>void tui_draw_box(int x, int y, int width, int height, int style, const char *title)</code></h4>
+<h4 id="tui_draw_box"><code>void tui_draw_box(int x, int y, int width, int height, int style, const char *title)</code></h4>
 <p>Draws a bordered box:</p>
 <ul>
 <li>Corners: <code>ACS_ULCORNER</code>, <code>ACS_URCORNER</code>, <code>ACS_LLCORNER</code>, <code>ACS_LRCORNER</code></li>
@@ -299,23 +299,23 @@ yap|mofl/languages/yap/yap.c|YAP language interpreter|tool|
 <li>Title: If provided and box is wide enough, draws <code>ACS_RTEE</code> + title + <code>ACS_LTEE</code> on the top border, 2 characters from left</li>
 </ul>
 
-<h4><code>void tui_draw_hline(int x, int y, int width, int style, char ch)</code></h4>
+<h4 id="tui_draw_hline"><code>void tui_draw_hline(int x, int y, int width, int style, char ch)</code></h4>
 <p>Draws a horizontal line of repeated characters using <code>mvaddch()</code> in a loop.</p>
 
-<h4><code>void tui_draw_vline(int x, int y, int height, int style, char ch)</code></h4>
+<h4 id="tui_draw_vline"><code>void tui_draw_vline(int x, int y, int height, int style, char ch)</code></h4>
 <p>Draws a vertical line of repeated characters using <code>mvaddch()</code> in a vertical loop.</p>
 
-<h4><code>void tui_draw_status_line(int style, const char *text)</code></h4>
+<h4 id="tui_draw_status_line"><code>void tui_draw_status_line(int style, const char *text)</code></h4>
 <p>Draws a status bar at the bottom row of the terminal:</p>
 <ul>
 <li>Fills the entire last row with spaces in the given style</li>
 <li>Draws the text clipped to terminal width minus 1 using <code>tui_clip_text()</code></li>
 </ul>
 
-<h4><code>int tui_key_is_printable(int key)</code></h4>
+<h4 id="tui_key_is_printable"><code>int tui_key_is_printable(int key)</code></h4>
 <p>Returns 1 if key is in range 32-126 (printable ASCII), 0 otherwise.</p>
 
-<h4><code>const char *tui_clip_text(const char *src, char *dst, int dst_size, int width)</code></h4>
+<h4 id="tui_clip_text"><code>const char *tui_clip_text(const char *src, char *dst, int dst_size, int width)</code></h4>
 <p>Clips text to fit a given width with ellipsis:</p>
 <ul>
 <li>If src is shorter than width, copies directly</li>
@@ -324,7 +324,7 @@ yap|mofl/languages/yap/yap.c|YAP language interpreter|tool|
 <li>Returns dst pointer, or "" if src is NULL</li>
 </ul>
 
-<h3>1.6 Event System</h3>
+<h3 id="tui-event">1.6 Event System</h3>
 <pre>enum tui_event_kind {
     TUI_EVENT_NONE = 0,    // No event
     TUI_EVENT_KEY = 1,     // Keyboard event
@@ -356,13 +356,13 @@ typedef struct {
 
 <hr>
 
-<h2>2. ELF Library — <code>libs/elf/</code></h2>
+<h2 id="elf-lib">2. ELF Library — <code>libs/elf/</code></h2>
 <p><strong>Files:</strong> <code>elf.h</code> (52 lines), <code>elf.c</code> (172 lines)</p>
 <p>A lightweight ELF64 parser that reads from memory buffers. Used by <code>size</code>, <code>nm</code>, and <code>mlink</code> tools. Supports little-endian ELF64 only.</p>
 
-<h3>2.1 Core Structures</h3>
+<h3 id="elf-structs">2.1 Core Structures</h3>
 
-<h4><code>ot_elf_section_t</code></h4>
+<h4 id="ot_elf_section_t"><code>ot_elf_section_t</code></h4>
 <p>Represents a single ELF section header entry after parsing:</p>
 <pre>typedef struct {
     char *name;            // Section name string (allocated, from .shstrtab)
@@ -381,7 +381,7 @@ typedef struct {
     uint64_t entsize;      // Entry size for tables (e.g. 24 for symtab, 24 for rela)
 } ot_elf_section_t;</pre>
 
-<h4><code>ot_elf_file_t</code></h4>
+<h4 id="ot_elf_file_t"><code>ot_elf_file_t</code></h4>
 <p>Represents a fully parsed ELF file:</p>
 <pre>typedef struct {
     const char *name;           // File name (borrowed pointer, not owned)
@@ -395,12 +395,12 @@ typedef struct {
     size_t section_count;       // Number of sections
 } ot_elf_file_t;</pre>
 
-<h3>2.2 API Functions — Complete Reference</h3>
+<h3 id="elf-api">2.2 API Functions — Complete Reference</h3>
 
-<h4><code>void ot_elf_init(ot_elf_file_t *elf)</code></h4>
+<h4 id="ot_elf_init"><code>void ot_elf_init(ot_elf_file_t *elf)</code></h4>
 <p>Zero-initializes an elf file struct via <code>memset(elf, 0, sizeof(*elf))</code>. Must be called before <code>ot_elf_parse()</code>.</p>
 
-<h4><code>void ot_elf_free(ot_elf_file_t *elf)</code></h4>
+<h4 id="ot_elf_free"><code>void ot_elf_free(ot_elf_file_t *elf)</code></h4>
 <p>Frees all allocated resources:</p>
 <ul>
 <li>Iterates through all sections and calls <code>free()</code> on each section's <code>name</code></li>
@@ -408,7 +408,7 @@ typedef struct {
 <li>Zeroes the entire struct</li>
 </ul>
 
-<h4><code>int ot_elf_parse(ot_elf_file_t *elf, const char *name, const unsigned char *data, size_t size, char *err, size_t err_size)</code></h4>
+<h4 id="ot_elf_parse"><code>int ot_elf_parse(ot_elf_file_t *elf, const char *name, const unsigned char *data, size_t size, char *err, size_t err_size)</code></h4>
 <p>Parses an ELF file from memory. Returns 0 on success, 1 on error.</p>
 <p><strong>Validation steps:</strong></p>
 <ol>
@@ -431,12 +431,12 @@ typedef struct {
 <li>Sets metadata: type, machine, entry point, shstrndx</li>
 </ol>
 
-<h4><code>int ot_elf_range_ok(size_t file_size, uint64_t off, uint64_t size)</code></h4>
+<h4 id="ot_elf_range_ok"><code>int ot_elf_range_ok(size_t file_size, uint64_t off, uint64_t size)</code></h4>
 <p>Validates that <code>off + size</code> fits within <code>file_size</code>:</p>
 <pre>return off <= file_size && size <= file_size - off;</pre>
 <p>This is the standard overflow-safe range check used throughout the ELF parser.</p>
 
-<h4><code>char *ot_elf_strdup_from_strtab(const unsigned char *base, size_t size, uint32_t off)</code></h4>
+<h4 id="ot_elf_strdup_from_strtab"><code>char *ot_elf_strdup_from_strtab(const unsigned char *base, size_t size, uint32_t off)</code></h4>
 <p>Extracts a null-terminated string from a string table at a given offset:</p>
 <ul>
 <li>If offset is out of bounds, returns <code>"<badstr>"</code></li>
@@ -445,7 +445,7 @@ typedef struct {
 <li>If no null byte found before end, returns <code>"<badstr>"</code></li>
 </ul>
 
-<h3>2.3 Byte Accessors</h3>
+<h3 id="elf-accessors">2.3 Byte Accessors</h3>
 <p>All multi-byte values in ELF files are little-endian. These accessors perform manual byte-wise reading/writing to avoid endianness dependencies on the host system:</p>
 
 <table>
@@ -460,13 +460,13 @@ typedef struct {
 
 <hr>
 
-<h2>3. Network Library — <code>libs/net/</code></h2>
+<h2 id="net-lib">3. Network Library — <code>libs/net/</code></h2>
 <p><strong>Files:</strong> <code>net.h</code> (59 lines), <code>url.c</code> (96 lines), <code>transport.c</code>, <code>http.c</code> (347 lines), <code>robots.c</code></p>
 <p>Three-layer networking stack: URL parsing, TCP/TLS transport, and HTTP client. The HTTP response parser was partially AI-generated.</p>
 
-<h3>3.1 URL Parser — <code>url.c</code></h3>
+<h3 id="net-url">3.1 URL Parser — <code>url.c</code></h3>
 
-<h4><code>net_url_t</code></h4>
+<h4 id="net_url_t"><code>net_url_t</code></h4>
 <pre>typedef struct {
     char *host;    // Hostname (e.g. "example.com")
     char *port;    // Port string (e.g. "80" or "443")
@@ -474,7 +474,7 @@ typedef struct {
     int use_tls;   // 1 for https://, 0 for http://
 } net_url_t;</pre>
 
-<h4><code>int net_parse_http_url(const char *url, net_url_t *out)</code></h4>
+<h4 id="net_parse_http_url"><code>int net_parse_http_url(const char *url, net_url_t *out)</code></h4>
 <p>Parses an HTTP/HTTPS URL. Returns 0 on success, 1 on error.</p>
 <p><strong>Parsing algorithm:</strong></p>
 <ol>
@@ -489,12 +489,12 @@ typedef struct {
 <li>All strings allocated with <code>malloc()</code></li>
 </ol>
 
-<h4><code>void net_free_url(net_url_t *url)</code></h4>
+<h4 id="net_free_url"><code>void net_free_url(net_url_t *url)</code></h4>
 <p>Frees all allocated string fields (host, port, path) and zeroes the struct.</p>
 
-<h3>3.2 Transport Layer — <code>transport.c</code></h3>
+<h3 id="net-transport">3.2 Transport Layer — <code>transport.c</code></h3>
 
-<h4><code>net_conn_t</code></h4>
+<h4 id="net_conn_t"><code>net_conn_t</code></h4>
 <pre>typedef struct {
     int fd;             // TCP socket file descriptor
     void *ssl_ctx;      // SSL context (opaque handle, NULL if no TLS)
@@ -502,7 +502,7 @@ typedef struct {
     int use_tls;        // 1 if TLS is active
 } net_conn_t;</pre>
 
-<h4><code>int net_conn_open(net_conn_t *conn, const char *host, const char *port, int timeout_sec, int use_tls, const char *tls_server_name, int noisy)</code></h4>
+<h4 id="net_conn_open"><code>int net_conn_open(net_conn_t *conn, const char *host, const char *port, int timeout_sec, int use_tls, const char *tls_server_name, int noisy)</code></h4>
 <p>Opens a TCP connection to the specified host:port with optional TLS upgrade:</p>
 <ul>
 <li>Resolves hostname via <code>getaddrinfo()</code></li>
@@ -513,22 +513,22 @@ typedef struct {
 <li>Returns 0 on success, non-zero on failure</li>
 </ul>
 
-<h4><code>void net_conn_close(net_conn_t *conn)</code></h4>
+<h4 id="net_conn_close"><code>void net_conn_close(net_conn_t *conn)</code></h4>
 <p>Closes the connection:</p>
 <ul>
 <li>If TLS active: performs SSL shutdown via <code>SSL_shutdown()</code>, frees SSL and SSL_CTX</li>
 <li>Closes the socket fd via <code>close()</code></li>
 </ul>
 
-<h4><code>ssize_t net_conn_read(net_conn_t *conn, void *buf, size_t len)</code></h4>
+<h4 id="net_conn_read"><code>ssize_t net_conn_read(net_conn_t *conn, void *buf, size_t len)</code></h4>
 <p>Reads data from the connection. If TLS active, uses <code>SSL_read()</code>, otherwise <code>read()</code>.</p>
 
-<h4><code>ssize_t net_conn_write(net_conn_t *conn, const void *buf, size_t len)</code></h4>
+<h4 id="net_conn_write"><code>ssize_t net_conn_write(net_conn_t *conn, const void *buf, size_t len)</code></h4>
 <p>Writes data to the connection. If TLS active, uses <code>SSL_write()</code>, otherwise <code>write()</code>.</p>
 
-<h3>3.3 HTTP Layer — <code>http.c</code></h3>
+<h3 id="net-http">3.3 HTTP Layer — <code>http.c</code></h3>
 
-<h4><code>net_http_response_t</code></h4>
+<h4 id="net_http_response_t"><code>net_http_response_t</code></h4>
 <pre>typedef struct {
     int status_code;            // HTTP status code (200, 404, 500...)
     int chunked;                // 1 if Transfer-Encoding: chunked
@@ -545,7 +545,7 @@ typedef struct {
 } stream_t;</pre>
 <p>The <code>stream_t</code> type implements a buffered read layer over the connection. Initial HTTP response data that was read while searching for the header terminator is stored in <code>prefill</code> so it can be consumed before reading more data from the socket.</p>
 
-<h4><code>int net_http_send_request(net_conn_t *conn, const char *method, const char *path, const char *host, const char *headers[], int header_count, const char *body, const char *user_agent)</code></h4>
+<h4 id="net_http_send_request"><code>int net_http_send_request(net_conn_t *conn, const char *method, const char *path, const char *host, const char *headers[], int header_count, const char *body, const char *user_agent)</code></h4>
 <p>Builds and sends an HTTP/1.1 request. Returns 0 on success, 1 on failure.</p>
 <p><strong>Request construction:</strong></p>
 <pre>METHOD path HTTP/1.1\r\n
@@ -560,7 +560,7 @@ body
 </pre>
 <p>The request is formatted into a 16KB static buffer using <code>snprintf()</code>. Custom headers are appended verbatim. Content-Length is included only if a body is provided. The request is sent via <code>send_all()</code> which handles partial writes and <code>EINTR</code>.</p>
 
-<h4><code>int net_http_read_response(net_conn_t *conn, FILE *out, int verbose, net_http_response_t *resp)</code></h4>
+<h4 id="net_http_read_response"><code>int net_http_read_response(net_conn_t *conn, FILE *out, int verbose, net_http_response_t *resp)</code></h4>
 <p>Reads and parses an HTTP response body. Returns 0 on success, 1 on failure.</p>
 <p><strong>Implementation details:</strong></p>
 <ol>
@@ -581,9 +581,9 @@ body
 <h4>Helper: <code>static int stream_read_line(stream_t *s, char *line, size_t cap)</code></h4>
 <p>Reads one byte at a time until <code>'\n'</code> is found, then null-terminates. Returns 0 on success.</p>
 
-<h3>3.4 Robots.txt Checker — <code>robots.c</code></h3>
+<h3 id="net-robots">3.4 Robots.txt Checker — <code>robots.c</code></h3>
 
-<h4><code>int net_robots_is_allowed(const char *host, const char *port, int use_tls, int timeout_sec, const char *path, const char *user_agent, int verbose, int *allowed)</code></h4>
+<h4 id="net_robots_is_allowed"><code>int net_robots_is_allowed(const char *host, const char *port, int use_tls, int timeout_sec, const char *path, const char *user_agent, int verbose, int *allowed)</code></h4>
 <p>Fetches and parses <code>/robots.txt</code> from the target server, then checks if the given path is allowed for the given user agent.</p>
 <p><strong>Algorithm:</strong></p>
 <ol>
@@ -599,38 +599,38 @@ body
 
 <hr>
 
-<h2>4. Memory Library — <code>libs/memory/</code></h2>
+<h2 id="mem-lib">4. Memory Library — <code>libs/memory/</code></h2>
 <p><strong>Files:</strong> <code>memory.h</code> (13 lines), <code>memory.c</code> (67 lines)</p>
-<p>Checked allocation wrappers that abort on failure. Every heap allocation in OneTool goes through these to guarantee OOM safety without cluttering code with NULL checks.</p>
+<p>Checked allocation wrappers that abort on failure. Every heap allocation in OneTool goes through these (<code><a href="#ot_xmalloc">ot_xmalloc</a></code>, <code><a href="#ot_xcalloc">ot_xcalloc</a></code>, <code><a href="#ot_xrealloc">ot_xrealloc</a></code>, <code><a href="#ot_xreallocarray">ot_xreallocarray</a></code>, <code><a href="#ot_xstrdup">ot_xstrdup</a></code>, <code><a href="#ot_xstrndup">ot_xstrndup</a></code>) to guarantee OOM safety without cluttering code with NULL checks.</p>
 
-<h3>4.1 Core Concepts</h3>
+<h3 id="mem-concepts">4.1 Core Concepts</h3>
 <ul>
 <li><strong>Non-zero size:</strong> All functions convert size 0 to 1 (<code>nonzero_size()</code>) to avoid implementation-defined malloc(0) behavior</li>
 <li><strong>Overflow protection:</strong> <code>checked_mul()</code> prevents integer overflow in multiplication (used by calloc and reallocarray)</li>
 <li><strong>Failure behavior:</strong> Prints "onetool: out of memory" to stderr and calls <code>exit(2)</code></li>
 </ul>
 
-<h3>4.2 API Functions</h3>
+<h3 id="mem-api">4.2 API Functions</h3>
 
-<h4><code>void *ot_xmalloc(size_t size)</code></h4>
+<h4 id="ot_xmalloc"><code>void *ot_xmalloc(size_t size)</code></h4>
 <p>Wraps <code>malloc()</code>. If size is 0, allocates 1 byte. Aborts if NULL returned and size was non-zero.</p>
 
-<h4><code>void *ot_xcalloc(size_t count, size_t size)</code></h4>
+<h4 id="ot_xcalloc"><code>void *ot_xcalloc(size_t count, size_t size)</code></h4>
 <p>Wraps <code>calloc()</code>. First computes <code>total = count * size</code> with overflow check (<code>checked_mul()</code>). Then allocates with <code>calloc(1, total)</code>, converting 0 to 1. Aborts if NULL.</p>
 
-<h4><code>void *ot_xrealloc(void *ptr, size_t size)</code></h4>
+<h4 id="ot_xrealloc"><code>void *ot_xrealloc(void *ptr, size_t size)</code></h4>
 <p>Wraps <code>realloc()</code>. Converts size 0 to 1. Aborts if NULL returned.</p>
 
-<h4><code>void *ot_xreallocarray(void *ptr, size_t count, size_t size)</code></h4>
+<h4 id="ot_xreallocarray"><code>void *ot_xreallocarray(void *ptr, size_t count, size_t size)</code></h4>
 <p>Computes <code>total = count * size</code> with overflow check, then calls <code>ot_xrealloc(ptr, total)</code>.</p>
 
-<h4><code>char *ot_xstrdup(const char *s)</code></h4>
+<h4 id="ot_xstrdup"><code>char *ot_xstrdup(const char *s)</code></h4>
 <p>Wraps <code>strdup()</code>: computes length via <code>strlen()</code>, allocates <code>len + 1</code> via <code>ot_xmalloc()</code>, copies with <code>memcpy()</code>.</p>
 
-<h4><code>char *ot_xstrndup(const char *s, size_t len)</code></h4>
+<h4 id="ot_xstrndup"><code>char *ot_xstrndup(const char *s, size_t len)</code></h4>
 <p>Wraps <code>strndup()</code>: allocates <code>len + 1</code> via <code>ot_xmalloc()</code>, copies <code>len</code> bytes, null-terminates.</p>
 
-<h3>4.3 Private Helpers</h3>
+<h3 id="mem-helpers">4.3 Private Helpers</h3>
 <pre>static void oom(void) {
     fprintf(stderr, "onetool: out of memory\n");
     exit(2);
@@ -1580,68 +1580,322 @@ srapi_result_t srapi_queue_copy_image_to_buffer(
 
 <hr>
 
-<h2 id="shader">12. Shader and Virtual Machine</h2>
+<h2 id="shader">12. Shader Virtual Machine — Specification</h2>
 
-<p>The SRAPI shader system uses a custom bytecode VM with 16 general-purpose registers (32-bit float). Shaders can be used as fragment shaders (per-pixel) or vertex shaders (per-vertex).</p>
+<p>The SRAPI shader system is a custom stackless register VM with 16 scalar float32 registers, a fixed-length decoded instruction format, and a variable-length bytecode encoding. It supports two execution modes: fragment (per-pixel) and vertex (per-vertex).</p>
 
-<h3>12.1 Shader Creation</h3>
-<pre>srapi_result_t srapi_create_shader(
-    const uint32_t *bytecode,
-    size_t word_count,
-    const float *uniforms,     // may be NULL
-    size_t uniform_count,      // may be 0
-    srapi_shader_t **out
-);</pre>
-<ul>
-<li>Copies bytecode, decodes instructions via <code>vm_decode_bytecode()</code></li>
-<li>Each bytecode word is <code>uint32_t</code>. Instruction format is variable-length:</li>
-</ul>
+<hr>
+
+<h3>12.1 Bytecode Encoding Specification</h3>
+
+<p>A shader program is an array of <code>uint32_t</code> words. The first word of each instruction is the opcode (uint8, must be ≤ 255). Following words are arguments encoded as uint8 values (must be ≤ 255), except for <code>LOAD_CONST</code> which takes a full <code>uint32_t</code> immediate.</p>
+
+<h4>12.1.1 Instruction Encoding Table</h4>
+
 <table>
-<tr><th>Args</th><th>Opcodes</th></tr>
-<tr><td>0 args</td><td>END</td></tr>
-<tr><td>2 args (dst, a)</td><td>MOV, LOAD_INPUT, LOAD_UNIFORM, FRACT, CLAMP01, SIN, COS, ABS, SQRT</td></tr>
-<tr><td>1 arg + immediate</td><td>LOAD_CONST (dst, imm32)</td></tr>
-<tr><td>3 args (dst, a, b)</td><td>ADD, SUB, MUL, DIV, MIN, MAX, POW</td></tr>
-<tr><td>4 args (dst, a, b, c)</td><td>MIX</td></tr>
-<tr><td>4 args (a, b, c, d)</td><td>OUT_COLOR (RGBA registers)</td></tr>
-<tr><td>2 args (a, b)</td><td>OUT_POSITION (x, y registers)</td></tr>
+<tr><th>Opcode</th><th>Value</th><th>Word Count</th><th>Wire Format</th></tr>
+<tr><td><code>END</code></td><td>0</td><td>1</td><td><code>[op]</code></td></tr>
+<tr><td><code>MOV</code></td><td>1</td><td>3</td><td><code>[op, dst, a]</code></td></tr>
+<tr><td><code>ADD</code></td><td>2</td><td>4</td><td><code>[op, dst, a, b]</code></td></tr>
+<tr><td><code>SUB</code></td><td>3</td><td>4</td><td><code>[op, dst, a, b]</code></td></tr>
+<tr><td><code>MUL</code></td><td>4</td><td>4</td><td><code>[op, dst, a, b]</code></td></tr>
+<tr><td><code>DIV</code></td><td>5</td><td>4</td><td><code>[op, dst, a, b]</code></td></tr>
+<tr><td><code>MIN</code></td><td>6</td><td>4</td><td><code>[op, dst, a, b]</code></td></tr>
+<tr><td><code>MAX</code></td><td>7</td><td>4</td><td><code>[op, dst, a, b]</code></td></tr>
+<tr><td><code>LOAD_INPUT</code></td><td>8</td><td>3</td><td><code>[op, dst, input_index]</code></td></tr>
+<tr><td><code>LOAD_UNIFORM</code></td><td>9</td><td>3</td><td><code>[op, dst, uniform_index]</code></td></tr>
+<tr><td><code>OUT_COLOR</code></td><td>10</td><td>5</td><td><code>[op, reg_r, reg_g, reg_b, reg_a]</code></td></tr>
+<tr><td><code>LOAD_CONST</code></td><td>11</td><td>3</td><td><code>[op, dst, imm32]</code> — imm32 is a full uint32_t word</td></tr>
+<tr><td><code>FRACT</code></td><td>12</td><td>3</td><td><code>[op, dst, a]</code></td></tr>
+<tr><td><code>CLAMP01</code></td><td>13</td><td>3</td><td><code>[op, dst, a]</code></td></tr>
+<tr><td><code>MIX</code></td><td>14</td><td>5</td><td><code>[op, dst, a, b, c]</code></td></tr>
+<tr><td><code>OUT_POSITION</code></td><td>15</td><td>3</td><td><code>[op, reg_x, reg_y]</code></td></tr>
+<tr><td><code>SIN</code></td><td>16</td><td>3</td><td><code>[op, dst, a]</code></td></tr>
+<tr><td><code>COS</code></td><td>17</td><td>3</td><td><code>[op, dst, a]</code></td></tr>
+<tr><td><code>ABS</code></td><td>18</td><td>3</td><td><code>[op, dst, a]</code></td></tr>
+<tr><td><code>SQRT</code></td><td>19</td><td>3</td><td><code>[op, dst, a]</code></td></tr>
+<tr><td><code>POW</code></td><td>20</td><td>4</td><td><code>[op, dst, a, b]</code></td></tr>
 </table>
 
-<h3>12.2 Uniform Management</h3>
-<pre>srapi_result_t srapi_shader_set_uniform(srapi_shader_t *shader, size_t index, float value);
-srapi_result_t srapi_shader_set_uniforms(srapi_shader_t *shader, size_t first,
-                                          const float *values, size_t count);</pre>
+<p>Total opcodes: 21 (values 0–20). Any opcode value outside this range causes <code>SRAPI_ERROR_BAD_ARG</code> at creation time.</p>
 
-<h3>12.3 Fragment Shader Execution</h3>
-<pre>srapi_result_t srapi_vm_run_fragment(
-    srapi_shader_t *shader,
-    const float inputs[6],       // X, Y, U, V, WIDTH, HEIGHT
-    srapi_color_t *out_color
-);</pre>
+<h4>12.1.2 Bytecode Validation</h4>
 <ul>
-<li>16 registers initialized to 0.0</li>
-<li>Default output: magenta (255, 0, 255, 255) if <code>OUT_COLOR</code> is never executed</li>
-<li>Shaders with <code>OUT_POSITION</code> ignore the position output in fragment mode</li>
-<li>Debug trace for the first 2 runs (when global <code>srapi</code> flag is set)</li>
+<li>Each argument word is validated at decode time: <code>word ≤ UINT8_MAX</code> (except the immediate of <code>LOAD_CONST</code>)</li>
+<li><code>END</code> may appear anywhere; decoding stops at <code>END</code> and the remaining words (if any) are ignored</li>
+<li>If <code>END</code> is not present, execution proceeds through all instructions and exits after the last one</li>
+<li>Opcodes <code>OUT_COLOR</code> and <code>OUT_POSITION</code> are valid in any position and quantity; the last executed instance determines the output</li>
+<li>Unknown opcodes cause <code>SRAPI_ERROR_BAD_ARG</code> at creation time</li>
 </ul>
 
-<h3>12.4 Vertex Shader Execution</h3>
+<hr>
+
+<h3>12.2 Decoded Instruction Format (<code>srapi_vm_inst_t</code>)</h3>
+
+<pre>typedef struct {
+    uint8_t op;      // opcode (0–20)
+    uint8_t dst;     // destination register index (0–15)
+    uint8_t a, b, c, d;  // source operand register indices (0–15)
+    uint32_t imm;    // immediate value (LOAD_CONST only)
+} srapi_vm_inst_t;</pre>
+
+<p>Size: 9 bytes (may be padded by compiler to 12 or 16). Decoded from bytecode by <code>vm_decode_bytecode()</code> in <code>shader.c</code>.</p>
+
+<hr>
+
+<h3>12.3 Register File</h3>
+
+<table>
+<tr><th>Property</th><th>Value</th></tr>
+<tr><td>Register count</td><td>16 (<code>SRAPI_VM_REG_COUNT</code>)</td></tr>
+<tr><td>Register width</td><td>32-bit IEEE 754 single-precision float</td></tr>
+<tr><td>Initial state (all modes)</td><td>All 16 registers set to <code>0.0f</code></td></tr>
+<tr><td>Out-of-bounds read</td><td>Returns <code>0.0f</code> (clamped by <code>vm_get_reg()</code>)</td></tr>
+<tr><td>Out-of-bounds write</td><td>Silently discarded (guarded by <code>dst &lt; SRAPI_VM_REG_COUNT</code>)</td></tr>
+</table>
+
+<hr>
+
+<h3>12.4 Fragment Shader Execution — <code>srapi_vm_run_fragment()</code></h3>
+
+<pre>srapi_result_t srapi_vm_run_fragment(
+    srapi_shader_t *shader,
+    const float inputs[6],
+    srapi_color_t *out_color
+);</pre>
+
+<h4>12.4.1 Input Slot Mapping</h4>
+
+<table>
+<tr><th>Index</th><th>Constant</th><th>Source</th></tr>
+<tr><td>0</td><td><code>SRAPI_VM_INPUT_X</code></td><td>Pixel X coordinate in screen space (float)</td></tr>
+<tr><td>1</td><td><code>SRAPI_VM_INPUT_Y</code></td><td>Pixel Y coordinate in screen space (float)</td></tr>
+<tr><td>2</td><td><code>SRAPI_VM_INPUT_U</code></td><td>Normalized U coordinate: <code>(pixel_x - rect_x0) / (rect_width - 1)</code>; 0 if width ≤ 1</td></tr>
+<tr><td>3</td><td><code>SRAPI_VM_INPUT_V</code></td><td>Normalized V coordinate: <code>(pixel_y - rect_y0) / (rect_height - 1)</code>; 0 if height ≤ 1</td></tr>
+<tr><td>4</td><td><code>SRAPI_VM_INPUT_WIDTH</code></td><td>Primitive width in pixels (float)</td></tr>
+<tr><td>5</td><td><code>SRAPI_VM_INPUT_HEIGHT</code></td><td>Primitive height in pixels (float)</td></tr>
+</table>
+
+<p>Input count: 6 (<code>SRAPI_VM_INPUT_COUNT</code>). Out-of-range <code>LOAD_INPUT</code> indices return <code>0.0f</code>.</p>
+
+<h4>12.4.2 Execution Pipeline</h4>
+
+<ol>
+<li>Validate <code>shader</code>, <code>shader-&gt;insts</code>, <code>out_color</code> — return <code>SRAPI_ERROR_BAD_ARG</code> if any is NULL</li>
+<li>Zero all 16 registers (<code>memset(regs, 0, sizeof(regs))</code>)</li>
+<li>Set default output color to magenta: <code>srapi_rgba(255, 0, 255, 255)</code></li>
+<li>Increment <code>shader-&gt;run_count</code></li>
+<li>If <code>shader-&gt;run_count ≤ 2</code> and global <code>srapi</code> flag is non-zero: trace the 6 input values to stderr</li>
+<li>Execute instructions sequentially from <code>insts[0]</code> to <code>insts[inst_count - 1]</code>:
+    <ul>
+    <li><code>END</code>: return <code>SRAPI_OK</code> immediately (do not execute further instructions)</li>
+    <li><code>OUT_COLOR</code>: writes <code>srapi_rgba(clamp_byte(r), clamp_byte(g), clamp_byte(b), clamp_byte(a))</code> to <code>*out_color</code>. Does NOT terminate execution.</li>
+    <li><code>OUT_POSITION</code>: silently ignored in fragment mode</li>
+    <li>All other opcodes: compute result into <code>regs[dst]</code> if <code>dst &lt; 16</code></li>
+    <li>Unknown opcode: calls <code>srapi_set_error()</code> and returns <code>SRAPI_ERROR_BAD_ARG</code></li>
+    </ul>
+</li>
+<li>If execution completes without encountering <code>END</code>, return <code>SRAPI_OK</code></li>
+</ol>
+
+<h4>12.4.3 Arithmetic Semantics</h4>
+
+<table>
+<tr><th>Opcode</th><th>Formula</th><th>Edge Cases</th></tr>
+<tr><td><code>MOV</code></td><td><code>dst = a</code></td><td>—</td></tr>
+<tr><td><code>ADD</code></td><td><code>dst = a + b</code></td><td>Standard IEEE 754 addition</td></tr>
+<tr><td><code>SUB</code></td><td><code>dst = a - b</code></td><td>Standard IEEE 754 subtraction</td></tr>
+<tr><td><code>MUL</code></td><td><code>dst = a × b</code></td><td>Standard IEEE 754 multiplication</td></tr>
+<tr><td><code>DIV</code></td><td><code>dst = a / b</code> if <code>b ≠ 0</code>, else <code>0.0f</code></td><td>Division by zero returns 0, not Inf/NaN</td></tr>
+<tr><td><code>MIN</code></td><td><code>dst = a &lt; b ? a : b</code></td><td>—</td></tr>
+<tr><td><code>MAX</code></td><td><code>dst = a &gt; b ? a : b</code></td><td>—</td></tr>
+<tr><td><code>FRACT</code></td><td><code>dst = a - floor(a)</code></td><td>Negative values: e.g. <code>FRACT(-1.3) = 0.7</code></td></tr>
+<tr><td><code>CLAMP01</code></td><td><code>dst = min(max(a, 0), 1)</code></td><td><code>if a ≤ 0 → 0; if a ≥ 1 → 1</code></td></tr>
+<tr><td><code>MIX</code></td><td><code>dst = a + (b - a) × clamp01(c)</code></td><td><code>c</code> is clamped to [0,1] before interpolation</td></tr>
+<tr><td><code>SIN</code></td><td><code>dst = sinf(a)</code></td><td>Standard libm <code>sinf</code></td></tr>
+<tr><td><code>COS</code></td><td><code>dst = cosf(a)</code></td><td>Standard libm <code>cosf</code></td></tr>
+<tr><td><code>ABS</code></td><td><code>dst = fabsf(a)</code></td><td>—</td></tr>
+<tr><td><code>SQRT</code></td><td><code>dst = sqrtf(max(a, 0))</code></td><td>Negative inputs clamped to 0 before sqrt</td></tr>
+<tr><td><code>POW</code></td><td><code>dst = powf(a, b)</code></td><td>Standard libm <code>powf</code></td></tr>
+</table>
+
+<h4>12.4.4 Color Output Encoding</h4>
+
+<pre>static uint8_t clamp_byte(float value) {
+    if (value &lt;= 0.0f) return 0;
+    if (value &gt;= 1.0f) return 255;
+    return (uint8_t)(value * 255.0f + 0.5f);
+}</pre>
+
+<p><code>OUT_COLOR</code> reads four registers (a=R, b=G, c=B, d=A), converts each through <code>clamp_byte()</code>, and packs into <code>srapi_color_t</code> (ARGB layout) via <code>srapi_rgba()</code>.</p>
+
+<p>Pixel value range mapping:</p>
+<ul>
+<li>Float [0.0, 1.0] → uint8 [0, 255] via <code>value × 255 + 0.5</code> (round-half-up)</li>
+<li>Values &lt; 0.0 → 0</li>
+<li>Values &gt; 1.0 → 255</li>
+</ul>
+
+<h4>12.4.5 Default Output</h4>
+<p>If no <code>OUT_COLOR</code> instruction is executed (or the shader has no instructions), the output color is magenta: <code>ARGB = 0xFFFF00FF</code> (A=255, R=255, G=0, B=255).</p>
+
+<hr>
+
+<h3>12.5 Vertex Shader Execution — <code>srapi_vm_run_vertex()</code></h3>
+
 <pre>srapi_result_t srapi_vm_run_vertex(
     srapi_shader_t *shader,
-    const float inputs[7],       // VERTEX_X, Y, R, G, B, A, INDEX
+    const float inputs[7],
     float out_position[2],
     srapi_color_t *out_color
 );</pre>
+
+<h4>12.5.1 Input Slot Mapping</h4>
+
+<table>
+<tr><th>Index</th><th>Constant</th><th>Source</th></tr>
+<tr><td>0</td><td><code>SRAPI_VM_INPUT_VERTEX_X</code></td><td>Vertex X coordinate from vertex buffer (<code>srapi_vertex_t.x</code>)</td></tr>
+<tr><td>1</td><td><code>SRAPI_VM_INPUT_VERTEX_Y</code></td><td>Vertex Y coordinate from vertex buffer (<code>srapi_vertex_t.y</code>)</td></tr>
+<tr><td>2</td><td><code>SRAPI_VM_INPUT_VERTEX_R</code></td><td>Red channel from vertex color</td></tr>
+<tr><td>3</td><td><code>SRAPI_VM_INPUT_VERTEX_G</code></td><td>Green channel from vertex color</td></tr>
+<tr><td>4</td><td><code>SRAPI_VM_INPUT_VERTEX_B</code></td><td>Blue channel from vertex color</td></tr>
+<tr><td>5</td><td><code>SRAPI_VM_INPUT_VERTEX_A</code></td><td>Alpha channel from vertex color</td></tr>
+<tr><td>6</td><td><code>SRAPI_VM_INPUT_VERTEX_INDEX</code></td><td>Vertex index within the draw call (0-based)</td></tr>
+</table>
+
+<p>Input count: 7 (<code>SRAPI_VM_VERTEX_INPUT_COUNT</code>).</p>
+
+<h4>12.5.2 Execution Pipeline</h4>
+
+<ol>
+<li>Validate arguments — return <code>SRAPI_ERROR_BAD_ARG</code> if any output pointer is NULL</li>
+<li>Zero all 16 registers</li>
+<li>Initialize default <code>out_position</code> from <code>inputs[VERTEX_X]</code> and <code>inputs[VERTEX_Y]</code></li>
+<li>Initialize default <code>out_color</code> from <code>inputs[VERTEX_R/G/B/A]</code> via <code>srapi_rgba(clamp_byte(r), ...)</code></li>
+<li>Increment <code>shader-&gt;run_count</code></li>
+<li>Execute instructions sequentially (same opcode set as fragment):</li>
+</ol>
+
+<h4>12.5.3 Vertex-Specific Opcodes</h4>
+
+<table>
+<tr><th>Opcode</th><th>Behavior in Vertex Mode</th></tr>
+<tr><td><code>OUT_POSITION</code></td><td>Writes <code>out_position[0] = regs[a]</code>, <code>out_position[1] = regs[b]</code></td></tr>
+<tr><td><code>OUT_COLOR</code></td><td>Same as fragment: writes <code>srapi_rgba(clamp_byte(a), ...)</code> to <code>*out_color</code></td></tr>
+</table>
+
+<p><code>OUT_POSITION</code> does not terminate execution; multiple <code>OUT_POSITION</code> instructions may execute, with the last one winning.</p>
+
+<hr>
+
+<h3>12.6 Load Operations</h3>
+
+<h4>LOAD_INPUT</h4>
+<p>Copies <code>inputs[inst-&gt;a]</code> to <code>regs[inst-&gt;dst]</code>. If <code>a ≥ input_count</code> for the execution mode, the register is set to <code>0.0f</code>.</p>
+
+<h4>LOAD_UNIFORM</h4>
+<p>Copies <code>shader-&gt;uniforms[inst-&gt;a]</code> to <code>regs[inst-&gt;dst]</code>. If <code>a ≥ shader-&gt;uniform_count</code>, the register is set to <code>0.0f</code>.</p>
+
+<h4>LOAD_CONST</h4>
+<p>Copies the bit pattern of <code>inst-&gt;imm</code> (uint32_t) into the float register via <code>memcpy</code> (no conversion):</p>
+<pre>static float vm_u32_to_float(uint32_t bits) {
+    float value;
+    memcpy(&amp;value, &amp;bits, sizeof(value));
+    return value;
+}</pre>
+<p>This allows loading arbitrary float bit patterns including NaN, Inf, and denormals. Example: <code>LOAD_CONST r0, 0x3F800000</code> loads <code>1.0f</code>.</p>
+
+<hr>
+
+<h3>12.7 Shader Creation — <code>srapi_create_shader()</code></h3>
+
+<pre>srapi_result_t srapi_create_shader(
+    const uint32_t *bytecode,
+    size_t word_count,
+    const float *uniforms,
+    size_t uniform_count,
+    srapi_shader_t **out
+);</pre>
+
+<h4>12.7.1 Allocation</h4>
 <ul>
-<li>Same opcodes as fragment shader</li>
-<li><code>OUT_POSITION</code> writes to <code>out_position[0]</code> (x) and <code>out_position[1]</code> (y)</li>
-<li><code>OUT_COLOR</code> writes to <code>out_color</code></li>
-<li>Initial position and color are loaded from <code>inputs[VERTEX_X/Y]</code> and <code>inputs[VERTEX_R/G/B/A]</code></li>
+<li>Allocates <code>srapi_shader_t</code> with <code>calloc(1, sizeof)</code></li>
+<li>Copies the bytecode array: <code>calloc(word_count) + memcpy</code></li>
+<li>Decodes all instructions via <code>vm_decode_bytecode()</code>:
+    <ul>
+    <li>Allocates <code>word_count</code> instruction slots (worst case: 1 word per instruction)</li>
+    <li>Returns <code>SRAPI_ERROR_BAD_ARG</code> on any decode failure (unknown opcode, argument overflow, truncated stream)</li>
+    </ul>
+</li>
+<li>If <code>uniform_count &gt; 0</code>: allocates uniform array with <code>calloc</code>, copies initial values if <code>uniforms</code> is non-NULL</li>
+<li>On any OOM: frees all partial allocations and returns <code>SRAPI_ERROR_OOM</code></li>
+<li>On success: calls <code>vm_disasm_shader()</code> for debug trace (when global <code>srapi</code> is set)</li>
 </ul>
 
-<h3>12.5 Shader Destruction</h3>
+<h4>12.7.2 Uniform Management</h4>
+<pre>srapi_result_t srapi_shader_set_uniform(srapi_shader_t *shader, size_t index, float value);
+srapi_result_t srapi_shader_set_uniforms(srapi_shader_t *shader, size_t first,
+                                          const float *values, size_t count);</pre>
+<p>Bounds-checked: returns <code>SRAPI_ERROR_BAD_ARG</code> if <code>index &gt;= uniform_count</code>, or <code>first + count &gt; uniform_count</code>. Does NOT allocate or grow the uniform array.</p>
+
+<hr>
+
+<h3>12.8 Shader Destruction — <code>srapi_destroy_shader()</code></h3>
+
 <pre>void srapi_destroy_shader(srapi_shader_t *shader);</pre>
-<p>Frees bytecode, decoded instructions, uniform array, and the shader struct.</p>
+
+<p>Frees in order: decoded instructions → bytecode → uniforms → shader struct. Safe to call with NULL. Debug-traces the destruction with word/instruction/uniform/run counts.</p>
+
+<hr>
+
+<h3>12.9 Debug and Trace Behavior</h3>
+
+<p>For the first 2 executions (<code>shader-&gt;run_count &lt; 2</code>), when the global <code>srapi</code> flag is non-zero:</p>
+<ul>
+<li>Fragment: prints input vector <code>(X, Y, U, V, WIDTH, HEIGHT)</code> and output color <code>(ARGB hex)</code></li>
+<li>Vertex: prints input <code>(X, Y, R, G, B, A, INDEX)</code> and output position + color</li>
+<li>At creation: disassembles all instructions to stderr with <code>[srapi]</code> prefix</li>
+</ul>
+
+<hr>
+
+<h3>12.10 Error Handling</h3>
+
+<table>
+<tr><th>Condition</th><th>Result</th></tr>
+<tr><td>NULL shader or output pointer</td><td><code>SRAPI_ERROR_BAD_ARG</code></td></tr>
+<tr><td>NULL <code>shader-&gt;insts</code></td><td><code>SRAPI_ERROR_BAD_ARG</code></td></tr>
+<tr><td>Unknown opcode at execution time</td><td><code>SRAPI_ERROR_BAD_ARG</code> + error message via <code>srapi_set_error()</code></td></tr>
+<tr><td>Unknown opcode at creation time</td><td><code>SRAPI_ERROR_BAD_ARG</code></td></tr>
+<tr><td>Out-of-range argument value (>255)</td><td><code>SRAPI_ERROR_BAD_ARG</code></td></tr>
+<tr><td>Truncated bytecode (premature end of stream)</td><td><code>SRAPI_ERROR_BAD_ARG</code></td></tr>
+<tr><td>Register index ≥ 16 for dst</td><td>Instruction is silently skipped (no-op)</td></tr>
+<tr><td>Register index ≥ 16 for source</td><td><code>0.0f</code> is used</td></tr>
+<tr><td>Uniform index ≥ uniform_count</td><td><code>0.0f</code> is loaded</td></tr>
+<tr><td>Input index ≥ input_count</td><td><code>0.0f</code> is used</td></tr>
+<tr><td>Division by zero</td><td>Result is <code>0.0f</code> (not Inf/NaN)</td></tr>
+<tr><td>Square root of negative</td><td>Clamped to 0 before sqrt, result is <code>0.0f</code></td></tr>
+</table>
+
+<hr>
+
+<h3>12.11 Shader Structure (<code>srapi_shader_t</code>)</h3>
+
+<pre>struct srapi_shader {
+    uint32_t *bytecode;        // copy of the original bytecode
+    size_t word_count;         // bytecode length in uint32_t words
+    srapi_vm_inst_t *insts;   // decoded instruction array
+    size_t inst_count;         // number of decoded instructions
+    float *uniforms;           // uniform float array
+    size_t uniform_count;      // number of uniforms
+    size_t run_count;          // total executions across both fragment/vertex modes
+};</pre>
+
+<hr>
+
+<h3>12.12 Integration with SIMD Engine</h3>
+
+<p>The scalar VM described above is the reference implementation. The SIMD engine (<code>exec_simd.c</code>) provides a drop-in replacement for fragment shaders via <code>srapi_vm_shade_rect()</code>, executing the same opcodes on 8-wide <code>__m256</code> vectors. See <a href="#simd">Section 19</a> for the SIMD specification.</p>
 
 <hr>
 
@@ -1983,72 +2237,287 @@ srapi_device_set_tile_cache_config(device, cols, rows);  // tile grid</pre>
 
 <hr>
 
-<h2 id="simd">19. SIMD Shader Execution</h2>
+<h2 id="simd">19. SIMD Shader Execution — Specification</h2>
 
-<p>The SIMD shader execution engine (<code>vm/exec_simd.c</code>) accelerates fragment shaders using AVX (Advanced Vector Extensions), processing 8 pixels simultaneously.</p>
+<p>The SIMD engine (<code>vm/exec_simd.c</code>) provides an AVX-accelerated fragment shader execution path. It processes 8 pixels simultaneously using 256-bit wide SIMD registers, with a scalar fallback and optional multi-threaded tile dispatch.</p>
 
-<h3>19.1 Overview</h3>
-<ul>
-<li>Uses <code>__m256</code> (8-wide single-precision SIMD) registers</li>
-<li>Implements all 21 VM opcodes with SIMD equivalents where possible</li>
-<li>Fallback to scalar for SIN, COS, POW (using <code>scalar_unary8</code> / <code>scalar_binary8</code>)</li>
-<li>Safe division: replaces zero divisors with 1.0 before division, zeros the result where divisor was zero</li>
-</ul>
+<h3>19.1 Architecture</h3>
 
-<h3>19.2 Entry Point</h3>
+<table>
+<tr><th>Component</th><th>Detail</th></tr>
+<tr><td>SIMD width</td><td>8 lanes (<code>__m256</code>, 8 × float32)</td></tr>
+<tr><td>Register count</td><td>16 × <code>__m256</code> (each lane holds one pixel's register value)</td></tr>
+<tr><td>ISA requirement</td><td>AVX (Intel Sandy Bridge / AMD Bulldozer or newer)</td></tr>
+<tr><td>Source file</td><td><code>vm/exec_simd.c</code></td></tr>
+<tr><td>Entry point</td><td><code>srapi_vm_shade_rect()</code></td></tr>
+</table>
+
+<h3>19.2 Entry Point — <code>srapi_vm_shade_rect()</code></h3>
+
 <pre>srapi_result_t srapi_vm_shade_rect(
     uint32_t *pixels,
     uint32_t pitch_bytes,
     srapi_shader_t *shader,
     int32_t rect_x0, int32_t rect_y0,
     uint32_t rect_width, uint32_t rect_height,
-    uint32_t x, uint32_t y,        // clip region
-    uint32_t width, uint32_t height
+    uint32_t x, uint32_t y,        // clip region origin
+    uint32_t width, uint32_t height // clip region extent
 );</pre>
-<p>Decision flow:</p>
-<ol>
-<li>If <code>shade_config.simd_enabled == 0</code>: calls scalar fallback (<code>shade_scalar</code>)</li>
-<li>If <code>shade_config.threads_enabled == 0</code>: calls SIMD directly (<code>shade_tile_rows</code>)</li>
-<li>Otherwise: splits the region into 32-row tiles and dispatches via thread pool</li>
-</ol>
 
-<h3>19.3 SIMD Pixel Pipeline</h3>
-<ol>
-<li><code>shade_tile_rows()</code> iterates rows; for each row, processes 8-pixel chunks</li>
-<li><code>run_chunk()</code> executes all instructions on 8-wide vectors:
-    <ul>
-    <li>Registers: 16 <code>__m256</code> values, all zero-initialized</li>
-    <li>Inputs: X, Y, U, V, WIDTH, HEIGHT as SIMD vectors</li>
-    <li>Uniforms: broadcast to all lanes</li>
-    <li>Constants: broadcast from <code>uint32_t</code> bit pattern</li>
-    </ul>
-</li>
-<li><code>emit_pixels()</code> converts RGBA floats to packed ARGB <code>uint32_t</code>, clamps to [0,1], multiplies by 255, rounds with +0.5, and stores via <code>_mm256_storeu_si256</code> (full 8 pixels) or <code>_mm256_maskstore_epi32</code> (partial last chunk)</li>
-</ol>
+<h4>19.2.1 Dispatch Logic</h4>
+
+<pre>cfg = srapi_get_shade_config();  // atomic load
+
+if cfg.simd_enabled == 0:
+    return shade_scalar(&amp;job)          // pure scalar per-pixel fallback
+
+if cfg.threads_enabled == 0:
+    shade_tile_rows(&amp;job, y, y + height)  // single-threaded SIMD
+
+else:
+    job.tile_rows = 32
+    tile_count = ceil(height / 32)
+    srapi_vm_threadpool_dispatch(tile_count, shade_tile_fn, &amp;job)
+    // calling thread participates as a worker</pre>
+
+<h4>19.2.2 Parameter Validation</h4>
+<ul>
+<li>Returns <code>SRAPI_ERROR_BAD_ARG</code> if <code>pixels == NULL</code>, <code>shader == NULL</code>, or <code>pitch_bytes == 0</code></li>
+<li>Returns <code>SRAPI_OK</code> immediately (no-op) if <code>width == 0 || height == 0</code></li>
+</ul>
+
+<h3>19.3 SIMD Pixel Pipeline — <code>shade_tile_rows()</code></h3>
+
+<h4>19.3.1 UV Coordinate Computation</h4>
+
+<pre>inv_w = (rect_width  &gt; 1) ? 1.0 / (rect_width  - 1) : 0.0
+inv_h = (rect_height &gt; 1) ? 1.0 / (rect_height - 1) : 0.0
+
+u_f = (x_f - rect_x0) * inv_w   // per-pixel normalized U
+v_f = (y_f - rect_y0) * inv_h   // per-pixel normalized V</pre>
+
+<p>For single-pixel primitives (<code>width ≤ 1</code> or <code>height ≤ 1</code>), the corresponding UV component is 0 for all pixels.</p>
+
+<h4>19.3.2 Pixel Chunking</h4>
+
+<pre>for each row py in [clip_y, clip_y + clip_height):
+    row = pixels + py * pitch_bytes
+    for each chunk px in [clip_x, clip_x + clip_width), stride 8:
+        remaining = clip_end - px
+        n_lanes = min(remaining, 8)
+        x_f = broadcast(px) + {0, 1, 2, 3, 4, 5, 6, 7}
+        y_f = broadcast(py)
+        execute shader on n_lanes pixels via run_chunk()
+        emit n_lanes pixels to row[px]</pre>
+
+<h3>19.4 Chunk Execution — <code>run_chunk()</code></h3>
+
+<h4>19.4.1 Register Initialization</h4>
+<p>All 16 <code>__m256</code> registers zeroed via <code>_mm256_setzero_ps()</code>. Default output color: <code>R=1.0, G=0.0, B=1.0, A=1.0</code> (magenta).</p>
+
+<h4>19.4.2 Instruction Loop</h4>
+<p>Iterates <code>shader-&gt;insts[0..inst_count-1]</code>. For each decoded instruction:</p>
+
+<table>
+<tr><th>Opcode</th><th>SIMD Implementation</th></tr>
+<tr><td><code>END</code></td><td><code>break</code> — exit instruction loop</td></tr>
+<tr><td><code>MOV</code></td><td><code>regs[dst] = regs[a]</code></td></tr>
+<tr><td><code>ADD</code></td><td><code>_mm256_add_ps(a, b)</code></td></tr>
+<tr><td><code>SUB</code></td><td><code>_mm256_sub_ps(a, b)</code></td></tr>
+<tr><td><code>MUL</code></td><td><code>_mm256_mul_ps(a, b)</code></td></tr>
+<tr><td><code>DIV</code></td><td><code>_mm256_div_ps(a, safe_b)</code> where <code>safe_b = blend(b, 1.0, cmp_eq(b, 0))</code>; result zeroed where <code>b == 0</code> via <code>_mm256_blendv_ps</code></td></tr>
+<tr><td><code>MIN</code></td><td><code>_mm256_min_ps(a, b)</code></td></tr>
+<tr><td><code>MAX</code></td><td><code>_mm256_max_ps(a, b)</code></td></tr>
+<tr><td><code>LOAD_INPUT</code></td><td>Switch on <code>inst-&gt;a</code>: loads the pre-computed SIMD vector for X, Y, U, V, WIDTH, or HEIGHT</td></tr>
+<tr><td><code>LOAD_UNIFORM</code></td><td><code>_mm256_set1_ps(shader-&gt;uniforms[a])</code> (broadcast scalar)</td></tr>
+<tr><td><code>LOAD_CONST</code></td><td><code>_mm256_set1_ps(u32_to_float(imm))</code> via <code>u32_bits_to_broadcast()</code></td></tr>
+<tr><td><code>FRACT</code></td><td><code>_mm256_sub_ps(v, _mm256_floor_ps(v))</code></td></tr>
+<tr><td><code>CLAMP01</code></td><td><code>_mm256_max_ps(0, _mm256_min_ps(1, v))</code></td></tr>
+<tr><td><code>SIN</code></td><td>Fallback to scalar: extract 8 floats, call <code>sinf</code> per lane, re-pack via <code>scalar_unary8()</code></td></tr>
+<tr><td><code>COS</code></td><td>Same as SIN but via <code>cosf</code></td></tr>
+<tr><td><code>ABS</code></td><td><code>_mm256_and_ps(v, mask_0x7FFFFFFF)</code></td></tr>
+<tr><td><code>SQRT</code></td><td><code>_mm256_sqrt_ps(_mm256_max_ps(0, a))</code></td></tr>
+<tr><td><code>POW</code></td><td>Fallback to scalar: <code>scalar_binary8(a, b, powf)</code></td></tr>
+<tr><td><code>MIX</code></td><td><code>a + (b - a) * clamp01(c)</code> using SIMD arithmetic</td></tr>
+<tr><td><code>OUT_COLOR</code></td><td>Captures <code>final_{r,g,b,a} = regs[inst-&gt;{a,b,c,d}]</code>; does NOT terminate</td></tr>
+<tr><td><code>OUT_POSITION</code></td><td>Silently ignored (no-op in fragment mode)</td></tr>
+</table>
+
+<h4>19.4.3 Safe Division Algorithm</h4>
+
+<pre>zero = _mm256_setzero_ps()
+safe = _mm256_blendv_ps(
+    _mm256_set1_ps(1.0f),
+    b,
+    _mm256_cmp_ps(b, zero, _CMP_NEQ_OQ)
+)
+quotient = _mm256_div_ps(a, safe)
+result = _mm256_blendv_ps(zero, quotient,
+             _mm256_cmp_ps(b, zero, _CMP_NEQ_OQ))</pre>
+
+<p>Lanes where <code>b == 0</code> produce result <code>0.0f</code>; other lanes produce <code>a / b</code>.</p>
+
+<h3>19.5 Pixel Output — <code>emit_pixels()</code></h3>
+
+<pre>static void emit_pixels(uint32_t *dst, int n_lanes,
+    __m256 fr, __m256 fg, __m256 fb, __m256 fa);
+
+1. Clamp each channel to [0, 1]
+2. Multiply by 255.0f, add 0.5f (round-half-up)
+3. Convert to int32 via _mm256_cvttps_epi32
+4. Pack: pixel = (b) | (g &lt;&lt; 8) | (r &lt;&lt; 16) | (a &lt;&lt; 24)
+5. Store:
+   - n_lanes == 8: _mm256_storeu_si256 (unaligned 256-bit store)
+   - n_lanes 1..7: _mm256_maskstore_epi32 (masked store with partial lane mask)</pre>
+
+<p>The store mask for partial chunks is a pre-computed constant array <code>g_store_mask[16]</code> where the first <code>n_lanes</code> entries are <code>-1</code> and the rest are <code>0</code>.</p>
+
+<h3>19.6 Scalar Fallback — <code>shade_scalar()</code></h3>
+
+<p>When SIMD is disabled, <code>shade_scalar()</code> processes one pixel at a time, calling <code>srapi_vm_run_fragment()</code> for each pixel. This is the reference path and produces identical results to the SIMD path (within IEEE 754 rounding differences for operations like <code>powf</code> and <code>sinf</code>).</p>
+
+<h3>19.7 Parallel Dispatch — <code>shade_tile_fn()</code></h3>
+
+<p>Callback for the thread pool:</p>
+<pre>void shade_tile_fn(void *user, uint32_t tile_index) {
+    job = (shade_job_t *)user;
+    row_begin = job-&gt;clip_y + tile_index * job-&gt;tile_rows;
+    row_end   = min(row_begin + job-&gt;tile_rows, job-&gt;clip_y + job-&gt;clip_height);
+    shade_tile_rows(job, row_begin, row_end);
+}</pre>
+
+<h3>19.8 Shade Job Structure</h3>
+
+<pre>typedef struct {
+    uint32_t *pixels;
+    uint32_t pitch_bytes;
+    srapi_shader_t *shader;
+    int32_t rect_x0, rect_y0;
+    uint32_t rect_width, rect_height;
+    uint32_t clip_x, clip_y;
+    uint32_t clip_width, clip_height;
+    uint32_t tile_rows;        // rows per tile for thread dispatch
+} shade_job_t;</pre>
 
 <hr>
 
-<h2 id="threadpool">20. Thread Pool</h2>
+<h2 id="threadpool">20. Thread Pool — Specification</h2>
 
-<p>The thread pool (<code>vm/threadpool.c</code>) enables parallel tile rendering for shaded rectangles.</p>
+<p>The thread pool (<code>vm/threadpool.c</code> + <code>vm/threadpool.h</code>) provides a fire-once parallel dispatch mechanism for shader tile rendering. Workers persist across dispatches and sleep when idle.</p>
 
-<h3>20.1 Design</h3>
+<h3>20.1 Worker Pool Initialization</h3>
+
+<pre>static void init_pool(void);  // called once via pthread_once
+
+1. Query online CPUs: sysconf(_SC_NPROCESSORS_ONLN)
+2. If online ≤ 1: n_workers = 0 (no workers created)
+3. Desired workers = min(online - 1, SRAPI_VM_MAX_WORKERS = 63)
+4. Create desired workers via pthread_create (detached)
+5. On creation failure: stop and use however many succeeded</pre>
+
+<p>Worker lifecycle: detached threads run <code>worker_main()</code> in an infinite loop, sleeping on condition variable <code>cv_go</code> until a job is available.</p>
+
+<h3>20.2 Data Structures</h3>
+
+<pre>typedef struct {
+    srapi_vm_tile_fn_t fn;     // tile processing callback
+    void *user;                 // user context (shade_job_t*)
+    uint32_t total;             // total tile count
+    atomic_uint next;           // next unclaimed tile index
+} pool_job_t;
+
+// Global state:
+static pthread_once_t init_once;     // one-time pool creation
+static pthread_mutex_t mu;           // protects current_job, workers_done, job_seq
+static pthread_cond_t cv_go;         // signals workers to start
+static pthread_cond_t cv_done;       // signals dispatcher that workers are done
+static pool_job_t *current_job;      // pointer to active job (NULL when idle)
+static int workers_done;             // count of workers that finished
+static int n_workers;                // total worker count (0 = no workers)
+static uint64_t job_seq;             // monotonically increasing job counter</pre>
+
+<h3>20.3 Worker Thread — <code>worker_main()</code></h3>
+
+<pre>for (;;):
+    lock(mu)
+    while current_job == NULL OR job_seq == last_seq:
+        pthread_cond_wait(&amp;cv_go, &amp;mu)
+    job = current_job
+    my_seq = job_seq
+    unlock(mu)
+
+    // Claim tiles atomically
+    for (;;):
+        i = atomic_fetch_add(&amp;job-&gt;next, 1, relaxed)
+        if i &gt;= job-&gt;total: break
+        job-&gt;fn(job-&gt;user, i)
+
+    lock(mu)
+    workers_done++
+    if workers_done == n_workers:
+        pthread_cond_signal(&amp;cv_done)   // wake dispatcher
+    last_seq = my_seq
+    unlock(mu)</pre>
+
+<h3>20.4 Dispatch — <code>srapi_vm_threadpool_dispatch()</code></h3>
+
+<pre>void srapi_vm_threadpool_dispatch(uint32_t tile_count,
+    srapi_vm_tile_fn_t fn, void *user);
+
+1. if tile_count == 0 or fn == NULL: return
+2. pthread_once(&amp;init_once, init_pool)
+3. if n_workers == 0 or tile_count == 1:
+       // no parallelism; execute inline
+       for i in 0..tile_count-1: fn(user, i)
+       return
+
+4. Initialize pool_job_t:
+       job.fn = fn
+       job.user = user
+       job.total = tile_count
+       atomic_init(&amp;job.next, 0)
+
+5. Wake workers:
+       lock(mu)
+       current_job = &amp;job
+       workers_done = 0
+       job_seq++
+       pthread_cond_broadcast(&amp;cv_go)   // wake ALL sleeping workers
+       unlock(mu)
+
+6. Dispatcher also processes tiles:
+       for (;;):
+           i = atomic_fetch_add(&amp;job.next, 1, relaxed)
+           if i &gt;= job.total: break
+           fn(user, i)
+
+7. Wait for all workers to finish:
+       lock(mu)
+       while workers_done &lt; n_workers:
+           pthread_cond_wait(&amp;cv_done, &amp;mu)
+       current_job = NULL
+       unlock(mu)</pre>
+
+<h3>20.5 Thread Safety Properties</h3>
 <ul>
-<li>Up to 63 worker threads (<code>SRAPI_VM_MAX_WORKERS</code>)</li>
-<li>Threads are created once via <code>pthread_once</code></li>
-<li>Workers sleep on a <code>pthread_cond_t</code> waiting for work</li>
-<li>Work is dispatched as tiles; workers atomically fetch and increment a tile counter</li>
+<li><code>atomic_uint next</code> ensures each tile is processed exactly once (no mutex contention on tile claiming)</li>
+<li>Condition variables avoid busy-waiting</li>
+<li>The dispatcher thread participates in processing, so at least <code>min(online_cpus, tile_count)</code> tiles run in parallel</li>
+<li>Job sequencing via <code>job_seq</code> guards against spurious wakeups from previous jobs</li>
+<li>Maximum 63 workers limits <code>pthread_cond_broadcast</code> wakeup storms</li>
+<li>No worker cleanup on shutdown (detached threads exit with process)</li>
 </ul>
 
-<h3>20.2 API</h3>
-<pre>typedef void (*srapi_vm_tile_fn_t)(void *user, uint32_t tile_index);
-
-void srapi_vm_threadpool_dispatch(
-    uint32_t tile_count,
-    srapi_vm_tile_fn_t fn,
-    void *user
-);</pre>
-<p>The calling thread participates by processing tiles after waking workers. The function returns when all tiles are complete.</p>
+<h3>20.6 Performance Characteristics</h3>
+<table>
+<tr><th>Metric</th><th>Value</th></tr>
+<tr><td>Max worker threads</td><td>63</td></tr>
+<tr><td>Worker creation</td><td>Once, lazy (<code>pthread_once</code>)</td></tr>
+<tr><td>Tile claiming cost</td><td>1 atomic fetch-add per tile per worker</td></tr>
+<tr><td>Dispatch latency</td><td>1 mutex lock + 1 cond broadcast</td></tr>
+<tr><td>Completion detection</td><td>1 cond wait (dispatcher) + atomic counter</td></tr>
+<tr><td>Worker parking</td><td>Infinite loop on condvar, zero CPU when idle</td></tr>
+</table>
 
 <hr>
 
@@ -3941,7 +4410,7 @@ onetool shutdown -t 10
 <h1>OneTool — TUI System</h1>
 <p>The OneTool TUI is defined entirely in <code>tui.c</code> (1336 lines). It provides an interactive terminal interface for browsing tools, configuring options, and launching tools with custom arguments.</p>
 
-<h2>Architecture Overview</h2>
+<h2 id="arch">Architecture Overview</h2>
 <p>The TUI is a state-machine driven, event-loop based interface with three screens:</p>
 <ol>
 <li><strong>Tools screen</strong> — List all tools in a left panel with details/preview in the right panel</li>
@@ -3949,8 +4418,8 @@ onetool shutdown -t 10
 <li><strong>Settings screen</strong> — Global settings: launch directory and theme palette configuration</li>
 </ol>
 
-<h2>Core State: <code>onetool_tui_state_t</code></h2>
-<pre><span class="kwd">typedef struct</span> {
+<h2 id="state">Core State: <code>onetool_tui_state_t</code></h2>
+<pre id="onetool_tui_state_t"><span class="kwd">typedef struct</span> {
     <span class="kwd">int</span> screen;                                 <span class="cmt">// Current screen (0=Tools, 1=Form, 2=Settings)</span>
     <span class="kwd">int</span> selected_tool;                          <span class="cmt">// Index of selected tool</span>
     <span class="kwd">int</span> tool_scroll;                            <span class="cmt">// Scroll position in tool list</span>
@@ -3971,19 +4440,19 @@ onetool shutdown -t 10
 } onetool_tui_state_t;
 </pre>
 
-<h2>Tool Forms</h2>
+<h2 id="forms">Tool Forms</h2>
 <p>Each tool can have a custom form with up to <code>TUI_MAX_FIELDS</code> (16) fields. Forms are defined in <code>load_embedded_tool_form()</code> which contains a large <code>if/else if</code> chain mapping tool names to their form definitions.</p>
 
-<h3>Field Types</h3>
+<h3 id="field-types">Field Types</h3>
 <table>
 <tr><th>Type</th><th>Enum</th><th>Behavior</th></tr>
-<tr><td>Text</td><td><code>ONETOOL_FIELD_TEXT</code></td><td>Free-form text input, supports typing and backspace. Values are passed as arguments with their flag prefix.</td></tr>
-<tr><td>Toggle</td><td><code>ONETOOL_FIELD_TOGGLE</code></td><td>Boolean on/off, toggled with Space. When on, the flag is emitted.</td></tr>
-<tr><td>Choice</td><td><code>ONETOOL_FIELD_CHOICE</code></td><td>Multiple preset options, navigated with Left/Right/Space. The selected value is emitted.</td></tr>
+<tr id="field-text"><td>Text</td><td><code>ONETOOL_FIELD_TEXT</code></td><td>Free-form text input, supports typing and backspace. Values are passed as arguments with their flag prefix.</td></tr>
+<tr id="field-toggle"><td>Toggle</td><td><code>ONETOOL_FIELD_TOGGLE</code></td><td>Boolean on/off, toggled with Space. When on, the flag is emitted.</td></tr>
+<tr id="field-choice"><td>Choice</td><td><code>ONETOOL_FIELD_CHOICE</code></td><td>Multiple preset options, navigated with Left/Right/Space. The selected value is emitted.</td></tr>
 </table>
 
-<h3>Form Field</h3>
-<pre><span class="kwd">typedef struct</span> {
+<h3 id="form-field">Form Field</h3>
+<pre id="onetool_form_field_t"><span class="kwd">typedef struct</span> {
     <span class="kwd">char</span> name[<span class="num">48</span>];               <span class="cmt">// Internal field name</span>
     <span class="kwd">char</span> label[<span class="num">96</span>];              <span class="cmt">// Display label</span>
     <span class="kwd">char</span> flag[<span class="num">24</span>];               <span class="cmt">// CLI flag prefix (e.g. "-o", "--timeout")</span>
@@ -3998,7 +4467,7 @@ onetool shutdown -t 10
 } onetool_form_field_t;
 </pre>
 
-<h3>Field Flags</h3>
+<h3 id="field-flags">Field Flags</h3>
 <p>When building the command line for execution:</p>
 <ul>
 <li>Text fields: if <code>flag</code> is non-empty, it is emitted before the value</li>
@@ -4007,20 +4476,20 @@ onetool shutdown -t 10
 <li>Fields with <code>flag = "@extra"</code>: the value is tokenized (supports quotes, escapes) and appended as-is</li>
 </ul>
 
-<h3>Special Tools: Task Manager & User Control</h3>
+<h3 id="special-tools">Special Tools: Task Manager &amp; User Control</h3>
 <p>When <code>taskmng</code> or <code>userc</code> are selected on the tools screen, the right panel becomes an interactive live view instead of showing static tool details:</p>
 <ul>
 <li><strong>taskmng:</strong> Live process list refreshed each frame via <code>taskmng_collect()</code>/<code>taskmng_refresh()</code>. Keyboard events for process control are handled inline.</li>
 <li><strong>userc:</strong> User list displayed and managed directly in the right panel. Keyboard events for add/delete/edit are handled inline.</li>
 </ul>
 
-<h2>Themes</h2>
-<p>Five built-in themes (ocean, forest, amber, mono, custom) are defined in <code>g_themes[]</code>. Each theme is a <code>tui_palette_t</code> with 7 color slots.</p>
+<h2 id="themes">Themes</h2>
+<p>Five built-in themes (ocean, forest, amber, mono, custom) are defined in <code>g_themes[]</code>. Each theme is a <code><a href="libs.html#tui-palette">tui_palette_t</a></code> with 7 color slots.</p>
 
-<h3>Theme Cycling</h3>
+<h3 id="theme-cycling">Theme Cycling</h3>
 <p>Press <code>T</code> (uppercase) to cycle forward through themes. The cycle wraps around. When in settings, theme presets can be selected and individual colors can be changed, which switches to "custom" theme.</p>
 
-<h2>Settings Screen</h2>
+<h2 id="settings">Settings Screen</h2>
 <p>The settings screen (<code>open_settings()</code>) provides:</p>
 <ul>
 <li><strong>Launch path:</strong> Working directory for tool execution (defaults to current directory)</li>
@@ -4029,26 +4498,26 @@ onetool shutdown -t 10
 </ul>
 <p>Changes to individual colors switch to "custom" theme and apply live.</p>
 
-<h2>Keyboard Shortcuts</h2>
+<h2 id="shortcuts">Keyboard Shortcuts</h2>
 <table>
 <tr><th>Key</th><th>Tools Screen</th><th>Form Screen</th><th>Settings Screen</th></tr>
-<tr><td>Arrows</td><td>Navigate tools</td><td>Navigate fields</td><td>Navigate settings</td></tr>
-<tr><td>PageUp/Down</td><td>Jump 8 tools</td><td>—</td><td>—</td></tr>
-<tr><td>Home/End</td><td>First/last tool</td><td>—</td><td>—</td></tr>
-<tr><td>Enter</td><td>Open tool form</td><td><strong>Run tool!</strong></td><td>Select choice option</td></tr>
-<tr><td>Esc / Q</td><td>Exit TUI</td><td>Back to tools</td><td>Back to previous</td></tr>
-<tr><td>N</td><td>Open settings</td><td>Open settings</td><td>Close settings</td></tr>
-<tr><td>Tab</td><td>—</td><td>Next field (wraps)</td><td>Next setting (wraps)</td></tr>
-<tr><td>Space</td><td>—</td><td>Toggle/cycle field</td><td>Select choice option</td></tr>
-<tr><td>T</td><td>Cycle theme</td><td>Cycle theme</td><td>—</td></tr>
-<tr><td>R</td><td>—</td><td>Run tool</td><td>—</td></tr>
-<tr><td>Left/Right</td><td>—</td><td>Cycle choice options</td><td>Cycle choice options</td></tr>
+<tr id="key-arrows"><td>Arrows</td><td>Navigate tools</td><td>Navigate fields</td><td>Navigate settings</td></tr>
+<tr id="key-pgup"><td>PageUp/Down</td><td>Jump 8 tools</td><td>—</td><td>—</td></tr>
+<tr id="key-homeend"><td>Home/End</td><td>First/last tool</td><td>—</td><td>—</td></tr>
+<tr id="key-enter"><td>Enter</td><td>Open tool form</td><td><strong>Run tool!</strong></td><td>Select choice option</td></tr>
+<tr id="key-esc"><td>Esc / Q</td><td>Exit TUI</td><td>Back to tools</td><td>Back to previous</td></tr>
+<tr id="key-n"><td>N</td><td>Open settings</td><td>Open settings</td><td>Close settings</td></tr>
+<tr id="key-tab"><td>Tab</td><td>—</td><td>Next field (wraps)</td><td>Next setting (wraps)</td></tr>
+<tr id="key-space"><td>Space</td><td>—</td><td>Toggle/cycle field</td><td>Select choice option</td></tr>
+<tr id="key-t"><td>T</td><td>Cycle theme</td><td>Cycle theme</td><td>—</td></tr>
+<tr id="key-r"><td>R</td><td>—</td><td>Run tool</td><td>—</td></tr>
+<tr id="key-leftright"><td>Left/Right</td><td>—</td><td>Cycle choice options</td><td>Cycle choice options</td></tr>
 </table>
 
-<h2>Tool Execution Flow</h2>
+<h2 id="exec-flow">Tool Execution Flow</h2>
 <ol>
 <li><code>run_active_tool()</code> builds the argument list from form fields using <code>build_tool_argv()</code></li>
-<li>TUI is shut down via <code>tui_shutdown()</code></li>
+<li>TUI is shut down via <code><a href="libs.html#tui_shutdown">tui_shutdown()</a></code></li>
 <li>The launch directory is changed if specified</li>
 <li>Tool is executed via <code>onetool_run_tool()</code></li>
 <li>After tool exits, <code>chdir()</code> back to original directory</li>
@@ -4056,7 +4525,7 @@ onetool shutdown -t 10
 <li>TUI is reinitialized with current theme</li>
 </ol>
 
-<h2>Token Parser</h2>
+<h2 id="token-parser">Token Parser</h2>
 <p>The <code>tokenize_extra_args()</code> function handles quoting and escaping for the "Extra args" field:</p>
 <ul>
 <li>Single quotes <code>'...'</code>: literal text, no interpretation</li>
@@ -4066,7 +4535,7 @@ onetool shutdown -t 10
 <li>Whitespace separates tokens outside quotes</li>
 </ul>
 
-<h2>Preview System</h2>
+<h2 id="preview">Preview System</h2>
 <p>At the bottom of form and tool screens, a preview line shows the command that would be executed. This is generated by <code>build_preview_text()</code> which runs the same <code>build_tool_argv()</code> function and formats the resulting arguments.</p>
 
 
@@ -4076,18 +4545,18 @@ onetool shutdown -t 10
 <p>The MOFL subsystem (licensed under BSD 2-Clause) contains two language implementations: <strong>YAP</strong> and <strong>Brainfuck</strong>. These are registered via the extra tools manifest and built as part of OneTool.</p>
 
 <hr>
-<h2>YAP Language</h2>
+<h2 id="yap">YAP Language</h2>
 <p><strong>Source:</strong> <code>mofl/languages/yap/yap.c</code> (1132 lines)</p>
 <p><strong>Entry:</strong> Registered as extra tool <code>yap</code></p>
 <p>YAP (Yet Another Programming language) is a scripting language interpreter bundled with OneTool. It supports variables, math operations, control flow, external library calls, and subroutines.</p>
 
-<h3>Features</h3>
+<h3 id="yap-features">Features</h3>
 <ul>
 <li>Variables (declared before use)</li>
 <li>Integer and string types</li>
 <li>Arithmetic: ADD, SUB, MUL, DIV</li>
 <li>Conditional blocks: IF/ENDIF</li>
-<li>Comparison operators: B (bigger), S (smaller), E (equal)</li>
+<li>Comparison operators: <a href="#op-b">B</a> (bigger), <a href="#op-s">S</a> (smaller), <a href="#op-e">E</a> (equal)</li>
 <li>Subroutine calls via GOTO/RETURN</li>
 <li>External dynamic library calling (Linux .so, Windows .dll)</li>
 <li>Print output: raw values, strings, numbers</li>
@@ -4095,29 +4564,29 @@ onetool shutdown -t 10
 <li>System variables: OPRES (math results), RETVAL (return values)</li>
 </ul>
 
-<h3>Language Syntax</h3>
+<h3 id="yap-syntax">Language Syntax</h3>
 
-<h4>Comments</h4>
+<h4 id="yap-comments">Comments</h4>
 <pre>; this is a comment
 ; everything after semicolon is ignored</pre>
 
-<h4>Variables</h4>
+<h4 id="yap-vars">Variables</h4>
 <pre>DECLARE VAR name
 SET name "John"
 PRINT name</pre>
 
-<h4>Print Options</h4>
+<h4 id="yap-print">Print Options</h4>
 <pre>PRINT NFORMAT hello    ; print raw value (no variable lookup)
 PRINT "hello"          ; print string literal
 PRINT 123              ; print number</pre>
 
-<h4>User Input</h4>
+<h4 id="yap-input">User Input</h4>
 <pre>READINT number
 PRINT number           ; prints the read number
 ; READINT stores the value into the variable
 ; and also updates OPRES with the same integer</pre>
 
-<h4>Math Operations</h4>
+<h4 id="yap-math">Math Operations</h4>
 <pre>ADD 2, 3
 PRINT OPRES            ; prints 5
 
@@ -4130,9 +4599,9 @@ PRINT OPRES            ; prints 12
 DIV 20 5
 PRINT OPRES            ; prints 4</pre>
 
-<p>All math results are stored in the system variable <code>OPRES</code>. Return values from subroutines are stored in <code>RETVAL</code>.</p>
+<p>All math results are stored in the system variable <code><a href="#yap-internals">OPRES</a></code>. Return values from subroutines are stored in <code><a href="#yap-internals">RETVAL</a></code>.</p>
 
-<h4>If Blocks</h4>
+<h4 id="yap-if">If Blocks</h4>
 <pre>IF name E "John"
   PRINT "user is John"
 ENDIF
@@ -4148,9 +4617,9 @@ ENDIF</pre>
 <p>Supported comparison operators:</p>
 <table>
 <tr><th>Operator</th><th>Meaning</th></tr>
-<tr><td><code>B</code></td><td>Bigger (greater than)</td></tr>
-<tr><td><code>S</code></td><td>Smaller (less than)</td></tr>
-<tr><td><code>E</code></td><td>Equal</td></tr>
+<tr id="op-b"><td><a href="#op-b"><code>B</code></a></td><td>Bigger (greater than)</td></tr>
+<tr id="op-s"><td><a href="#op-s"><code>S</code></a></td><td>Smaller (less than)</td></tr>
+<tr id="op-e"><td><a href="#op-e"><code>E</code></a></td><td>Equal</td></tr>
 </table>
 
 <p>Operators can also be written at the end:</p>
@@ -4158,7 +4627,7 @@ ENDIF</pre>
 PRINT "same meaning as IF 10 B 3"
 ENDIF</pre>
 
-<h4>Subroutines (GOTO/RETURN)</h4>
+<h4 id="yap-subroutines">Subroutines (GOTO/RETURN)</h4>
 <pre>; Line numbers are addresses (starting from 1)
 ; Each line is an address you can jump to
 ; After GOTO finishes (see RETURN), execution continues
@@ -4172,7 +4641,7 @@ ENDIF</pre>
 6:  RETURN "back"           ; jump back to line 3
 7:  PRINT RETVAL            ; prints "back"</pre>
 
-<h4>External Library Calls</h4>
+<h4 id="yap-call">External Library Calls</h4>
 <pre>; Linux
 CALL "/full/path/libexample.so" add_numbers INT2 2 3
 PRINT OPRES
@@ -4184,15 +4653,15 @@ PRINT RETVAL</pre>
 <p>Supported call signatures:</p>
 <table>
 <tr><th>Signature</th><th>C Function</th></tr>
-<tr><td><code>INT0</code></td><td><code>int func(void)</code></td></tr>
-<tr><td><code>INT1</code></td><td><code>int func(int)</code></td></tr>
-<tr><td><code>INT2</code></td><td><code>int func(int, int)</code></td></tr>
-<tr><td><code>INTSTR1</code></td><td><code>int func(const char*)</code></td></tr>
-<tr><td><code>STR0</code></td><td><code>const char* func(void)</code></td></tr>
-<tr><td><code>STR1</code></td><td><code>const char* func(const char*)</code></td></tr>
+<tr id="sig-int0"><td><a href="#sig-int0"><code>INT0</code></a></td><td><code>int func(void)</code></td></tr>
+<tr id="sig-int1"><td><a href="#sig-int1"><code>INT1</code></a></td><td><code>int func(int)</code></td></tr>
+<tr id="sig-int2"><td><a href="#sig-int2"><code>INT2</code></a></td><td><code>int func(int, int)</code></td></tr>
+<tr id="sig-intstr1"><td><a href="#sig-intstr1"><code>INTSTR1</code></a></td><td><code>int func(const char*)</code></td></tr>
+<tr id="sig-str0"><td><a href="#sig-str0"><code>STR0</code></a></td><td><code>const char* func(void)</code></td></tr>
+<tr id="sig-str1"><td><a href="#sig-str1"><code>STR1</code></a></td><td><code>const char* func(const char*)</code></td></tr>
 </table>
 
-<h3>Interpreter Internals</h3>
+<h3 id="yap-internals">Interpreter Internals</h3>
 <p>The interpreter has a lexer (<code>struct lexer</code>) that tokenizes source lines, a line parser, and an execution engine. Key internal structures:</p>
 <ul>
 <li><strong>Lexer:</strong> Splits input text into token lists</li>
@@ -4201,7 +4670,7 @@ PRINT RETVAL</pre>
 <li><strong>System variables:</strong> <code>OPRES</code> stores math/results, <code>RETVAL</code> stores subroutine return values</li>
 </ul>
 
-<h3>YAP Fork Variant</h3>
+<h3 id="yap-fork">YAP Fork Variant</h3>
 <p>There is also a modified fork of YAP at <code>mofl/languages/yap/fork/yap.c</code> with its own set of examples demonstrating loops, math, subroutines, arrays, floats, and system strings.</p>
 
 <h4>YAP Fork Examples</h4>
@@ -4215,35 +4684,35 @@ PRINT RETVAL</pre>
 </table>
 
 <hr>
-<h2>Brainfuck Language</h2>
+<h2 id="brainfuck">Brainfuck Language</h2>
 <p><strong>Source:</strong> <code>mofl/languages/brainfuck/</code></p>
 <p>Brainfuck is implemented in three ways within the project:</p>
 
-<h3>Compiler — <code>compiler/compbf.c</code></h3>
+<h3 id="bf-compiler">Compiler — <code>compiler/compbf.c</code></h3>
 <p>An optimizing Brainfuck compiler that translates Brainfuck source code into native machine code (or intermediate representation).</p>
 
-<h3>Interpreters</h3>
+<h3 id="bf-interpreters">Interpreters</h3>
 <table>
 <tr><th>File</th><th>Language</th><th>Description</th></tr>
 <tr><td><code>interpreter/asbf.s</code></td><td>x86-64 Assembly</td><td>A hand-optimized Brainfuck interpreter in assembly language</td></tr>
 <tr><td><code>interpreter/pybf.py</code></td><td>Python</td><td>A Python-based Brainfuck interpreter for reference and testing</td></tr>
 </table>
 
-<h3>Brainfuck Example</h3>
+<h3 id="bf-example">Brainfuck Example</h3>
 <p>The <code>examples/mandelbrot.bf</code> file contains a Mandelbrot set renderer written in Brainfuck — a classic demonstration of the language's computational completeness.</p>
 
-<h3>Brainfuck Language Reference</h3>
+<h3 id="bf-ref">Brainfuck Language Reference</h3>
 <p>Brainfuck operates on an array of memory cells (typically 30,000 bytes), a data pointer, and uses 8 commands:</p>
 <table>
 <tr><th>Command</th><th>Meaning</th></tr>
-<tr><td><code>></code></td><td>Increment the data pointer (move right)</td></tr>
-<tr><td><code><</code></td><td>Decrement the data pointer (move left)</td></tr>
-<tr><td><code>+</code></td><td>Increment the byte at the data pointer</td></tr>
-<tr><td><code>-</code></td><td>Decrement the byte at the data pointer</td></tr>
-<tr><td><code>.</code></td><td>Output the byte at the data pointer</td></tr>
-<tr><td><code>,</code></td><td>Input a byte and store it at the data pointer</td></tr>
-<tr><td><code>[</code></td><td>Jump forward to matching <code>]</code> if byte at pointer is zero</td></tr>
-<tr><td><code>]</code></td><td>Jump back to matching <code>[</code> if byte at pointer is non-zero</td></tr>
+<tr id="bf-incptr"><td><a href="#bf-incptr"><code>&gt;</code></a></td><td>Increment the data pointer (move right)</td></tr>
+<tr id="bf-decpptr"><td><a href="#bf-decpptr"><code>&lt;</code></a></td><td>Decrement the data pointer (move left)</td></tr>
+<tr id="bf-inc"><td><a href="#bf-inc"><code>+</code></a></td><td>Increment the byte at the data pointer</td></tr>
+<tr id="bf-dec"><td><a href="#bf-dec"><code>-</code></a></td><td>Decrement the byte at the data pointer</td></tr>
+<tr id="bf-out"><td><a href="#bf-out"><code>.</code></a></td><td>Output the byte at the data pointer</td></tr>
+<tr id="bf-in"><td><a href="#bf-in"><code>,</code></a></td><td>Input a byte and store it at the data pointer</td></tr>
+<tr id="bf-jmpf"><td><a href="#bf-jmpf"><code>[</code></a></td><td>Jump forward to matching <code>]</code> if byte at pointer is zero</td></tr>
+<tr id="bf-jmpb"><td><a href="#bf-jmpb"><code>]</code></a></td><td>Jump back to matching <code>[</code> if byte at pointer is non-zero</td></tr>
 </table>
 
 

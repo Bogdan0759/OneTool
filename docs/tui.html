@@ -19,7 +19,7 @@ th{background:#1a1a2e;color:#fff}
 <h1>OneTool — TUI System</h1>
 <p>The OneTool TUI is defined entirely in <code>tui.c</code> (1336 lines). It provides an interactive terminal interface for browsing tools, configuring options, and launching tools with custom arguments.</p>
 
-<h2>Architecture Overview</h2>
+<h2 id="arch">Architecture Overview</h2>
 <p>The TUI is a state-machine driven, event-loop based interface with three screens:</p>
 <ol>
 <li><strong>Tools screen</strong> — List all tools in a left panel with details/preview in the right panel</li>
@@ -27,8 +27,8 @@ th{background:#1a1a2e;color:#fff}
 <li><strong>Settings screen</strong> — Global settings: launch directory and theme palette configuration</li>
 </ol>
 
-<h2>Core State: <code>onetool_tui_state_t</code></h2>
-<pre><span class="kwd">typedef struct</span> {
+<h2 id="state">Core State: <code>onetool_tui_state_t</code></h2>
+<pre id="onetool_tui_state_t"><span class="kwd">typedef struct</span> {
     <span class="kwd">int</span> screen;                                 <span class="cmt">// Current screen (0=Tools, 1=Form, 2=Settings)</span>
     <span class="kwd">int</span> selected_tool;                          <span class="cmt">// Index of selected tool</span>
     <span class="kwd">int</span> tool_scroll;                            <span class="cmt">// Scroll position in tool list</span>
@@ -49,19 +49,19 @@ th{background:#1a1a2e;color:#fff}
 } onetool_tui_state_t;
 </pre>
 
-<h2>Tool Forms</h2>
+<h2 id="forms">Tool Forms</h2>
 <p>Each tool can have a custom form with up to <code>TUI_MAX_FIELDS</code> (16) fields. Forms are defined in <code>load_embedded_tool_form()</code> which contains a large <code>if/else if</code> chain mapping tool names to their form definitions.</p>
 
-<h3>Field Types</h3>
+<h3 id="field-types">Field Types</h3>
 <table>
 <tr><th>Type</th><th>Enum</th><th>Behavior</th></tr>
-<tr><td>Text</td><td><code>ONETOOL_FIELD_TEXT</code></td><td>Free-form text input, supports typing and backspace. Values are passed as arguments with their flag prefix.</td></tr>
-<tr><td>Toggle</td><td><code>ONETOOL_FIELD_TOGGLE</code></td><td>Boolean on/off, toggled with Space. When on, the flag is emitted.</td></tr>
-<tr><td>Choice</td><td><code>ONETOOL_FIELD_CHOICE</code></td><td>Multiple preset options, navigated with Left/Right/Space. The selected value is emitted.</td></tr>
+<tr id="field-text"><td>Text</td><td><code>ONETOOL_FIELD_TEXT</code></td><td>Free-form text input, supports typing and backspace. Values are passed as arguments with their flag prefix.</td></tr>
+<tr id="field-toggle"><td>Toggle</td><td><code>ONETOOL_FIELD_TOGGLE</code></td><td>Boolean on/off, toggled with Space. When on, the flag is emitted.</td></tr>
+<tr id="field-choice"><td>Choice</td><td><code>ONETOOL_FIELD_CHOICE</code></td><td>Multiple preset options, navigated with Left/Right/Space. The selected value is emitted.</td></tr>
 </table>
 
-<h3>Form Field</h3>
-<pre><span class="kwd">typedef struct</span> {
+<h3 id="form-field">Form Field</h3>
+<pre id="onetool_form_field_t"><span class="kwd">typedef struct</span> {
     <span class="kwd">char</span> name[<span class="num">48</span>];               <span class="cmt">// Internal field name</span>
     <span class="kwd">char</span> label[<span class="num">96</span>];              <span class="cmt">// Display label</span>
     <span class="kwd">char</span> flag[<span class="num">24</span>];               <span class="cmt">// CLI flag prefix (e.g. "-o", "--timeout")</span>
@@ -76,7 +76,7 @@ th{background:#1a1a2e;color:#fff}
 } onetool_form_field_t;
 </pre>
 
-<h3>Field Flags</h3>
+<h3 id="field-flags">Field Flags</h3>
 <p>When building the command line for execution:</p>
 <ul>
 <li>Text fields: if <code>flag</code> is non-empty, it is emitted before the value</li>
@@ -85,20 +85,20 @@ th{background:#1a1a2e;color:#fff}
 <li>Fields with <code>flag = "@extra"</code>: the value is tokenized (supports quotes, escapes) and appended as-is</li>
 </ul>
 
-<h3>Special Tools: Task Manager & User Control</h3>
+<h3 id="special-tools">Special Tools: Task Manager &amp; User Control</h3>
 <p>When <code>taskmng</code> or <code>userc</code> are selected on the tools screen, the right panel becomes an interactive live view instead of showing static tool details:</p>
 <ul>
 <li><strong>taskmng:</strong> Live process list refreshed each frame via <code>taskmng_collect()</code>/<code>taskmng_refresh()</code>. Keyboard events for process control are handled inline.</li>
 <li><strong>userc:</strong> User list displayed and managed directly in the right panel. Keyboard events for add/delete/edit are handled inline.</li>
 </ul>
 
-<h2>Themes</h2>
-<p>Five built-in themes (ocean, forest, amber, mono, custom) are defined in <code>g_themes[]</code>. Each theme is a <code>tui_palette_t</code> with 7 color slots.</p>
+<h2 id="themes">Themes</h2>
+<p>Five built-in themes (ocean, forest, amber, mono, custom) are defined in <code>g_themes[]</code>. Each theme is a <code><a href="libs.html#tui-palette">tui_palette_t</a></code> with 7 color slots.</p>
 
-<h3>Theme Cycling</h3>
+<h3 id="theme-cycling">Theme Cycling</h3>
 <p>Press <code>T</code> (uppercase) to cycle forward through themes. The cycle wraps around. When in settings, theme presets can be selected and individual colors can be changed, which switches to "custom" theme.</p>
 
-<h2>Settings Screen</h2>
+<h2 id="settings">Settings Screen</h2>
 <p>The settings screen (<code>open_settings()</code>) provides:</p>
 <ul>
 <li><strong>Launch path:</strong> Working directory for tool execution (defaults to current directory)</li>
@@ -107,26 +107,26 @@ th{background:#1a1a2e;color:#fff}
 </ul>
 <p>Changes to individual colors switch to "custom" theme and apply live.</p>
 
-<h2>Keyboard Shortcuts</h2>
+<h2 id="shortcuts">Keyboard Shortcuts</h2>
 <table>
 <tr><th>Key</th><th>Tools Screen</th><th>Form Screen</th><th>Settings Screen</th></tr>
-<tr><td>Arrows</td><td>Navigate tools</td><td>Navigate fields</td><td>Navigate settings</td></tr>
-<tr><td>PageUp/Down</td><td>Jump 8 tools</td><td>—</td><td>—</td></tr>
-<tr><td>Home/End</td><td>First/last tool</td><td>—</td><td>—</td></tr>
-<tr><td>Enter</td><td>Open tool form</td><td><strong>Run tool!</strong></td><td>Select choice option</td></tr>
-<tr><td>Esc / Q</td><td>Exit TUI</td><td>Back to tools</td><td>Back to previous</td></tr>
-<tr><td>N</td><td>Open settings</td><td>Open settings</td><td>Close settings</td></tr>
-<tr><td>Tab</td><td>—</td><td>Next field (wraps)</td><td>Next setting (wraps)</td></tr>
-<tr><td>Space</td><td>—</td><td>Toggle/cycle field</td><td>Select choice option</td></tr>
-<tr><td>T</td><td>Cycle theme</td><td>Cycle theme</td><td>—</td></tr>
-<tr><td>R</td><td>—</td><td>Run tool</td><td>—</td></tr>
-<tr><td>Left/Right</td><td>—</td><td>Cycle choice options</td><td>Cycle choice options</td></tr>
+<tr id="key-arrows"><td>Arrows</td><td>Navigate tools</td><td>Navigate fields</td><td>Navigate settings</td></tr>
+<tr id="key-pgup"><td>PageUp/Down</td><td>Jump 8 tools</td><td>—</td><td>—</td></tr>
+<tr id="key-homeend"><td>Home/End</td><td>First/last tool</td><td>—</td><td>—</td></tr>
+<tr id="key-enter"><td>Enter</td><td>Open tool form</td><td><strong>Run tool!</strong></td><td>Select choice option</td></tr>
+<tr id="key-esc"><td>Esc / Q</td><td>Exit TUI</td><td>Back to tools</td><td>Back to previous</td></tr>
+<tr id="key-n"><td>N</td><td>Open settings</td><td>Open settings</td><td>Close settings</td></tr>
+<tr id="key-tab"><td>Tab</td><td>—</td><td>Next field (wraps)</td><td>Next setting (wraps)</td></tr>
+<tr id="key-space"><td>Space</td><td>—</td><td>Toggle/cycle field</td><td>Select choice option</td></tr>
+<tr id="key-t"><td>T</td><td>Cycle theme</td><td>Cycle theme</td><td>—</td></tr>
+<tr id="key-r"><td>R</td><td>—</td><td>Run tool</td><td>—</td></tr>
+<tr id="key-leftright"><td>Left/Right</td><td>—</td><td>Cycle choice options</td><td>Cycle choice options</td></tr>
 </table>
 
-<h2>Tool Execution Flow</h2>
+<h2 id="exec-flow">Tool Execution Flow</h2>
 <ol>
 <li><code>run_active_tool()</code> builds the argument list from form fields using <code>build_tool_argv()</code></li>
-<li>TUI is shut down via <code>tui_shutdown()</code></li>
+<li>TUI is shut down via <code><a href="libs.html#tui_shutdown">tui_shutdown()</a></code></li>
 <li>The launch directory is changed if specified</li>
 <li>Tool is executed via <code>onetool_run_tool()</code></li>
 <li>After tool exits, <code>chdir()</code> back to original directory</li>
@@ -134,7 +134,7 @@ th{background:#1a1a2e;color:#fff}
 <li>TUI is reinitialized with current theme</li>
 </ol>
 
-<h2>Token Parser</h2>
+<h2 id="token-parser">Token Parser</h2>
 <p>The <code>tokenize_extra_args()</code> function handles quoting and escaping for the "Extra args" field:</p>
 <ul>
 <li>Single quotes <code>'...'</code>: literal text, no interpretation</li>
@@ -144,7 +144,7 @@ th{background:#1a1a2e;color:#fff}
 <li>Whitespace separates tokens outside quotes</li>
 </ul>
 
-<h2>Preview System</h2>
+<h2 id="preview">Preview System</h2>
 <p>At the bottom of form and tool screens, a preview line shows the command that would be executed. This is generated by <code>build_preview_text()</code> which runs the same <code>build_tool_argv()</code> function and formats the resulting arguments.</p>
 
 </body>

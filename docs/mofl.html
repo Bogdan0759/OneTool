@@ -20,18 +20,18 @@ th{background:#1a1a2e;color:#fff}
 <p>The MOFL subsystem (licensed under BSD 2-Clause) contains two language implementations: <strong>YAP</strong> and <strong>Brainfuck</strong>. These are registered via the extra tools manifest and built as part of OneTool.</p>
 
 <hr>
-<h2>YAP Language</h2>
+<h2 id="yap">YAP Language</h2>
 <p><strong>Source:</strong> <code>mofl/languages/yap/yap.c</code> (1132 lines)</p>
 <p><strong>Entry:</strong> Registered as extra tool <code>yap</code></p>
 <p>YAP (Yet Another Programming language) is a scripting language interpreter bundled with OneTool. It supports variables, math operations, control flow, external library calls, and subroutines.</p>
 
-<h3>Features</h3>
+<h3 id="yap-features">Features</h3>
 <ul>
 <li>Variables (declared before use)</li>
 <li>Integer and string types</li>
 <li>Arithmetic: ADD, SUB, MUL, DIV</li>
 <li>Conditional blocks: IF/ENDIF</li>
-<li>Comparison operators: B (bigger), S (smaller), E (equal)</li>
+<li>Comparison operators: <a href="#op-b">B</a> (bigger), <a href="#op-s">S</a> (smaller), <a href="#op-e">E</a> (equal)</li>
 <li>Subroutine calls via GOTO/RETURN</li>
 <li>External dynamic library calling (Linux .so, Windows .dll)</li>
 <li>Print output: raw values, strings, numbers</li>
@@ -39,29 +39,29 @@ th{background:#1a1a2e;color:#fff}
 <li>System variables: OPRES (math results), RETVAL (return values)</li>
 </ul>
 
-<h3>Language Syntax</h3>
+<h3 id="yap-syntax">Language Syntax</h3>
 
-<h4>Comments</h4>
+<h4 id="yap-comments">Comments</h4>
 <pre>; this is a comment
 ; everything after semicolon is ignored</pre>
 
-<h4>Variables</h4>
+<h4 id="yap-vars">Variables</h4>
 <pre>DECLARE VAR name
 SET name "John"
 PRINT name</pre>
 
-<h4>Print Options</h4>
+<h4 id="yap-print">Print Options</h4>
 <pre>PRINT NFORMAT hello    ; print raw value (no variable lookup)
 PRINT "hello"          ; print string literal
 PRINT 123              ; print number</pre>
 
-<h4>User Input</h4>
+<h4 id="yap-input">User Input</h4>
 <pre>READINT number
 PRINT number           ; prints the read number
 ; READINT stores the value into the variable
 ; and also updates OPRES with the same integer</pre>
 
-<h4>Math Operations</h4>
+<h4 id="yap-math">Math Operations</h4>
 <pre>ADD 2, 3
 PRINT OPRES            ; prints 5
 
@@ -74,9 +74,9 @@ PRINT OPRES            ; prints 12
 DIV 20 5
 PRINT OPRES            ; prints 4</pre>
 
-<p>All math results are stored in the system variable <code>OPRES</code>. Return values from subroutines are stored in <code>RETVAL</code>.</p>
+<p>All math results are stored in the system variable <code><a href="#yap-internals">OPRES</a></code>. Return values from subroutines are stored in <code><a href="#yap-internals">RETVAL</a></code>.</p>
 
-<h4>If Blocks</h4>
+<h4 id="yap-if">If Blocks</h4>
 <pre>IF name E "John"
   PRINT "user is John"
 ENDIF
@@ -92,9 +92,9 @@ ENDIF</pre>
 <p>Supported comparison operators:</p>
 <table>
 <tr><th>Operator</th><th>Meaning</th></tr>
-<tr><td><code>B</code></td><td>Bigger (greater than)</td></tr>
-<tr><td><code>S</code></td><td>Smaller (less than)</td></tr>
-<tr><td><code>E</code></td><td>Equal</td></tr>
+<tr id="op-b"><td><a href="#op-b"><code>B</code></a></td><td>Bigger (greater than)</td></tr>
+<tr id="op-s"><td><a href="#op-s"><code>S</code></a></td><td>Smaller (less than)</td></tr>
+<tr id="op-e"><td><a href="#op-e"><code>E</code></a></td><td>Equal</td></tr>
 </table>
 
 <p>Operators can also be written at the end:</p>
@@ -102,7 +102,7 @@ ENDIF</pre>
 PRINT "same meaning as IF 10 B 3"
 ENDIF</pre>
 
-<h4>Subroutines (GOTO/RETURN)</h4>
+<h4 id="yap-subroutines">Subroutines (GOTO/RETURN)</h4>
 <pre>; Line numbers are addresses (starting from 1)
 ; Each line is an address you can jump to
 ; After GOTO finishes (see RETURN), execution continues
@@ -116,7 +116,7 @@ ENDIF</pre>
 6:  RETURN "back"           ; jump back to line 3
 7:  PRINT RETVAL            ; prints "back"</pre>
 
-<h4>External Library Calls</h4>
+<h4 id="yap-call">External Library Calls</h4>
 <pre>; Linux
 CALL "/full/path/libexample.so" add_numbers INT2 2 3
 PRINT OPRES
@@ -128,15 +128,15 @@ PRINT RETVAL</pre>
 <p>Supported call signatures:</p>
 <table>
 <tr><th>Signature</th><th>C Function</th></tr>
-<tr><td><code>INT0</code></td><td><code>int func(void)</code></td></tr>
-<tr><td><code>INT1</code></td><td><code>int func(int)</code></td></tr>
-<tr><td><code>INT2</code></td><td><code>int func(int, int)</code></td></tr>
-<tr><td><code>INTSTR1</code></td><td><code>int func(const char*)</code></td></tr>
-<tr><td><code>STR0</code></td><td><code>const char* func(void)</code></td></tr>
-<tr><td><code>STR1</code></td><td><code>const char* func(const char*)</code></td></tr>
+<tr id="sig-int0"><td><a href="#sig-int0"><code>INT0</code></a></td><td><code>int func(void)</code></td></tr>
+<tr id="sig-int1"><td><a href="#sig-int1"><code>INT1</code></a></td><td><code>int func(int)</code></td></tr>
+<tr id="sig-int2"><td><a href="#sig-int2"><code>INT2</code></a></td><td><code>int func(int, int)</code></td></tr>
+<tr id="sig-intstr1"><td><a href="#sig-intstr1"><code>INTSTR1</code></a></td><td><code>int func(const char*)</code></td></tr>
+<tr id="sig-str0"><td><a href="#sig-str0"><code>STR0</code></a></td><td><code>const char* func(void)</code></td></tr>
+<tr id="sig-str1"><td><a href="#sig-str1"><code>STR1</code></a></td><td><code>const char* func(const char*)</code></td></tr>
 </table>
 
-<h3>Interpreter Internals</h3>
+<h3 id="yap-internals">Interpreter Internals</h3>
 <p>The interpreter has a lexer (<code>struct lexer</code>) that tokenizes source lines, a line parser, and an execution engine. Key internal structures:</p>
 <ul>
 <li><strong>Lexer:</strong> Splits input text into token lists</li>
@@ -145,7 +145,7 @@ PRINT RETVAL</pre>
 <li><strong>System variables:</strong> <code>OPRES</code> stores math/results, <code>RETVAL</code> stores subroutine return values</li>
 </ul>
 
-<h3>YAP Fork Variant</h3>
+<h3 id="yap-fork">YAP Fork Variant</h3>
 <p>There is also a modified fork of YAP at <code>mofl/languages/yap/fork/yap.c</code> with its own set of examples demonstrating loops, math, subroutines, arrays, floats, and system strings.</p>
 
 <h4>YAP Fork Examples</h4>
@@ -159,35 +159,35 @@ PRINT RETVAL</pre>
 </table>
 
 <hr>
-<h2>Brainfuck Language</h2>
+<h2 id="brainfuck">Brainfuck Language</h2>
 <p><strong>Source:</strong> <code>mofl/languages/brainfuck/</code></p>
 <p>Brainfuck is implemented in three ways within the project:</p>
 
-<h3>Compiler — <code>compiler/compbf.c</code></h3>
+<h3 id="bf-compiler">Compiler — <code>compiler/compbf.c</code></h3>
 <p>An optimizing Brainfuck compiler that translates Brainfuck source code into native machine code (or intermediate representation).</p>
 
-<h3>Interpreters</h3>
+<h3 id="bf-interpreters">Interpreters</h3>
 <table>
 <tr><th>File</th><th>Language</th><th>Description</th></tr>
 <tr><td><code>interpreter/asbf.s</code></td><td>x86-64 Assembly</td><td>A hand-optimized Brainfuck interpreter in assembly language</td></tr>
 <tr><td><code>interpreter/pybf.py</code></td><td>Python</td><td>A Python-based Brainfuck interpreter for reference and testing</td></tr>
 </table>
 
-<h3>Brainfuck Example</h3>
+<h3 id="bf-example">Brainfuck Example</h3>
 <p>The <code>examples/mandelbrot.bf</code> file contains a Mandelbrot set renderer written in Brainfuck — a classic demonstration of the language's computational completeness.</p>
 
-<h3>Brainfuck Language Reference</h3>
+<h3 id="bf-ref">Brainfuck Language Reference</h3>
 <p>Brainfuck operates on an array of memory cells (typically 30,000 bytes), a data pointer, and uses 8 commands:</p>
 <table>
 <tr><th>Command</th><th>Meaning</th></tr>
-<tr><td><code>></code></td><td>Increment the data pointer (move right)</td></tr>
-<tr><td><code><</code></td><td>Decrement the data pointer (move left)</td></tr>
-<tr><td><code>+</code></td><td>Increment the byte at the data pointer</td></tr>
-<tr><td><code>-</code></td><td>Decrement the byte at the data pointer</td></tr>
-<tr><td><code>.</code></td><td>Output the byte at the data pointer</td></tr>
-<tr><td><code>,</code></td><td>Input a byte and store it at the data pointer</td></tr>
-<tr><td><code>[</code></td><td>Jump forward to matching <code>]</code> if byte at pointer is zero</td></tr>
-<tr><td><code>]</code></td><td>Jump back to matching <code>[</code> if byte at pointer is non-zero</td></tr>
+<tr id="bf-incptr"><td><a href="#bf-incptr"><code>&gt;</code></a></td><td>Increment the data pointer (move right)</td></tr>
+<tr id="bf-decpptr"><td><a href="#bf-decpptr"><code>&lt;</code></a></td><td>Decrement the data pointer (move left)</td></tr>
+<tr id="bf-inc"><td><a href="#bf-inc"><code>+</code></a></td><td>Increment the byte at the data pointer</td></tr>
+<tr id="bf-dec"><td><a href="#bf-dec"><code>-</code></a></td><td>Decrement the byte at the data pointer</td></tr>
+<tr id="bf-out"><td><a href="#bf-out"><code>.</code></a></td><td>Output the byte at the data pointer</td></tr>
+<tr id="bf-in"><td><a href="#bf-in"><code>,</code></a></td><td>Input a byte and store it at the data pointer</td></tr>
+<tr id="bf-jmpf"><td><a href="#bf-jmpf"><code>[</code></a></td><td>Jump forward to matching <code>]</code> if byte at pointer is zero</td></tr>
+<tr id="bf-jmpb"><td><a href="#bf-jmpb"><code>]</code></a></td><td>Jump back to matching <code>[</code> if byte at pointer is non-zero</td></tr>
 </table>
 
 </body>
