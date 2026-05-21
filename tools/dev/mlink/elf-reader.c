@@ -36,6 +36,7 @@ static int load_sections(ml_context_t *ctx, ml_object_t *obj, const ot_elf_file_
     for (size_t i = 0; i < elf->section_count; i++) {
         const ot_elf_section_t *shdr = &elf->sections[i];
         ml_section_t *s = &obj->sections[i];
+        int is_macro;
 
         s->name = ml_xstrdup(shdr->name);
         s->type = shdr->type;
@@ -43,7 +44,19 @@ static int load_sections(ml_context_t *ctx, ml_object_t *obj, const ot_elf_file_
         s->align = shdr->addralign == 0 ? 1 : shdr->addralign;
         s->size = shdr->size;
         s->kind = classify_section(s->type, s->flags, s->name);
+        is_macro = strcmp(s->name, ".mlink.macro") == 0;
 
+        if (is_macro && s->size > 0 && s->type != SHT_NOBITS) {
+            if (!ot_elf_range_ok(obj->size, shdr->offset, shdr->size)) {
+                ml_error(ctx, "%s: section %s is outside file", obj->name, s->name);
+                return 1;
+            }
+            if (ml_macros_add_from_object(ctx, obj, obj->data + shdr->offset,
+                                          (size_t)s->size) != 0) {
+                return 1;
+            }
+            continue;
+        }
         if (s->kind == ML_SEC_SKIP || s->type == SHT_NOBITS || s->size == 0) {
             continue;
         }

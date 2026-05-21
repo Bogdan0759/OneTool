@@ -83,14 +83,17 @@ static int parse_args(int argc, char *argv[], ml_context_t *ctx) {
                 return 1;
             }
             ctx->entry_name = argv[++i];
+            ctx->entry_from_cli = 1;
             continue;
         }
         if (strncmp(arg, "-e=", 3) == 0) {
             ctx->entry_name = arg + 3;
+            ctx->entry_from_cli = 1;
             continue;
         }
         if (strncmp(arg, "--entry=", 8) == 0) {
             ctx->entry_name = arg + 8;
+            ctx->entry_from_cli = 1;
             continue;
         }
         if (strcmp(arg, "--base") == 0) {
@@ -102,6 +105,7 @@ static int parse_args(int argc, char *argv[], ml_context_t *ctx) {
                 fprintf(stderr, "mlink: --base must be page aligned\n");
                 return 1;
             }
+            ctx->base_from_cli = 1;
             continue;
         }
         if (strncmp(arg, "--base=", 7) == 0) {
@@ -113,6 +117,7 @@ static int parse_args(int argc, char *argv[], ml_context_t *ctx) {
                 fprintf(stderr, "mlink: --base must be page aligned\n");
                 return 1;
             }
+            ctx->base_from_cli = 1;
             continue;
         }
         if (strcmp(arg, "-Map") == 0) {
@@ -225,16 +230,25 @@ int main(int argc, char *argv[]) {
     }
 
     if (ctx.error_count == 0) {
+        ml_macros_apply_pre_layout(&ctx);
+    }
+    if (ctx.error_count == 0) {
         ml_resolve_symbols(&ctx);
     }
     if (ctx.error_count == 0) {
         ml_inject_defsyms(&ctx);
     }
     if (ctx.error_count == 0) {
+        ml_macros_inject_symbols(&ctx);
+    }
+    if (ctx.error_count == 0) {
         ml_layout(&ctx);
     }
     if (ctx.error_count == 0) {
         ml_report_undefined(&ctx);
+    }
+    if (ctx.error_count == 0) {
+        ml_macros_apply_post_layout(&ctx);
     }
     if (ctx.error_count == 0) {
         ml_apply_relocations(&ctx);

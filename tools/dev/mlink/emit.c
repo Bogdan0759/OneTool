@@ -43,10 +43,10 @@ static void put_phdr(unsigned char *p, uint32_t flags, uint64_t offset,
     ml_put64(p + 48, ML_PAGE_SIZE);
 }
 
-static void put_gnu_stack(unsigned char *p) {
+static void put_gnu_stack(unsigned char *p, int stack_exec) {
     memset(p, 0, sizeof(Elf64_Phdr));
     ml_put32(p, PT_GNU_STACK);
-    ml_put32(p + 4, PF_R | PF_W);
+    ml_put32(p + 4, PF_R | PF_W | (stack_exec ? PF_X : 0));
     ml_put64(p + 48, 16);
 }
 
@@ -104,7 +104,7 @@ int ml_emit_output(ml_context_t *ctx) {
     }
 
     if (!ctx->no_gnu_stack) {
-        put_gnu_stack(ph);
+        put_gnu_stack(ph, ctx->stack_exec);
     }
 
     if (copy_sections(ctx, out, out_size) != 0) {
