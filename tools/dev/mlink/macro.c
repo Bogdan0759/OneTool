@@ -31,14 +31,10 @@ static char *take_word(const char **pp) {
     return ml_xstrndup(start, (size_t)(p - start));
 }
 
-static int parse_term(const char *raw, ml_macro_term_t *out) {
-    const char *p = skip_spaces(raw);
-    if (*p == '\0') {
-        return 1;
-    }
-    if ((p[0] >= '0' && p[0] <= '9') || (p[0] == '-' && p[1] >= '0' && p[1] <= '9')) {
+static int parse_primary(const char *tok, ml_macro_term_part_t *out) {
+    if (tok[0] >= '0' && tok[0] <= '9') {
         uint64_t v;
-        if (ml_parse_u64(p, &v) != 0) {
+        if (ml_parse_u64(tok, &v) != 0) {
             return 1;
         }
         out->is_symbol = 0;
@@ -47,8 +43,101 @@ static int parse_term(const char *raw, ml_macro_term_t *out) {
         return 0;
     }
     out->is_symbol = 1;
-    out->name = ml_xstrdup(p);
+    out->name = ml_xstrdup(tok);
+    out->value = 0;
     return 0;
+}
+
+static int parse_expr(const char *raw, ml_macro_term_t *out) {
+    const char *p = skip_spaces(raw);
+    int sign = 1;
+
+    out->parts = NULL;
+    out->count = 0;
+
+    if (*p == '\0') {
+        return 1;
+    }
+    if (*p == '+') { sign = 1;  p++; }
+    else if (*p == '-') { sign = -1; p++; }
+
+    for (;;) {
+        const char *start;
+        char *tok;
+        ml_macro_term_part_t part;
+
+        p = skip_spaces(p);
+        start = p;
+        while (*p && *p != ' ' && *p != '\t' && *p != '+' && *p != '-') p++;
+        if (p == start) {
+            return 1;
+        }
+        tok = ml_xstrndup(start, (size_t)(p - start));
+        if (parse_primary(tok, &part) != 0) {
+            free(tok);
+            return 1;
+        }
+        free(tok);
+        part.sign = sign;
+
+        out->parts = ml_xrealloc(out->parts,
+                                 (out->count + 1) * sizeof(out->parts[0]));
+        out->parts[out->count++] = part;
+
+        p = skip_spaces(p);
+        if (*p == '\0') {
+            return 0;
+        }
+        if (*p == '+') { sign = 1;  p++; continue; }
+        if (*p == '-') { sign = -1; p++; continue; }
+        return 1;
+    }
+}
+
+void ml_macro_term_free(ml_macro_term_t *t) {
+    for (size_t i = 0; i < t->count; i++) {
+        free(t->parts[i].name);
+    }
+    free(t->parts);
+    t->parts = NULL;
+    t->count = 0;
+}
+
+static char *take_term(const char **pp) {
+    const char *p = skip_spaces(*pp);
+    const char *start = p;
+    const char *end;
+    while (*p && *p != ',' &&
+           *p != '<' && *p != '>' && *p != '=' && *p != '!') {
+        p++;
+    }
+    if (p == start) {
+        return NULL;
+    }
+    end = p;
+    while (end > start && (end[-1] == ' ' || end[-1] == '\t')) end--;
+    if (end == start) {
+        return NULL;
+    }
+    *pp = p;
+    return ml_xstrndup(start, (size_t)(end - start));
+}
+
+static char *take_op(const char **pp) {
+    const char *p = skip_spaces(*pp);
+    char buf[3] = {0, 0, 0};
+    size_t n = 0;
+    if (*p == '<' || *p == '>' || *p == '=' || *p == '!') {
+        buf[n++] = *p++;
+        if (*p == '=') {
+            buf[n++] = *p++;
+        }
+    }
+    if (n == 0) {
+        return NULL;
+    }
+    *pp = p;
+    return ml_xstrdup(buf);
 }
 
 static int parse_op(const char *s, ml_assert_op_t *out) {
@@ -148,8 +237,8 @@ static int parse_assert(ml_context_t *ctx, ml_object_t *obj, const char *args,
     }
 
     p = expr;
-    lhs_str = take_word(&p);
-    op_str = take_word(&p);
+    lhs_str = take_term(&p);
+    op_str = take_op(&p);
     p = skip_spaces(p);
     rhs_str = ml_xstrdup(p);
 
@@ -161,11 +250,11 @@ static int parse_assert(ml_context_t *ctx, ml_object_t *obj, const char *args,
         ml_error(ctx, "%s: ASSERT: unknown operator '%s'", obj->name, op_str);
         goto out;
     }
-    if (parse_term(lhs_str, &m->lhs) != 0) {
+    if (parse_expr(lhs_str, &m->lhs) != 0) {
         ml_error(ctx, "%s: ASSERT: bad lhs '%s'", obj->name, lhs_str);
         goto out;
     }
-    if (parse_term(rhs_str, &m->rhs) != 0) {
+    if (parse_expr(rhs_str, &m->rhs) != 0) {
         ml_error(ctx, "%s: ASSERT: bad rhs '%s'", obj->name, rhs_str);
         goto out;
     }
@@ -358,17 +447,25 @@ int ml_macros_inject_symbols(ml_context_t *ctx) {
 
 static int resolve_term(ml_context_t *ctx, const ml_macro_term_t *t,
                         const char *src, uint64_t *out) {
-    ml_global_t *g;
-    if (!t->is_symbol) {
-        *out = t->value;
-        return 0;
+    uint64_t total = 0;
+    for (size_t i = 0; i < t->count; i++) {
+        const ml_macro_term_part_t *p = &t->parts[i];
+        uint64_t v;
+        if (p->is_symbol) {
+            ml_global_t *g = ml_find_global(ctx, p->name);
+            if (g == NULL || (!g->defined && !g->common)) {
+                ml_error(ctx, "%s: ASSERT references undefined symbol %s",
+                         src, p->name);
+                return 1;
+            }
+            v = g->value;
+        } else {
+            v = p->value;
+        }
+        if (p->sign > 0) total += v;
+        else total -= v;
     }
-    g = ml_find_global(ctx, t->name);
-    if (g == NULL || (!g->defined && !g->common)) {
-        ml_error(ctx, "%s: ASSERT references undefined symbol %s", src, t->name);
-        return 1;
-    }
-    *out = g->value;
+    *out = total;
     return 0;
 }
 
