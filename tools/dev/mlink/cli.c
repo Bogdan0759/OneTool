@@ -101,7 +101,7 @@ static int parse_args(int argc, char *argv[], ml_context_t *ctx) {
                 return 1;
             }
             if ((ctx->base_addr & (ML_PAGE_SIZE - 1)) != 0) {
-                fprintf(stderr, "mlink: base needed to be  page aligned\n");
+                fprintf(stderr, "mlink: --base must be page aligned\n");
                 return 1;
             }
             continue;
