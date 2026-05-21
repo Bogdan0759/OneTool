@@ -32,7 +32,9 @@ static int compute_global_values(ml_context_t *ctx) {
         ml_global_t *g = &ctx->globals[i];
         if (g->defined) {
             if (g->absolute) {
-                g->value = g->symbol->value;
+                if (g->symbol != NULL) {
+                    g->value = g->symbol->value;
+                }
             } else if (local_symbol_addr(g->object, g->symbol, &g->value) != 0) {
                 ml_error(ctx, "symbol %s points to unsupported section", g->name);
             }
@@ -109,7 +111,7 @@ int ml_layout(ml_context_t *ctx) {
     has_rw = has_data || has_bss || has_common;
     ctx->has_rodata_segment = has_ro;
     ctx->has_rw_segment = has_rw;
-    ctx->phnum = 1 + (has_ro ? 1 : 0) + (has_rw ? 1 : 0);
+    ctx->phnum = 1 + (has_ro ? 1 : 0) + (has_rw ? 1 : 0) + (ctx->no_gnu_stack ? 0 : 1);
 
     header_size = sizeof(Elf64_Ehdr) + (uint64_t)ctx->phnum * sizeof(Elf64_Phdr);
     rx_cursor = ml_align_up(header_size, 16);
@@ -205,6 +207,8 @@ int ml_layout(ml_context_t *ctx) {
     ctx->final_file_size = ctx->has_rw_segment ?
         ctx->data_offset + ctx->data_filesz :
         (ctx->has_rodata_segment ? ctx->ro_offset + ctx->ro_filesz : ctx->rx_filesz);
+
+    ml_inject_linker_symbols(ctx);
 
     ml_global_t *entry = ml_find_global(ctx, ctx->entry_name);
     if (entry == NULL || (!entry->defined && !entry->common)) {

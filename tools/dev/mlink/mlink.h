@@ -80,6 +80,11 @@ typedef struct {
 } ml_global_t;
 
 typedef struct {
+    char *name;
+    uint64_t value;
+} ml_defsym_t;
+
+typedef struct {
     const char *output_path;
     const char *entry_name;
     const char *map_path;
@@ -88,10 +93,19 @@ typedef struct {
     int print_symbols;
     int dry_run;
     int verbose;
+    int no_gnu_stack;
 
     char **inputs;
     size_t input_count;
     size_t input_cap;
+
+    char **lib_paths;
+    size_t lib_path_count;
+    size_t lib_path_cap;
+
+    ml_defsym_t *defsyms;
+    size_t defsym_count;
+    size_t defsym_cap;
 
     ml_object_t **objects;
     size_t object_count;
@@ -119,6 +133,9 @@ void ml_context_init(ml_context_t *ctx);
 void ml_context_free(ml_context_t *ctx);
 int ml_add_input_path(ml_context_t *ctx, const char *path);
 int ml_add_object(ml_context_t *ctx, ml_object_t *obj);
+int ml_add_lib_path(ml_context_t *ctx, const char *path);
+int ml_add_lib_name(ml_context_t *ctx, const char *name);
+int ml_add_defsym(ml_context_t *ctx, const char *spec);
 void ml_object_free(ml_object_t *obj);
 
 void *ml_xmalloc(size_t size);
@@ -147,6 +164,9 @@ int ml_parse_elf_object(ml_context_t *ctx, const char *name,
 
 int ml_resolve_symbols(ml_context_t *ctx);
 ml_global_t *ml_find_global(ml_context_t *ctx, const char *name);
+int ml_inject_defsyms(ml_context_t *ctx);
+void ml_inject_linker_symbols(ml_context_t *ctx);
+int ml_report_undefined(ml_context_t *ctx);
 
 int ml_layout(ml_context_t *ctx);
 int ml_apply_relocations(ml_context_t *ctx);

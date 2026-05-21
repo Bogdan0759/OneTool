@@ -2,8 +2,10 @@
 
 #include <ar.h>
 #include <errno.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 static int starts_with(const unsigned char *data, size_t size, const char *magic) {
     size_t len = strlen(magic);
@@ -45,10 +47,18 @@ void ml_context_free(ml_context_t *ctx) {
     for (size_t i = 0; i < ctx->object_count; i++) {
         ml_object_free(ctx->objects[i]);
     }
+    for (size_t i = 0; i < ctx->lib_path_count; i++) {
+        free(ctx->lib_paths[i]);
+    }
+    for (size_t i = 0; i < ctx->defsym_count; i++) {
+        free(ctx->defsyms[i].name);
+    }
 
     free(ctx->inputs);
     free(ctx->objects);
     free(ctx->globals);
+    free(ctx->lib_paths);
+    free(ctx->defsyms);
     memset(ctx, 0, sizeof(*ctx));
 }
 
@@ -69,6 +79,59 @@ int ml_add_object(ml_context_t *ctx, ml_object_t *obj) {
         ctx->object_cap = next;
     }
     ctx->objects[ctx->object_count++] = obj;
+    return 0;
+}
+
+int ml_add_lib_path(ml_context_t *ctx, const char *path) {
+    if (ctx->lib_path_count == ctx->lib_path_cap) {
+        size_t next = ctx->lib_path_cap == 0 ? 4 : ctx->lib_path_cap * 2;
+        ctx->lib_paths = ml_xrealloc(ctx->lib_paths, next * sizeof(ctx->lib_paths[0]));
+        ctx->lib_path_cap = next;
+    }
+    ctx->lib_paths[ctx->lib_path_count++] = ml_xstrdup(path);
+    return 0;
+}
+
+int ml_add_lib_name(ml_context_t *ctx, const char *name) {
+    char path[PATH_MAX];
+
+    for (size_t i = 0; i < ctx->lib_path_count; i++) {
+        if (name[0] == ':') {
+            snprintf(path, sizeof(path), "%s/%s", ctx->lib_paths[i], name + 1);
+        } else {
+            snprintf(path, sizeof(path), "%s/lib%s.a", ctx->lib_paths[i], name);
+        }
+        if (access(path, R_OK) == 0) {
+            ml_add_input_path(ctx, path);
+            ml_verbose(ctx, "-l%s -> %s", name, path);
+            return 0;
+        }
+    }
+    ml_error(ctx, "-l%s: library not found", name);
+    return 1;
+}
+
+int ml_add_defsym(ml_context_t *ctx, const char *spec) {
+    const char *eq = strchr(spec, '=');
+    uint64_t value;
+    ml_defsym_t *d;
+
+    if (eq == NULL || eq == spec) {
+        ml_error(ctx, "--defsym: expected NAME=VALUE, got '%s'", spec);
+        return 1;
+    }
+    if (ml_parse_u64(eq + 1, &value) != 0) {
+        ml_error(ctx, "--defsym %s: invalid value", spec);
+        return 1;
+    }
+    if (ctx->defsym_count == ctx->defsym_cap) {
+        size_t next = ctx->defsym_cap == 0 ? 4 : ctx->defsym_cap * 2;
+        ctx->defsyms = ml_xrealloc(ctx->defsyms, next * sizeof(ctx->defsyms[0]));
+        ctx->defsym_cap = next;
+    }
+    d = &ctx->defsyms[ctx->defsym_count++];
+    d->name = ml_xstrndup(spec, (size_t)(eq - spec));
+    d->value = value;
     return 0;
 }
 

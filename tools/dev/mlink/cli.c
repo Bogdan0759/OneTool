@@ -6,20 +6,25 @@
 
 static void help(const char *tool) {
     printf("mlink - minimalistic ELF64 x86-64 linker\n");
-    printf("usage: %s [options] file.o [lib.a ...]\n", tool);
+    printf("usage: %s [options] file.o [lib.a ...] [-lname ...]\n", tool);
     printf("options:\n");
     printf("  -o file            output executable (default a.out)\n");
     printf("  -e symbol          entry symbol (default _start)\n");
     printf("  --base addr        image base address (default 0x400000)\n");
+    printf("  -L path            add path to library search directories\n");
+    printf("  -l name            link with libname.a (or :file.a)\n");
+    printf("  --defsym SYM=VAL   define absolute symbol\n");
     printf("  -Map file          write link map\n");
     printf("  --print-map        print link map to stdout\n");
     printf("  --print-symbols    print global symbols to stdout\n");
     printf("  --dry-run          parse, resolve and layout without writing output\n");
+    printf("  --no-gnu-stack     omit PT_GNU_STACK (non-executable stack hint)\n");
     printf("  -v, --verbose      print archive member selection and loader details\n");
     printf("  -h, --help         show this help\n");
     printf("\n");
     printf("scope: static ET_EXEC from ELF64 relocatable objects; supports .o, simple .a,\n");
-    printf("       .text/.rodata/.data/.bss/common and common x86-64 relocations.\n");
+    printf("       .text/.rodata/.data/.bss/common and common x86-64 relocations\n");
+    printf("       (incl. GOTPCREL[X] relaxation: mov->lea and indirect call/jmp).\n");
 }
 
 static int parse_args(int argc, char *argv[], ml_context_t *ctx) {
@@ -42,6 +47,10 @@ static int parse_args(int argc, char *argv[], ml_context_t *ctx) {
         }
         if (strcmp(arg, "--dry-run") == 0) {
             ctx->dry_run = 1;
+            continue;
+        }
+        if (strcmp(arg, "--no-gnu-stack") == 0) {
+            ctx->no_gnu_stack = 1;
             continue;
         }
         if (strcmp(arg, "--print-map") == 0) {
@@ -118,6 +127,50 @@ static int parse_args(int argc, char *argv[], ml_context_t *ctx) {
             ctx->map_path = arg + 5;
             continue;
         }
+        if (strcmp(arg, "-L") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "mlink: missing value for -L\n");
+                return 1;
+            }
+            ml_add_lib_path(ctx, argv[++i]);
+            continue;
+        }
+        if (strncmp(arg, "-L", 2) == 0 && arg[2] != '\0') {
+            ml_add_lib_path(ctx, arg + 2);
+            continue;
+        }
+        if (strcmp(arg, "-l") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "mlink: missing value for -l\n");
+                return 1;
+            }
+            if (ml_add_lib_name(ctx, argv[++i]) != 0) {
+                return 1;
+            }
+            continue;
+        }
+        if (strncmp(arg, "-l", 2) == 0 && arg[2] != '\0') {
+            if (ml_add_lib_name(ctx, arg + 2) != 0) {
+                return 1;
+            }
+            continue;
+        }
+        if (strcmp(arg, "--defsym") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "mlink: missing value for --defsym\n");
+                return 1;
+            }
+            if (ml_add_defsym(ctx, argv[++i]) != 0) {
+                return 1;
+            }
+            continue;
+        }
+        if (strncmp(arg, "--defsym=", 9) == 0) {
+            if (ml_add_defsym(ctx, arg + 9) != 0) {
+                return 1;
+            }
+            continue;
+        }
         if (arg[0] == '-') {
             fprintf(stderr, "mlink: unknown option %s\n", arg);
             return 1;
@@ -175,7 +228,13 @@ int main(int argc, char *argv[]) {
         ml_resolve_symbols(&ctx);
     }
     if (ctx.error_count == 0) {
+        ml_inject_defsyms(&ctx);
+    }
+    if (ctx.error_count == 0) {
         ml_layout(&ctx);
+    }
+    if (ctx.error_count == 0) {
+        ml_report_undefined(&ctx);
     }
     if (ctx.error_count == 0) {
         ml_apply_relocations(&ctx);

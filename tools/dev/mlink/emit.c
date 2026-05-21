@@ -43,6 +43,13 @@ static void put_phdr(unsigned char *p, uint32_t flags, uint64_t offset,
     ml_put64(p + 48, ML_PAGE_SIZE);
 }
 
+static void put_gnu_stack(unsigned char *p) {
+    memset(p, 0, sizeof(Elf64_Phdr));
+    ml_put32(p, PT_GNU_STACK);
+    ml_put32(p + 4, PF_R | PF_W);
+    ml_put64(p + 48, 16);
+}
+
 static int copy_sections(ml_context_t *ctx, unsigned char *out, size_t out_size) {
     for (size_t i = 0; i < ctx->object_count; i++) {
         ml_object_t *obj = ctx->objects[i];
@@ -93,6 +100,11 @@ int ml_emit_output(ml_context_t *ctx) {
     if (ctx->has_rw_segment) {
         put_phdr(ph, PF_R | PF_W, ctx->data_offset, ctx->base_addr + ctx->data_offset,
                  ctx->data_filesz, ctx->data_memsz);
+        ph += sizeof(Elf64_Phdr);
+    }
+
+    if (!ctx->no_gnu_stack) {
+        put_gnu_stack(ph);
     }
 
     if (copy_sections(ctx, out, out_size) != 0) {
