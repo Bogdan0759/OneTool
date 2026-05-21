@@ -57,8 +57,8 @@ void ml_context_free(ml_context_t *ctx) {
         ml_macro_t *m = &ctx->macros[i];
         free(m->name);
         free(m->message);
-        free(m->lhs.name);
-        free(m->rhs.name);
+        ml_macro_term_free(&m->lhs);
+        ml_macro_term_free(&m->rhs);
     }
 
     free(ctx->inputs);

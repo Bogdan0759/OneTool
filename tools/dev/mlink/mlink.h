@@ -104,10 +104,18 @@ typedef enum {
 } ml_assert_op_t;
 
 typedef struct {
-    char *name;
+    int sign;          /* +1 or -1 */
     int is_symbol;
-    uint64_t value;
+    char *name;        /* set when is_symbol */
+    uint64_t value;    /* set when !is_symbol */
+} ml_macro_term_part_t;
+
+typedef struct {
+    ml_macro_term_part_t *parts;
+    size_t count;
 } ml_macro_term_t;
+
+void ml_macro_term_free(ml_macro_term_t *t);
 
 typedef struct {
     ml_macro_kind_t kind;
