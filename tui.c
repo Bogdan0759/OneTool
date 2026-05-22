@@ -488,6 +488,20 @@ static void load_embedded_tool_form(onetool_form_t *form, const struct onetool_t
         copy_string(form->summary, sizeof(form->summary), "Demo of the ranal GUI library (built on top of srapi). Shows panels, labels, buttons, sliders, checkboxes, and a textbox.");
         add_text_field(form, "record", "Record", "--record", "", "ranal.srvid", "Optional .srvid output file to record the session.");
         add_text_field(form, "record_fps", "Record FPS", "--record-fps", "", "30", "Target recording fps (default 30).");
+    } else if (strcmp(tool->name, "swm") == 0) {
+        copy_string(form->title, sizeof(form->title), "swm — compositor");
+        copy_string(form->summary, sizeof(form->summary), "Simple window manager / compositor running on DRM. Listens for sprot clients on a unix socket. Press Esc inside the TTY to quit.");
+        add_text_field(form, "socket", "Socket", "--socket", "", "/tmp/swm.sock", "Path to the unix socket (default /tmp/swm.sock).");
+        add_text_field(form, "bg", "Background", "--bg", "", "101418", "Hex RRGGBB for compositor background.");
+        add_toggle_field(form, "debug", "Debug", "--debug", 0, "Enable srapi trace output.");
+    } else if (strcmp(tool->name, "sprot_hello") == 0) {
+        copy_string(form->title, sizeof(form->title), "sprot_hello — test client");
+        copy_string(form->summary, sizeof(form->summary), "Minimal sprot client: connects to swm, creates a surface, paints a rectangle, drains events.");
+        add_text_field(form, "socket", "Socket", "--socket", "", "/tmp/swm.sock", "Path to the swm socket.");
+        add_text_field(form, "w", "Width", "-w", "320", "320", "Surface width.");
+        add_text_field(form, "h", "Height", "-h", "200", "200", "Surface height.");
+        add_text_field(form, "seconds", "Seconds", "--seconds", "10", "10", "Run time before disconnect.");
+        add_text_field(form, "color", "Color", "--color", "4070C8", "RRGGBB", "Hex color for the rectangle.");
     } else {
         form->has_config = 0;
     }

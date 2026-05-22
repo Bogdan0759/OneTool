@@ -36,6 +36,8 @@ implemented tools:
 - `nm` - prints elf symbols
 - `click` - SRAPI click-the-cube minigame (15s round)
 - `ranal_demo` - demo of the ranal GUI library
+- `swm` - simple window manager / compositor (sprot v0.1)
+- `sprot_hello` - minimal sprot client (draws a colored rectangle)
 framework parts:
 
 - `libs/net` - network library for URL parsing, HTTP and transport
@@ -44,6 +46,8 @@ framework parts:
 - `libs/memory` - checked allocation helpers
 - `libs/srapi` - simple rendering API
 - `libs/gui/ranal` - retained-mode GUI library on top of srapi
+- `libs/gui/sprot` - simple wire protocol for compositor/client comms (unix socket + memfd buffers)
+- `libs/gui/swm` - simple window manager / compositor (sprot v0.1)
 ## build
 
 requirement:
