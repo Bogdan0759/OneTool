@@ -11,6 +11,11 @@ typedef struct {
     ranal_widget_t *root;
     ranal_widget_t *card;
     ranal_widget_t *title;
+    ranal_widget_t *popup;
+    ranal_context_t *off_ctx;
+    ranal_surface_t *off_surface;
+    ranal_widget_t *off_tick_label;
+    int off_tick;
 } demo_state_t;
 static demo_state_t g_state;
 static void on_increment(ranal_widget_t *w, void *user) {
@@ -37,6 +42,63 @@ static void on_dark(ranal_widget_t *w, int v, void *user) {
     s->dark_mode = v;
     ranal_set_theme(v ? &ranal_theme_light : &ranal_theme_dark);
     (void)w;
+}
+static void on_popup_close(ranal_widget_t *w, void *user) {
+    demo_state_t *s = user;
+    (void)w;
+    if (s->popup != NULL) {
+        ranal_popup_close(s->popup);
+        s->popup = NULL;
+    }
+}
+static void on_popup_reset(ranal_widget_t *w, void *user) {
+    demo_state_t *s = user;
+    (void)w;
+    s->counter = 0;
+    if (s->popup != NULL) {
+        ranal_popup_close(s->popup);
+        s->popup = NULL;
+    }
+}
+static void on_open_popup(ranal_widget_t *w, void *user) {
+    demo_state_t *s = user;
+    (void)w;
+    if (s->popup != NULL) {
+        return;
+    }
+    s->popup = ranal_popup(ranal_window_width() / 2 - 100, ranal_window_height() / 2 - 60);
+    if (s->popup == NULL) return;
+    ranal_set_background(s->popup, RANAL_COLOR(28, 32, 44));
+    ranal_widget_t *plabel = ranal_label(s->popup, "popup menu (z-order test)");
+    ranal_set_role(plabel, RANAL_ROLE_ACCENT);
+    ranal_widget_t *prow = ranal_panel(s->popup);
+    ranal_set_layout(prow, RANAL_LAYOUT_HORIZ);
+    ranal_set_spacing(prow, 6);
+    ranal_set_padding(prow, 0);
+    ranal_set_auto_size(prow, 1, 1);
+    ranal_widget_t *pr_reset = ranal_button(prow, "reset counter");
+    ranal_on_click(pr_reset, on_popup_reset, s);
+    ranal_widget_t *pr_close = ranal_button(prow, "close");
+    ranal_on_click(pr_close, on_popup_close, s);
+}
+static void build_offscreen(demo_state_t *s) {
+    s->off_ctx = ranal_context_create_offscreen(240, 110);
+    if (s->off_ctx == NULL) return;
+    ranal_context_t *prev = ranal_get_current();
+    ranal_set_current(s->off_ctx);
+    ranal_widget_t *off_root = ranal_context_root(s->off_ctx);
+    ranal_set_layout(off_root, RANAL_LAYOUT_VERT);
+    ranal_set_padding(off_root, 10);
+    ranal_set_spacing(off_root, 6);
+    ranal_set_background(off_root, RANAL_COLOR(40, 48, 70));
+    ranal_widget_t *t = ranal_label(off_root, "offscreen surface");
+    ranal_set_role(t, RANAL_ROLE_ACCENT);
+    ranal_label(off_root, "rendered via");
+    ranal_label(off_root, "ranal_context_create_offscreen");
+    s->off_tick_label = ranal_label(off_root, "tick: 0");
+    ranal_set_role(s->off_tick_label, RANAL_ROLE_DIM);
+    s->off_surface = ranal_context_surface(s->off_ctx);
+    ranal_set_current(prev);
 }
 int main(int argc, char *argv[]) {
     const char *record_path = NULL;
@@ -116,21 +178,57 @@ int main(int argc, char *argv[]) {
     ranal_widget_t *tb = ranal_textbox(card, g_state.username, sizeof(g_state.username));
 
     ranal_label(card, "");
+    ranal_widget_t *btn_popup = ranal_button(card, "open popup");
+    ranal_on_click(btn_popup, on_open_popup, &g_state);
+
+    ranal_label(card, "");
     ranal_widget_t *btn_quit = ranal_button(card, "Quit");
     ranal_on_click(btn_quit, on_quit, NULL);
 
+    build_offscreen(&g_state);
+
     printf("ranal_demo: window %dx%d\n", ranal_window_width(), ranal_window_height());
     printf("controls: Esc=quit, click to interact, type to edit text\n");
+    if (g_state.off_surface != NULL) {
+        printf("offscreen surface: %dx%d (blitted top-right)\n",
+               ranal_surface_width(g_state.off_surface),
+               ranal_surface_height(g_state.off_surface));
+    }
 
-    while (!ranal_frame()) {
+    ranal_context_t *main_ctx = ranal_get_current();
+    int frame_idx = 0;
+    while (!ranal_should_close()) {
         char buf[64];
         snprintf(buf, sizeof(buf), "counter: %d", g_state.counter);
         ranal_set_text(counter_label, buf);
         snprintf(buf, sizeof(buf), "%.2f", g_state.volume);
         ranal_set_text(vol_label, buf);
+
+        if (g_state.off_ctx != NULL && (frame_idx & 7) == 0) {
+            ranal_set_current(g_state.off_ctx);
+            char ob[32];
+            snprintf(ob, sizeof(ob), "tick: %d", g_state.off_tick++);
+            ranal_set_text(g_state.off_tick_label, ob);
+            ranal_set_current(main_ctx);
+            ranal_context_frame(g_state.off_ctx);
+        }
+
+        if (ranal_render() != 0) break;
+        if (g_state.off_surface != NULL) {
+            int32_t bx = ranal_window_width() - ranal_surface_width(g_state.off_surface) - 20;
+            ranal_blit_surface(g_state.off_surface, bx, 20);
+        }
+        if (ranal_present() != 0) break;
+        frame_idx++;
     }
     printf("ranal_demo: final state counter=%d volume=%.2f dark=%d user=%s\n",
            g_state.counter, g_state.volume, g_state.dark_mode, g_state.username);
+    if (g_state.popup != NULL) {
+        ranal_popup_close(g_state.popup);
+    }
+    if (g_state.off_ctx != NULL) {
+        ranal_context_destroy(g_state.off_ctx);
+    }
     ranal_shutdown();
     return 0;
 }

@@ -36,6 +36,8 @@ typedef enum {
 } ranal_align_t;
 
 typedef struct ranal_widget ranal_widget_t;
+typedef struct ranal_context ranal_context_t;
+typedef struct ranal_surface ranal_surface_t;
 typedef void (*ranal_on_click_fn)(ranal_widget_t *widget, void *user);
 typedef void (*ranal_on_toggle_fn)(ranal_widget_t *widget, int value, void *user);
 typedef void (*ranal_on_slide_fn)(ranal_widget_t *widget, float value, void *user);
@@ -93,6 +95,8 @@ int  ranal_should_close(void);
 void ranal_request_close(void);
 void ranal_run(void);
 int  ranal_frame(void);
+int  ranal_render(void);
+int  ranal_present(void);
 int32_t ranal_window_width(void);
 int32_t ranal_window_height(void);
 float   ranal_frame_time(void);
@@ -138,4 +142,24 @@ void ranal_draw_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, ranal_color
 void ranal_draw_text(int32_t x, int32_t y, const char *text, ranal_color_t color);
 int32_t ranal_text_width(const char *text);
 int32_t ranal_text_height(void);
+
+ranal_surface_t *ranal_surface_create(int32_t width, int32_t height);
+void ranal_surface_destroy(ranal_surface_t *surface);
+uint32_t *ranal_surface_pixels(ranal_surface_t *surface);
+int32_t ranal_surface_width(const ranal_surface_t *surface);
+int32_t ranal_surface_height(const ranal_surface_t *surface);
+int32_t ranal_surface_pitch(const ranal_surface_t *surface);
+void ranal_blit_surface(const ranal_surface_t *src, int32_t dst_x, int32_t dst_y);
+
+ranal_context_t *ranal_context_create_offscreen(int32_t width, int32_t height);
+void ranal_context_destroy(ranal_context_t *ctx);
+int ranal_context_frame(ranal_context_t *ctx);
+ranal_widget_t *ranal_context_root(ranal_context_t *ctx);
+ranal_surface_t *ranal_context_surface(ranal_context_t *ctx);
+void ranal_set_current(ranal_context_t *ctx);
+ranal_context_t *ranal_get_current(void);
+ranal_context_t *ranal_default_context(void);
+
+ranal_widget_t *ranal_popup(int32_t x, int32_t y);
+void ranal_popup_close(ranal_widget_t *popup);
 #endif
