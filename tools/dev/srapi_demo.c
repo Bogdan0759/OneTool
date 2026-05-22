@@ -7,7 +7,7 @@
 
 static void help(const char *tool) {
     printf("srapi_demo - render a test frame or simple animation with SRAPI\n");
-    printf("usage: %s [-o output.ppm] [-w width] [-h height] [--frames n] [--gpu] [--tile-cache] [--probe-gpu] [--probe-i915 [node]] [--probe-fbdev] [--smoke-low] [--smoke-gpu] [--smoke-i915 [node]] [--smoke-fbdev] [--drm [card]] [--fbdev [fb]] [--hold seconds] [--debug] [--list-displays] [--list-modes [connector]]\n", tool);
+    printf("usage: %s [-o output.ppm] [-w width] [-h height] [--frames n] [--gpu] [--tile-cache] [--probe-gpu] [--probe-i915 [node]] [--probe-fbdev] [--smoke-low] [--smoke-gpu] [--smoke-i915 [node]] [--smoke-fbdev] [--drm [card]] [--fbdev [fb]] [--hold seconds] [--input] [--debug] [--list-displays] [--list-modes [connector]]\n", tool);
     printf("i915 screen rendering: %s --gpu --drm [/dev/dri/cardN] [--tile-cache]\n", tool);
 }
 
@@ -887,6 +887,8 @@ int main(int argc, char *argv[]) {
     uint32_t list_modes_connector = 0;
     const char *i915_device = NULL;
     int hold_seconds = 5;
+    int use_input = 0;
+    srapi_input_context_t *input = NULL;
     srapi_context_t *ctx = NULL;
     srapi_framebuffer_t *fb = NULL;
     srapi_drm_display_t *drm = NULL;
@@ -975,6 +977,8 @@ int main(int argc, char *argv[]) {
             hold_seconds = (int)parsed;
         } else if (strcmp(argv[i], "--debug") == 0) {
             srapi = 1;
+        } else if (strcmp(argv[i], "--input") == 0) {
+            use_input = 1;
         } else if (strcmp(argv[i], "--list-displays") == 0 || strcmp(argv[i], "--list_displays") == 0) {
             list_displays = 1;
         } else if (strcmp(argv[i], "--list-modes") == 0 || strcmp(argv[i], "--list_modes") == 0) {
@@ -1260,43 +1264,141 @@ int main(int argc, char *argv[]) {
     );
     if (r != SRAPI_OK) goto fail;
 
-    if (gpu_i915) {
-        srapi_cmd_emit(cmd, &(srapi_command_t){
-            .kind = SRAPI_COMMAND_CLEAR,
-            .color = srapi_rgba(10, 12, 16, 255),
-        });
-        srapi_cmd_shade_rect(cmd, 0, 0, width, height, shader);
-        srapi_cmd_fill_rect(cmd, 40, 40, width / 2, height / 3, srapi_rgba(220, 80, 60, 255));
-        srapi_cmd_fill_rect(cmd, (int32_t)(width / 3), (int32_t)(height / 3), width / 2, height / 3, srapi_rgba(55, 160, 230, 255));
-        srapi_cmd_fill_triangle(
-            cmd,
-            (int32_t)(width / 2), 24,
-            32, (int32_t)height - 32,
-            (int32_t)width - 32, (int32_t)height - 48,
-            srapi_rgba(180, 230, 80, 255)
-        );
-        srapi_cmd_draw_line(cmd, 0, 0, (int32_t)width - 1, (int32_t)height - 1, srapi_rgba(245, 220, 90, 255));
-        srapi_cmd_draw_line(cmd, 0, (int32_t)height - 1, (int32_t)width - 1, 0, srapi_rgba(90, 245, 170, 255));
-    } else {
-        srapi_cmd_emit(cmd, &(srapi_command_t){
-            .kind = SRAPI_COMMAND_CLEAR,
-            .color = srapi_rgba(10, 12, 16, 255),
-        });
-        srapi_cmd_shade_rect(cmd, 0, 0, width, height, shader);
-        srapi_cmd_fill_rect(cmd, 40, 40, width / 2, height / 3, srapi_rgba(220, 80, 60, 255));
-        srapi_cmd_fill_rect(cmd, (int32_t)(width / 3), (int32_t)(height / 3), width / 2, height / 3, srapi_rgba(55, 160, 230, 255));
-        srapi_cmd_fill_triangle(
-            cmd,
-            (int32_t)(width / 2), 24,
-            32, (int32_t)height - 32,
-            (int32_t)width - 32, (int32_t)height - 48,
-            srapi_rgba(180, 230, 80, 255)
-        );
-        srapi_cmd_draw_line(cmd, 0, 0, (int32_t)width - 1, (int32_t)height - 1, srapi_rgba(245, 220, 90, 255));
-        srapi_cmd_draw_line(cmd, 0, (int32_t)height - 1, (int32_t)width - 1, 0, srapi_rgba(90, 245, 170, 255));
+    if (use_input) {
+        srapi_input_desc_t in_desc = {
+            .auto_discover = 1,
+            .grab = 0,
+            .initial_mouse_x = (int32_t)(width / 2),
+            .initial_mouse_y = (int32_t)(height / 2),
+        };
+        r = srapi_input_create(&in_desc, &input);
+        if (r != SRAPI_OK) {
+            fprintf(stderr, "input init failed: %s\n", srapi_last_error());
+            goto fail;
+        }
+        srapi_input_set_bounds(input, (int32_t)width, (int32_t)height);
+        printf("input enabled: %s to quit, keys/mouse change the big triangle color\n",
+               srapi_scancode_name(SRAPI_SCANCODE_ESCAPE));
     }
 
-    for (uint32_t frame = 0; frame < frames; frame++) {
+    srapi_color_t triangle_base = srapi_rgba(180, 230, 80, 255);
+    srapi_color_t triangle_color = triangle_base;
+    srapi_scancode_t last_key = SRAPI_SCANCODE_UNKNOWN;
+    uint32_t last_button = 0;
+    int32_t cursor_x = (int32_t)(width / 2);
+    int32_t cursor_y = (int32_t)(height / 2);
+    int tilt_left_frames = 0;
+    int tilt_right_frames = 0;
+    int input_quit = 0;
+    (void)gpu_i915;
+
+    for (uint32_t frame = 0; frame < frames && !input_quit; frame++) {
+        if (input != NULL) {
+            srapi_input_event_t ev;
+            while (srapi_input_poll(input, &ev) == 1) {
+                switch (ev.type) {
+                    case SRAPI_INPUT_EVENT_KEY_DOWN:
+                        last_key = ev.key.scancode;
+                        if (last_key == SRAPI_SCANCODE_ESCAPE) {
+                            input_quit = 1;
+                        }
+                        printf("key down  %-16s mods=0x%04x repeat=%u\n",
+                               srapi_scancode_name(last_key), ev.key.modifiers, ev.key.repeat);
+                        break;
+                    case SRAPI_INPUT_EVENT_KEY_UP:
+                        if (last_key == ev.key.scancode) {
+                            last_key = SRAPI_SCANCODE_UNKNOWN;
+                        }
+                        break;
+                    case SRAPI_INPUT_EVENT_MOUSE_BUTTON_DOWN:
+                        if (ev.mouse_button.button == SRAPI_MOUSE_BUTTON_WHEEL_LEFT) {
+                            tilt_left_frames = 15;
+                            printf("wheel tilt LEFT\n");
+                        } else if (ev.mouse_button.button == SRAPI_MOUSE_BUTTON_WHEEL_RIGHT) {
+                            tilt_right_frames = 15;
+                            printf("wheel tilt RIGHT\n");
+                        } else {
+                            last_button = ev.mouse_button.button;
+                            printf("mbutton dn button=%u at (%d,%d)\n",
+                                   ev.mouse_button.button, ev.mouse_button.x, ev.mouse_button.y);
+                        }
+                        break;
+                    case SRAPI_INPUT_EVENT_MOUSE_BUTTON_UP:
+                        if (ev.mouse_button.button != SRAPI_MOUSE_BUTTON_WHEEL_LEFT &&
+                            ev.mouse_button.button != SRAPI_MOUSE_BUTTON_WHEEL_RIGHT &&
+                            last_button == ev.mouse_button.button) {
+                            last_button = 0;
+                        }
+                        break;
+                    case SRAPI_INPUT_EVENT_MOUSE_MOTION:
+                        cursor_x = ev.mouse_motion.x;
+                        cursor_y = ev.mouse_motion.y;
+                        break;
+                    case SRAPI_INPUT_EVENT_MOUSE_WHEEL:
+                        printf("wheel dx=%d dy=%d\n", ev.mouse_wheel.dx, ev.mouse_wheel.dy);
+                        break;
+                    case SRAPI_INPUT_EVENT_DEVICE_ADDED:
+                        printf("device added id=%u '%s' (%s)\n",
+                               ev.device_id, ev.device.name, ev.device.path);
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            if (tilt_left_frames > 0) {
+                triangle_color = srapi_rgba(255, 120, 0, 255);
+                tilt_left_frames--;
+            } else if (tilt_right_frames > 0) {
+                triangle_color = srapi_rgba(0, 180, 255, 255);
+                tilt_right_frames--;
+            } else if (last_button == SRAPI_MOUSE_BUTTON_LEFT) {
+                triangle_color = srapi_rgba(80, 200, 240, 255);
+            } else if (last_button == SRAPI_MOUSE_BUTTON_RIGHT) {
+                triangle_color = srapi_rgba(240, 80, 200, 255);
+            } else if (last_button == SRAPI_MOUSE_BUTTON_MIDDLE) {
+                triangle_color = srapi_rgba(245, 200, 70, 255);
+            } else if (last_button == SRAPI_MOUSE_BUTTON_X1) {
+                triangle_color = srapi_rgba(160, 60, 250, 255);
+            } else if (last_button == SRAPI_MOUSE_BUTTON_X2) {
+                triangle_color = srapi_rgba(60, 250, 160, 255);
+            } else if (last_key != SRAPI_SCANCODE_UNKNOWN) {
+                uint32_t h = (uint32_t)last_key * 2654435761u;
+                uint8_t r8 = (uint8_t)(h >> 24);
+                uint8_t g8 = (uint8_t)(h >> 16);
+                uint8_t b8 = (uint8_t)(h >> 8);
+                triangle_color = srapi_rgba(r8 | 0x40, g8 | 0x40, b8 | 0x40, 255);
+            } else {
+                triangle_color = triangle_base;
+            }
+        }
+
+        srapi_cmd_reset(cmd);
+        srapi_cmd_emit(cmd, &(srapi_command_t){
+            .kind = SRAPI_COMMAND_CLEAR,
+            .color = srapi_rgba(10, 12, 16, 255),
+        });
+        srapi_cmd_shade_rect(cmd, 0, 0, width, height, shader);
+        srapi_cmd_fill_rect(cmd, 40, 40, width / 2, height / 3, srapi_rgba(220, 80, 60, 255));
+        srapi_cmd_fill_rect(cmd, (int32_t)(width / 3), (int32_t)(height / 3), width / 2, height / 3, srapi_rgba(55, 160, 230, 255));
+        srapi_cmd_fill_triangle(
+            cmd,
+            (int32_t)(width / 2), 24,
+            32, (int32_t)height - 32,
+            (int32_t)width - 32, (int32_t)height - 48,
+            triangle_color
+        );
+        srapi_cmd_draw_line(cmd, 0, 0, (int32_t)width - 1, (int32_t)height - 1, srapi_rgba(245, 220, 90, 255));
+        srapi_cmd_draw_line(cmd, 0, (int32_t)height - 1, (int32_t)width - 1, 0, srapi_rgba(90, 245, 170, 255));
+
+        if (input != NULL) {
+            int32_t cur_w = 7;
+            int32_t cur_h = 7;
+            int32_t cx = cursor_x - cur_w / 2;
+            int32_t cy = cursor_y - cur_h / 2;
+            srapi_cmd_fill_rect(cmd, cx, cy, (uint32_t)cur_w, (uint32_t)cur_h, srapi_rgba(255, 255, 255, 255));
+        }
+
         float shift = wave_u32(frame, 24, 0.0f, 0.45f);
         float blue = wave_u32(frame + 8, 32, 0.45f, 1.0f);
         float uniforms[] = { shift, blue, 1.0f };
@@ -1363,6 +1465,7 @@ int main(int argc, char *argv[]) {
     }
     srapi_drm_close(drm);
     srapi_fbdev_close(fbdev);
+    srapi_input_destroy(input);
     srapi_destroy_context(ctx);
     return 0;
 
@@ -1377,6 +1480,7 @@ fail:
     }
     srapi_drm_close(drm);
     srapi_fbdev_close(fbdev);
+    srapi_input_destroy(input);
     srapi_destroy_context(ctx);
     return 1;
 }
