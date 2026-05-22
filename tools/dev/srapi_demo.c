@@ -1287,12 +1287,29 @@ int main(int argc, char *argv[]) {
     uint32_t last_button = 0;
     int32_t cursor_x = (int32_t)(width / 2);
     int32_t cursor_y = (int32_t)(height / 2);
-    int tilt_left_frames = 0;
-    int tilt_right_frames = 0;
+    float tilt_left_remaining = 0.0f;
+    float tilt_right_remaining = 0.0f;
+    srapi_clock_t clock;
+    srapi_clock_init(&clock);
+    float fps_accum = 0.0f;
+    uint32_t fps_frames = 0;
     int input_quit = 0;
     (void)gpu_i915;
 
     for (uint32_t frame = 0; frame < frames && !input_quit; frame++) {
+        float dt = srapi_clock_tick(&clock);
+
+        fps_accum += dt;
+        fps_frames++;
+        if (fps_accum >= 1.0f) {
+            printf("fps=%.1f dt=%.3fms total=%.2fs\n",
+                   (float)fps_frames / fps_accum,
+                   dt * 1000.0f,
+                   srapi_clock_elapsed(&clock));
+            fps_accum = 0.0f;
+            fps_frames = 0;
+        }
+
         if (input != NULL) {
             srapi_input_event_t ev;
             while (srapi_input_poll(input, &ev) == 1) {
@@ -1312,10 +1329,10 @@ int main(int argc, char *argv[]) {
                         break;
                     case SRAPI_INPUT_EVENT_MOUSE_BUTTON_DOWN:
                         if (ev.mouse_button.button == SRAPI_MOUSE_BUTTON_WHEEL_LEFT) {
-                            tilt_left_frames = 15;
+                            tilt_left_remaining = 0.25f;
                             printf("wheel tilt LEFT\n");
                         } else if (ev.mouse_button.button == SRAPI_MOUSE_BUTTON_WHEEL_RIGHT) {
-                            tilt_right_frames = 15;
+                            tilt_right_remaining = 0.25f;
                             printf("wheel tilt RIGHT\n");
                         } else {
                             last_button = ev.mouse_button.button;
@@ -1346,12 +1363,14 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-            if (tilt_left_frames > 0) {
+            if (tilt_left_remaining > 0.0f) {
                 triangle_color = srapi_rgba(255, 120, 0, 255);
-                tilt_left_frames--;
-            } else if (tilt_right_frames > 0) {
+                tilt_left_remaining -= dt;
+                if (tilt_left_remaining < 0.0f) tilt_left_remaining = 0.0f;
+            } else if (tilt_right_remaining > 0.0f) {
                 triangle_color = srapi_rgba(0, 180, 255, 255);
-                tilt_right_frames--;
+                tilt_right_remaining -= dt;
+                if (tilt_right_remaining < 0.0f) tilt_right_remaining = 0.0f;
             } else if (last_button == SRAPI_MOUSE_BUTTON_LEFT) {
                 triangle_color = srapi_rgba(80, 200, 240, 255);
             } else if (last_button == SRAPI_MOUSE_BUTTON_RIGHT) {
