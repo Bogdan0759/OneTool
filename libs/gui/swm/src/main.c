@@ -393,11 +393,27 @@ typedef enum {
     SWM_HIT_BTN_CLOSE,
 } swm_hit_region_t;
 
+static void surface_effective_rect(const swm_surface_t *s, int32_t *ex, int32_t *ey, int32_t *ew, int32_t *eh) {
+    if (s->maximized) {
+        *ex = SWM_BORDER;
+        *ey = SWM_TITLEBAR_H + SWM_BORDER;
+        *ew = (int32_t)g_swm.display_w - 2 * SWM_BORDER;
+        *eh = (int32_t)g_swm.display_h - SWM_TITLEBAR_H - 2 * SWM_BORDER;
+    } else {
+        *ex = s->pos_x;
+        *ey = s->pos_y;
+        *ew = (int32_t)s->width;
+        *eh = (int32_t)s->height;
+    }
+}
+
 static void surface_outer_rect(const swm_surface_t *s, int32_t *ox, int32_t *oy, int32_t *ow, int32_t *oh) {
-    *ox = s->pos_x - SWM_BORDER;
-    *oy = s->pos_y - SWM_TITLEBAR_H - SWM_BORDER;
-    *ow = (int32_t)s->width + 2 * SWM_BORDER;
-    *oh = (int32_t)s->height + SWM_TITLEBAR_H + 2 * SWM_BORDER;
+    int32_t ex, ey, ew, eh;
+    surface_effective_rect(s, &ex, &ey, &ew, &eh);
+    *ox = ex - SWM_BORDER;
+    *oy = ey - SWM_TITLEBAR_H - SWM_BORDER;
+    *ow = ew + 2 * SWM_BORDER;
+    *oh = eh + SWM_TITLEBAR_H + 2 * SWM_BORDER;
 }
 
 static void titlebar_button_rects(const swm_surface_t *s,
@@ -418,11 +434,12 @@ static swm_hit_region_t hit_test(int32_t mx, int32_t my, swm_surface_t **out_sur
     for (int i = n - 1; i >= 0; i--) {
         swm_surface_t *s = list[i];
         int32_t ox, oy, ow, oh;
+        int32_t ex, ey, ew, eh;
         surface_outer_rect(s, &ox, &oy, &ow, &oh);
+        surface_effective_rect(s, &ex, &ey, &ew, &eh);
         if (mx < ox || mx >= ox + ow || my < oy || my >= oy + oh) continue;
 
-        if (my >= s->pos_y && my < s->pos_y + (int32_t)s->height &&
-            mx >= s->pos_x && mx < s->pos_x + (int32_t)s->width) {
+        if (my >= ey && my < ey + eh && mx >= ex && mx < ex + ew) {
             *out_surface = s;
             return SWM_HIT_CONTENT;
         }
@@ -571,22 +588,44 @@ static void composite_surfaces(srapi_framebuffer_t *fb, uint32_t bg_color) {
         draw_titlebar_chrome(dst, dst_w, dst_h, dst_pitch_px, s, s == focused);
 
         if (s->buf_map == NULL) continue;
-        int32_t sx0 = 0, sy0 = 0;
-        int32_t w = (int32_t)s->width;
-        int32_t h = (int32_t)s->height;
-        int32_t dx = s->pos_x;
-        int32_t dy = s->pos_y;
-        if (dx < 0) { sx0 = -dx; w -= sx0; dx = 0; }
-        if (dy < 0) { sy0 = -dy; h -= sy0; dy = 0; }
-        if (dx + w > dst_w) w = dst_w - dx;
-        if (dy + h > dst_h) h = dst_h - dy;
-        if (w <= 0 || h <= 0) continue;
+        int32_t ex, ey, ew, eh;
+        surface_effective_rect(s, &ex, &ey, &ew, &eh);
         int32_t src_pitch_px = (int32_t)(s->stride / 4u);
         const uint32_t *src = (const uint32_t *)s->buf_map;
-        for (int32_t row = 0; row < h; row++) {
-            const uint32_t *sr = src + (sy0 + row) * src_pitch_px + sx0;
-            uint32_t *dr = dst + (dy + row) * dst_pitch_px + dx;
-            memcpy(dr, sr, (size_t)w * 4u);
+        int32_t src_w = (int32_t)s->width;
+        int32_t src_h = (int32_t)s->height;
+
+        if (ew == src_w && eh == src_h) {
+            int32_t sx0 = 0, sy0 = 0;
+            int32_t w = src_w, h = src_h;
+            int32_t dx = ex, dy = ey;
+            if (dx < 0) { sx0 = -dx; w -= sx0; dx = 0; }
+            if (dy < 0) { sy0 = -dy; h -= sy0; dy = 0; }
+            if (dx + w > dst_w) w = dst_w - dx;
+            if (dy + h > dst_h) h = dst_h - dy;
+            if (w <= 0 || h <= 0) continue;
+            for (int32_t row = 0; row < h; row++) {
+                const uint32_t *sr = src + (sy0 + row) * src_pitch_px + sx0;
+                uint32_t *dr = dst + (dy + row) * dst_pitch_px + dx;
+                memcpy(dr, sr, (size_t)w * 4u);
+            }
+        } else {
+            int32_t dy0 = ey > 0 ? ey : 0;
+            int32_t dy1 = ey + eh < dst_h ? ey + eh : dst_h;
+            int32_t dx0 = ex > 0 ? ex : 0;
+            int32_t dx1 = ex + ew < dst_w ? ex + ew : dst_w;
+            if (ew <= 0 || eh <= 0) continue;
+            for (int32_t dy = dy0; dy < dy1; dy++) {
+                int32_t sy = (int32_t)(((int64_t)(dy - ey) * src_h) / eh);
+                if (sy < 0) sy = 0; else if (sy >= src_h) sy = src_h - 1;
+                const uint32_t *sr = src + sy * src_pitch_px;
+                uint32_t *dr = dst + dy * dst_pitch_px;
+                for (int32_t dx = dx0; dx < dx1; dx++) {
+                    int32_t sx = (int32_t)(((int64_t)(dx - ex) * src_w) / ew);
+                    if (sx < 0) sx = 0; else if (sx >= src_w) sx = src_w - 1;
+                    dr[dx] = sr[sx];
+                }
+            }
         }
     }
     draw_cursor(dst, dst_w, dst_h, dst_pitch_px, g_swm.mouse_x, g_swm.mouse_y);
@@ -611,17 +650,7 @@ static void send_configure_to(swm_surface_t *s, uint32_t state_flags) {
 }
 
 static void toggle_maximize(swm_surface_t *s) {
-    if (s->maximized) {
-        s->pos_x = s->saved_pos_x;
-        s->pos_y = s->saved_pos_y;
-        s->maximized = 0;
-    } else {
-        s->saved_pos_x = s->pos_x;
-        s->saved_pos_y = s->pos_y;
-        s->pos_x = SWM_BORDER;
-        s->pos_y = SWM_TITLEBAR_H + SWM_BORDER;
-        s->maximized = 1;
-    }
+    s->maximized = !s->maximized;
     send_configure_to(s, (s->maximized ? SPROT_SURFACE_STATE_MAXIMIZED : 0) | SPROT_SURFACE_STATE_FOCUSED);
 }
 
@@ -640,10 +669,11 @@ static void forward_input(const srapi_input_event_t *ev) {
             }
             region = hit_test(g_swm.mouse_x, g_swm.mouse_y, &s);
             if (region == SWM_HIT_CONTENT && s != NULL && s->owner != NULL) {
-                sprot_body_pointer_motion_t body = {
-                    .x = g_swm.mouse_x - s->pos_x,
-                    .y = g_swm.mouse_y - s->pos_y,
-                };
+                int32_t ex, ey, ew, eh;
+                surface_effective_rect(s, &ex, &ey, &ew, &eh);
+                int32_t lx = (int32_t)(((int64_t)(g_swm.mouse_x - ex) * (int64_t)s->width) / (ew > 0 ? ew : 1));
+                int32_t ly = (int32_t)(((int64_t)(g_swm.mouse_y - ey) * (int64_t)s->height) / (eh > 0 ? eh : 1));
+                sprot_body_pointer_motion_t body = { .x = lx, .y = ly };
                 send_event(s->owner->sock, SPROT_EVT_POINTER_MOTION, s->id, 0, &body, sizeof(body));
             }
             break;
