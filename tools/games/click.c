@@ -144,13 +144,15 @@ static void draw_cursor(srapi_cmd_buffer_t *cmd, int32_t x, int32_t y) {
 
 int main(int argc, char *argv[]) {
     const char *drm_device = NULL;
+    const char *record_path = NULL;
+    uint32_t record_fps = 30;
     int debug = 0;
     int use_gpu = 0;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             printf("click - SRAPI click-the-cube minigame\n");
-            printf("usage: %s [--drm /dev/dri/cardN] [--gpu] [--debug]\n", argv[0]);
+            printf("usage: %s [--drm /dev/dri/cardN] [--gpu] [--debug] [--record file.srvid] [--record-fps n]\n", argv[0]);
             printf("you have 15 seconds. cubes spawn and live for 3 seconds.\n");
             printf("click them with the left mouse button. Esc to abort.\n");
             printf("--gpu  use GPU/i915 BLT path when available (otherwise CPU rasterizer).\n");
@@ -161,6 +163,16 @@ int main(int argc, char *argv[]) {
             use_gpu = 1;
         } else if (strcmp(argv[i], "--debug") == 0) {
             debug = 1;
+        } else if (strcmp(argv[i], "--record") == 0 && i + 1 < argc) {
+            record_path = argv[++i];
+        } else if (strcmp(argv[i], "--record-fps") == 0 && i + 1 < argc) {
+            char *end = NULL;
+            unsigned long v = strtoul(argv[++i], &end, 10);
+            if (end == NULL || *end != '\0' || v == 0 || v > 240) {
+                fprintf(stderr, "bad --record-fps\n");
+                return 1;
+            }
+            record_fps = (uint32_t)v;
         }
     }
     if (debug) {
@@ -201,6 +213,16 @@ int main(int argc, char *argv[]) {
     }
     uint32_t width = srapi_drm_width(drm);
     uint32_t height = srapi_drm_height(drm);
+
+    if (record_path != NULL) {
+        r = srapi_drm_record_start(drm, record_path, record_fps * 1000);
+        if (r != SRAPI_OK) {
+            fprintf(stderr, "click: drm record start failed: %s\n", srapi_last_error());
+            srapi_drm_close(drm);
+            return 1;
+        }
+        fprintf(stderr, "click: recording -> %s @ %u fps\n", record_path, record_fps);
+    }
 
     srapi_backend_t render_backend = SRAPI_BACKEND_GPU;
     if (use_gpu) {

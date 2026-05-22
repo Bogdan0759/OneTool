@@ -2,11 +2,14 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <linux/kd.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <poll.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
 
 #define SRAPI_DRM_CONNECTED 1
@@ -356,6 +359,179 @@ static srapi_result_t drm_set_crtc(
     srapi_drm_display_t *display,
     const struct drm_mode_modeinfo *mode,
     uint32_t fb_id
+);
+
+
+static srapi_drm_display_t *g_vt_display;
+
+static void vt_sig_release(int sig) {
+    srapi_drm_display_t *d = g_vt_display;
+
+    (void)sig;
+    if (d == NULL) {
+        return;
+    }
+    if (d->fd >= 0) {
+        srapi_drm_ioctl(d->fd, DRM_IOCTL_DROP_MASTER, NULL);
+    }
+    if (d->tty_fd >= 0) {
+        ioctl(d->tty_fd, VT_RELDISP, 1);
+    }
+    d->paused = 1;
+}
+
+static void vt_sig_acquire(int sig) {
+    srapi_drm_display_t *d = g_vt_display;
+
+    (void)sig;
+    if (d == NULL) {
+        return;
+    }
+    if (d->tty_fd >= 0) {
+        ioctl(d->tty_fd, VT_RELDISP, VT_ACKACQ);
+    }
+    d->need_resume = 1;
+}
+
+static int open_tty(void) {
+    int fd;
+
+    fd = open("/dev/tty", O_RDWR | O_CLOEXEC);
+    if (fd < 0) {
+        fd = open("/dev/tty0", O_RDWR | O_CLOEXEC);
+    }
+    return fd;
+}
+
+static int vt_install(srapi_drm_display_t *display) {
+    struct vt_stat vt_state;
+    struct vt_mode vtm;
+    struct sigaction sa;
+    long kd_mode = 0;
+    int tty_fd;
+
+    display->tty_fd = -1;
+    display->vt_nr = 0;
+    display->has_saved_vt_mode = 0;
+    display->has_saved_kd_mode = 0;
+    display->paused = 0;
+    display->need_resume = 0;
+
+    tty_fd = open_tty();
+    if (tty_fd < 0) {
+        srapi_debugf("drm vt: open tty failed: %s", strerror(errno));
+        return 0;
+    }
+
+    memset(&vt_state, 0, sizeof(vt_state));
+    if (ioctl(tty_fd, VT_GETSTATE, &vt_state) != 0) {
+        srapi_debugf("drm vt: VT_GETSTATE failed (not a console?): %s", strerror(errno));
+        close(tty_fd);
+        return 0;
+    }
+    display->vt_nr = vt_state.v_active;
+
+    if (ioctl(tty_fd, KDGETMODE, &kd_mode) == 0) {
+        display->saved_kd_mode = kd_mode;
+        display->has_saved_kd_mode = 1;
+    }
+
+    memset(&vtm, 0, sizeof(vtm));
+    if (ioctl(tty_fd, VT_GETMODE, &vtm) != 0) {
+        srapi_debugf("drm vt: VT_GETMODE failed: %s", strerror(errno));
+        close(tty_fd);
+        return 0;
+    }
+    display->saved_vt_mode = vtm;
+    display->has_saved_vt_mode = 1;
+
+    g_vt_display = display;
+
+    memset(&sa, 0, sizeof(sa));
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    sa.sa_handler = vt_sig_release;
+    sigaction(SIGUSR1, &sa, NULL);
+    sa.sa_handler = vt_sig_acquire;
+    sigaction(SIGUSR2, &sa, NULL);
+
+    vtm.mode = VT_PROCESS;
+    vtm.relsig = SIGUSR1;
+    vtm.acqsig = SIGUSR2;
+    if (ioctl(tty_fd, VT_SETMODE, &vtm) != 0) {
+        srapi_debugf("drm vt: VT_SETMODE(VT_PROCESS) failed: %s", strerror(errno));
+        sa.sa_handler = SIG_DFL;
+        sigaction(SIGUSR1, &sa, NULL);
+        sigaction(SIGUSR2, &sa, NULL);
+        g_vt_display = NULL;
+        display->has_saved_vt_mode = 0;
+        close(tty_fd);
+        return 0;
+    }
+
+    ioctl(tty_fd, KDSETMODE, KD_GRAPHICS);
+    display->tty_fd = tty_fd;
+    srapi_debugf("drm vt: installed on VT %d (rel=SIGUSR1 acq=SIGUSR2)", display->vt_nr);
+    return 1;
+}
+
+static void vt_restore(srapi_drm_display_t *display) {
+    struct sigaction sa;
+
+    if (display->tty_fd < 0) {
+        return;
+    }
+
+    if (display->fd >= 0 && !display->paused) {
+        srapi_drm_ioctl(display->fd, DRM_IOCTL_DROP_MASTER, NULL);
+    }
+
+    ioctl(display->tty_fd, KDSETMODE, KD_TEXT);
+
+    if (display->has_saved_vt_mode) {
+        ioctl(display->tty_fd, VT_SETMODE, &display->saved_vt_mode);
+        display->has_saved_vt_mode = 0;
+    }
+
+    memset(&sa, 0, sizeof(sa));
+    sigemptyset(&sa.sa_mask);
+    sa.sa_handler = SIG_DFL;
+    sigaction(SIGUSR1, &sa, NULL);
+    sigaction(SIGUSR2, &sa, NULL);
+
+    g_vt_display = NULL;
+    close(display->tty_fd);
+    display->tty_fd = -1;
+    srapi_debugf("drm vt: restored");
+}
+
+static int vt_handle_resume(srapi_drm_display_t *display) {
+    if (!display->need_resume) {
+        return 1;
+    }
+    display->need_resume = 0;
+    display->paused = 0;
+
+    if (display->fd >= 0) {
+        if (srapi_drm_ioctl(display->fd, DRM_IOCTL_SET_MASTER, NULL) != 0) {
+            srapi_debugf("drm vt: SET_MASTER on resume failed: %s", strerror(errno));
+            return 0;
+        }
+    }
+    if (drm_set_crtc(display, &display->mode,
+                     display->buffers[display->front].fb_id) != SRAPI_OK) {
+        srapi_debugf("drm vt: SETCRTC on resume failed");
+        return 0;
+    }
+    srapi_debugf("drm vt: resumed on VT %d", display->vt_nr);
+    return 1;
+}
+
+
+static srapi_result_t drm_set_crtc(
+    srapi_drm_display_t *display,
+    const struct drm_mode_modeinfo *mode,
+    uint32_t fb_id
 ) {
     uint64_t connector_ptr;
     struct drm_mode_crtc set;
@@ -409,6 +585,7 @@ srapi_result_t srapi_drm_open_display(
         return SRAPI_ERROR_OOM;
     }
     display->fd = fd;
+    display->tty_fd = -1;
     snprintf(display->device_path, sizeof(display->device_path), "%s", resolved);
 
     if (!find_output(fd, desc->connector_id, desc->width, desc->height, desc->refresh_millihz,
@@ -438,6 +615,9 @@ srapi_result_t srapi_drm_open_display(
     }
 
     srapi_debugf("drm setcrtc ok crtc=%u connector=%u fb=%u", display->crtc_id, display->connector_id, display->buffers[display->front].fb_id);
+
+    vt_install(display);
+
     *out = display;
     return SRAPI_OK;
 }
@@ -447,7 +627,11 @@ void srapi_drm_close(srapi_drm_display_t *display) {
         return;
     }
 
-    if (display->fd >= 0 && display->has_old_crtc) {
+    srapi_drm_record_close(display);
+
+    if (display->tty_fd >= 0) {
+        vt_restore(display);
+    } else if (display->fd >= 0 && display->has_old_crtc) {
         srapi_debugf("drm restore old crtc=%u fb=%u", display->old_crtc.crtc_id, display->old_crtc.fb_id);
         srapi_drm_ioctl(display->fd, DRM_IOCTL_MODE_SETCRTC, &display->old_crtc);
     }
@@ -517,6 +701,15 @@ srapi_result_t srapi_drm_present(srapi_drm_display_t *display) {
         return SRAPI_ERROR_BAD_ARG;
     }
 
+    if (display->need_resume) {
+        if (!vt_handle_resume(display)) {
+            return SRAPI_ERROR;
+        }
+    }
+    if (display->paused) {
+        return SRAPI_OK;
+    }
+
     next = display->front ^ 1;
     struct drm_mode_crtc_page_flip flip = {
         .crtc_id = display->crtc_id,
@@ -531,6 +724,7 @@ srapi_result_t srapi_drm_present(srapi_drm_display_t *display) {
         }
         display->front = next;
         srapi_debugf("drm page_flip present fb=%u front=%d", display->buffers[display->front].fb_id, display->front);
+        srapi_drm_record_capture(display);
         return SRAPI_OK;
     }
 
@@ -554,6 +748,7 @@ srapi_result_t srapi_drm_present(srapi_drm_display_t *display) {
 
     display->front = next;
     srapi_debugf("drm present fb=%u front=%d", display->buffers[display->front].fb_id, display->front);
+    srapi_drm_record_capture(display);
     return SRAPI_OK;
 }
 

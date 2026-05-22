@@ -599,6 +599,14 @@ srapi_result_t srapi_drm_set_mode(
     uint32_t refresh_millihz
 );
 
+srapi_result_t srapi_drm_record_start(
+    srapi_drm_display_t *display,
+    const char *path,
+    uint32_t fps_millihz
+);
+void srapi_drm_record_stop(srapi_drm_display_t *display);
+int srapi_drm_is_recording(const srapi_drm_display_t *display);
+
 srapi_result_t srapi_fbdev_open(const char *device_path, srapi_fbdev_display_t **out);
 srapi_result_t srapi_fbdev_open_display(
     const srapi_fbdev_display_desc_t *desc,

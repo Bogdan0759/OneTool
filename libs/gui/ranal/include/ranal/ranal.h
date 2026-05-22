@@ -97,6 +97,8 @@ int32_t ranal_window_width(void);
 int32_t ranal_window_height(void);
 float   ranal_frame_time(void);
 double  ranal_time_elapsed(void);
+ranal_result_t ranal_record_start(const char *path, uint32_t fps);
+void ranal_record_stop(void);
 ranal_widget_t *ranal_root(void);
 ranal_widget_t *ranal_panel(ranal_widget_t *parent);
 ranal_widget_t *ranal_label(ranal_widget_t *parent, const char *text);
