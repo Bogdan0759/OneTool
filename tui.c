@@ -473,6 +473,9 @@ static void load_embedded_tool_form(onetool_form_t *form, const struct onetool_t
         copy_string(form->summary, sizeof(form->summary), "SRAPI minigame: click cubes that appear on screen. 15s round; cubes expire after 3s.");
         add_text_field(form, "drm", "DRM device", "--drm", "", "/dev/dri/card0", "Optional DRM card path. Auto-detected if empty.");
         add_toggle_field(form, "gpu", "Use GPU", "--gpu", 0, "Render via GPU/i915 BLT path when available.");
+    } else if (strcmp(tool->name, "ranal_demo") == 0) {
+        copy_string(form->title, sizeof(form->title), "ranal — GUI demo");
+        copy_string(form->summary, sizeof(form->summary), "Demo of the ranal GUI library (built on top of srapi). Shows panels, labels, buttons, sliders, checkboxes, and a textbox.");
     } else {
         form->has_config = 0;
     }

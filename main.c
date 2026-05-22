@@ -31,6 +31,7 @@ int cf(int argc, char *argv[]);
 int cv(int argc, char *argv[]);
 int uc(int argc, char *argv[]);
 int ck(int argc, char *argv[]);
+int rd(int argc, char *argv[]);
 int tui_main(const char *onetool_argv0);
 const char onetool_version[] = "1.8.0";
 
@@ -69,6 +70,8 @@ const struct onetool_tool onetool_builtin_tools[] = {
     {"userc", uc, "interactive user control (add/del/edit users)",
      ONETOOL_ARGV0_TOOL_NAME},
     {"click", ck, "SRAPI click-the-cube minigame (15s)",
+     ONETOOL_ARGV0_TOOL_NAME},
+    {"ranal_demo", rd, "demo of the ranal GUI library",
      ONETOOL_ARGV0_TOOL_NAME},
 };
 
