@@ -7,7 +7,7 @@
 
 static void help(const char *tool) {
     printf("srapi_demo - render a test frame or simple animation with SRAPI\n");
-    printf("usage: %s [-o output.ppm] [-w width] [-h height] [--frames n] [--gpu] [--tile-cache] [--probe-gpu] [--probe-i915 [node]] [--probe-fbdev] [--smoke-low] [--smoke-gpu] [--smoke-i915 [node]] [--smoke-fbdev] [--drm [card]] [--fbdev [fb]] [--hold seconds] [--input] [--debug] [--list-displays] [--list-modes [connector]]\n", tool);
+    printf("usage: %s [-o output.ppm] [-w width] [-h height] [--frames n] [--gpu] [--tile-cache] [--probe-gpu] [--probe-i915 [node]] [--probe-fbdev] [--smoke-low] [--smoke-gpu] [--smoke-i915 [node]] [--smoke-fbdev] [--drm [card]] [--fbdev [fb]] [--hold seconds] [--input] [--debug] [--list-displays] [--list-modes [connector]] [--record file.srvid] [--record-fps n]\n", tool);
     printf("i915 screen rendering: %s --gpu --drm [/dev/dri/cardN] [--tile-cache]\n", tool);
 }
 
@@ -888,6 +888,8 @@ int main(int argc, char *argv[]) {
     const char *i915_device = NULL;
     int hold_seconds = 5;
     int use_input = 0;
+    const char *record_path = NULL;
+    uint32_t record_fps = 30;
     srapi_input_context_t *input = NULL;
     srapi_context_t *ctx = NULL;
     srapi_framebuffer_t *fb = NULL;
@@ -975,6 +977,15 @@ int main(int argc, char *argv[]) {
                 return 1;
             }
             hold_seconds = (int)parsed;
+        } else if (strcmp(argv[i], "--record") == 0 && i + 1 < argc) {
+            record_path = argv[++i];
+        } else if (strcmp(argv[i], "--record-fps") == 0 && i + 1 < argc) {
+            uint32_t parsed;
+            if (!parse_u32(argv[++i], &parsed) || parsed == 0 || parsed > 240) {
+                fprintf(stderr, "bad record fps\n");
+                return 1;
+            }
+            record_fps = parsed;
         } else if (strcmp(argv[i], "--debug") == 0) {
             srapi = 1;
         } else if (strcmp(argv[i], "--input") == 0) {
@@ -1140,6 +1151,15 @@ int main(int argc, char *argv[]) {
         width = srapi_drm_width(drm);
         height = srapi_drm_height(drm);
         fb = srapi_drm_backbuffer(drm);
+
+        if (record_path != NULL) {
+            r = srapi_drm_record_start(drm, record_path, record_fps * 1000);
+            if (r != SRAPI_OK) {
+                fprintf(stderr, "drm record start failed: %s\n", srapi_last_error());
+                goto fail;
+            }
+            fprintf(stderr, "recording -> %s @ %u fps\n", record_path, record_fps);
+        }
     }
     if (use_gpu && use_drm) {
         const char *gpu_path = drm_device != NULL ? drm_device : srapi_drm_device_path(drm);

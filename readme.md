@@ -23,6 +23,7 @@ implemented tools:
 - `taskmng` - TUI task manager with process control
 - `gapi_supported` - check available graphics API
 - `srapi_demo` - render a test frame with SRAPI
+- `srvid2mp4` - convert .srvid screen recordings to mp4/webm via ffmpeg
 - `fsinfo` - filesystem info
 - `fsize` - print file size
 - `ls` - list files

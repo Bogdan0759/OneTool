@@ -18,6 +18,7 @@ int sz(int argc, char *argv[]);
 int nm(int argc, char *argv[]);
 int ga(int argc, char *argv[]);
 int sr(int argc, char *argv[]);
+int s2(int argc, char *argv[]);
 int dn(int argc, char *argv[]);
 int pg(int argc, char *argv[]);
 int ns(int argc, char *argv[]);
@@ -50,6 +51,8 @@ const struct onetool_tool onetool_builtin_tools[] = {
     {"gapi_supported", ga, "check available graphics API",
      ONETOOL_ARGV0_TOOL_NAME},
     {"srapi_demo", sr, "render a test frame with SRAPI", ONETOOL_ARGV0_TOOL_NAME},
+    {"srvid2mp4", s2, "convert .srvid recording to mp4/webm via ffmpeg",
+     ONETOOL_ARGV0_TOOL_NAME},
     {"down", dn, "HTTP downloader (curl-like)", ONETOOL_ARGV0_TOOL_NAME},
     {"ping", pg, "ICMP ping with stats", ONETOOL_ARGV0_TOOL_NAME},
     {"nsetup", ns, "simple network setup via DHCP",

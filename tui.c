@@ -405,6 +405,14 @@ static void load_embedded_tool_form(onetool_form_t *form, const struct onetool_t
         add_text_field(form, "output", "Output", "-o", "srapi_demo.ppm", "frame.ppm", "Output PPM file.");
         add_text_field(form, "width", "Width", "-w", "640", "640", "Framebuffer width.");
         add_text_field(form, "height", "Height", "-h", "360", "360", "Framebuffer height.");
+    } else if (strcmp(tool->name, "srvid2mp4") == 0) {
+        copy_string(form->title, sizeof(form->title), "SRVID -> MP4");
+        copy_string(form->summary, sizeof(form->summary), "Decode a .srvid screen recording and pipe rawvideo into ffmpeg to produce mp4/webm/etc.");
+        add_text_field(form, "input", "Input", "", "capture.srvid", "capture.srvid", "Path to the .srvid input file.");
+        add_text_field(form, "output", "Output", "", "capture.mp4", "capture.mp4", "Path to the output container.");
+        add_text_field(form, "codec", "Codec", "--codec", "", "libx264", "Video codec passed to ffmpeg (default: libx264, libvpx-vp9 for .webm).");
+        add_text_field(form, "crf", "CRF", "--crf", "18", "18", "Quality (lower is better; 18-23 typical).");
+        add_text_field(form, "ffmpeg", "ffmpeg binary", "--ffmpeg", "", "/usr/bin/ffmpeg", "Override the ffmpeg executable path.");
     } else if (strcmp(tool->name, "down") == 0) {
         copy_string(form->title, sizeof(form->title), "HTTP Downloader");
         copy_string(form->summary, sizeof(form->summary), "Download an HTTP resource with common OneTool options. Advanced flags can still be added through Extra args.");
@@ -473,9 +481,13 @@ static void load_embedded_tool_form(onetool_form_t *form, const struct onetool_t
         copy_string(form->summary, sizeof(form->summary), "SRAPI minigame: click cubes that appear on screen. 15s round; cubes expire after 3s.");
         add_text_field(form, "drm", "DRM device", "--drm", "", "/dev/dri/card0", "Optional DRM card path. Auto-detected if empty.");
         add_toggle_field(form, "gpu", "Use GPU", "--gpu", 0, "Render via GPU/i915 BLT path when available.");
+        add_text_field(form, "record", "Record", "--record", "", "click.srvid", "Optional .srvid output file to record the session.");
+        add_text_field(form, "record_fps", "Record FPS", "--record-fps", "", "30", "Target recording fps (default 30).");
     } else if (strcmp(tool->name, "ranal_demo") == 0) {
         copy_string(form->title, sizeof(form->title), "ranal — GUI demo");
         copy_string(form->summary, sizeof(form->summary), "Demo of the ranal GUI library (built on top of srapi). Shows panels, labels, buttons, sliders, checkboxes, and a textbox.");
+        add_text_field(form, "record", "Record", "--record", "", "ranal.srvid", "Optional .srvid output file to record the session.");
+        add_text_field(form, "record_fps", "Record FPS", "--record-fps", "", "30", "Target recording fps (default 30).");
     } else {
         form->has_config = 0;
     }

@@ -1,5 +1,7 @@
 #include <ranal/ranal.h>
+#include <srapi/srapi.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 typedef struct {
     int counter;
@@ -37,11 +39,40 @@ static void on_dark(ranal_widget_t *w, int v, void *user) {
     (void)w;
 }
 int main(int argc, char *argv[]) {
-    (void)argc; (void)argv;
+    const char *record_path = NULL;
+    uint32_t record_fps = 30;
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+            printf("ranal_demo - demo of the ranal GUI library on top of srapi\n");
+            printf("usage: %s [--record file.srvid] [--record-fps n] --debug\n", argv[0]);
+            return 0;
+        } else if (strcmp(argv[i], "--record") == 0 && i + 1 < argc) {
+            record_path = argv[++i];
+        } else if (strcmp(argv[i], "--record-fps") == 0 && i + 1 < argc) {
+            char *end = NULL;
+            unsigned long v = strtoul(argv[++i], &end, 10);
+            if (end == NULL || *end != '\0' || v == 0 || v > 240) {
+                fprintf(stderr, "bad --record-fps\n");
+                return 1;
+            }
+            record_fps = (uint32_t)v;
+        } else if (strcmp(argv[i], "--debug") == 0) {
+            srapi = 1;
+        }
+    }
     ranal_window_desc_t desc = { .width = 0, .height = 0, .title = "ranal demo" };
     if (ranal_init(&desc) != RANAL_OK) {
         fprintf(stderr, "ranal_demo: %s\n", ranal_last_error());
         return 1;
+    }
+    if (record_path != NULL) {
+        if (ranal_record_start(record_path, record_fps) != RANAL_OK) {
+            fprintf(stderr, "ranal_demo: %s\n", ranal_last_error());
+            ranal_shutdown();
+            return 1;
+        }
+        fprintf(stderr, "ranal_demo: recording -> %s @ %u fps\n", record_path, record_fps);
     }
     memset(&g_state, 0, sizeof(g_state));
     g_state.volume = 0.5f;
@@ -52,7 +83,7 @@ int main(int argc, char *argv[]) {
     ranal_set_padding(card, 24);
     ranal_set_spacing(card, 10);
     ranal_set_fill_parent(card, 1, 1);
-    ranal_widget_t *title = ranal_label(card, "ranal - gui on top of srapi");
+    ranal_widget_t *title = ranal_label(card, "test");
     ranal_set_role(title, RANAL_ROLE_ACCENT);
     g_state.root = root;
     g_state.card = card;
@@ -64,11 +95,11 @@ int main(int argc, char *argv[]) {
     ranal_set_padding(row, 0);
     ranal_set_auto_size(row, 1, 1);
 
-    ranal_widget_t *btn_inc = ranal_button(row, "+ increment");
+    ranal_widget_t *btn_inc = ranal_button(row, "inc");
     ranal_on_click(btn_inc, on_increment, &g_state);
     ranal_widget_t *btn_reset = ranal_button(row, "reset");
     ranal_on_click(btn_reset, on_reset, &g_state);
-    ranal_widget_t *counter_label = ranal_label(row, "counter: 0");
+    ranal_widget_t *counter_label = ranal_label(row, "0");
 
     ranal_label(card, "");
     ranal_label(card, "volume");
@@ -77,11 +108,11 @@ int main(int argc, char *argv[]) {
     ranal_widget_t *vol_label = ranal_label(card, "0.50");
 
     ranal_label(card, "");
-    ranal_widget_t *cb = ranal_checkbox(card, "enable dark mode", 0);
+    ranal_widget_t *cb = ranal_checkbox(card, "white mode", 0);
     ranal_on_toggle(cb, on_dark, &g_state);
 
     ranal_label(card, "");
-    ranal_label(card, "username (click to edit)");
+    ranal_label(card, "textbox");
     ranal_widget_t *tb = ranal_textbox(card, g_state.username, sizeof(g_state.username));
 
     ranal_label(card, "");

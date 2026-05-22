@@ -132,6 +132,25 @@ int32_t ranal_window_width(void) { return g_ranal.width; }
 int32_t ranal_window_height(void) { return g_ranal.height; }
 float   ranal_frame_time(void) { return g_ranal.dt; }
 double  ranal_time_elapsed(void) { return (double)srapi_clock_elapsed(&g_ranal.total_clock); }
+ranal_result_t ranal_record_start(const char *path, uint32_t fps) {
+    if (!g_ranal.initialized || g_ranal.drm == NULL) {
+        ranal_set_error_("ranal: not initialized");
+        return RANAL_ERROR;
+    }
+    if (fps == 0) {
+        fps = 30;
+    }
+    if (srapi_drm_record_start(g_ranal.drm, path, fps * 1000) != SRAPI_OK) {
+        ranal_set_error_("ranal: %s", srapi_last_error());
+        return RANAL_ERROR;
+    }
+    return RANAL_OK;
+}
+void ranal_record_stop(void) {
+    if (g_ranal.initialized && g_ranal.drm != NULL) {
+        srapi_drm_record_stop(g_ranal.drm);
+    }
+}
 static void size_pass(ranal_widget_t *w) {
     if (w == NULL) return;
     for (ranal_widget_t *c = w->first_child; c != NULL; c = c->next_sibling) {
