@@ -34,6 +34,7 @@ implemented tools:
 - `size` - prints elf sections size
 - `nm` - prints elf symbols
 - `click` - SRAPI click-the-cube minigame (15s round)
+- `ranal_demo` - demo of the ranal GUI library
 framework parts:
 
 - `libs/net` - network library for URL parsing, HTTP and transport
@@ -41,6 +42,7 @@ framework parts:
 - `libs/elf` - ELF parser lib
 - `libs/memory` - checked allocation helpers
 - `libs/srapi` - simple rendering API
+- `libs/gui/ranal` - retained-mode GUI library on top of srapi
 ## build
 
 requirement:
