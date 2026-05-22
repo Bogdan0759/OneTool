@@ -30,8 +30,9 @@ int tm(int argc, char *argv[]);
 int cf(int argc, char *argv[]);
 int cv(int argc, char *argv[]);
 int uc(int argc, char *argv[]);
+int ck(int argc, char *argv[]);
 int tui_main(const char *onetool_argv0);
-const char onetool_version[] = "1.5.0";
+const char onetool_version[] = "1.8.0";
 
 const struct onetool_tool onetool_builtin_tools[] = {
     {"lastmod", lm, "print the last modification time of a file",
@@ -66,6 +67,8 @@ const struct onetool_tool onetool_builtin_tools[] = {
     {"cvm", cv, "show current video mode and resolution",
      ONETOOL_ARGV0_TOOL_NAME},
     {"userc", uc, "interactive user control (add/del/edit users)",
+     ONETOOL_ARGV0_TOOL_NAME},
+    {"click", ck, "SRAPI click-the-cube minigame (15s)",
      ONETOOL_ARGV0_TOOL_NAME},
 };
 

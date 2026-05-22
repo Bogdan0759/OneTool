@@ -350,3 +350,71 @@ srapi_result_t srapi_display_list_modes_drm(
     }
     return SRAPI_OK;
 }
+
+srapi_result_t srapi_drm_recommend(srapi_drm_recommendation_t *out) {
+    char path[64];
+    int best_score = -1;
+    int found = 0;
+
+    if (out == NULL) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+    memset(out, 0, sizeof(*out));
+
+    for (int i = 0; i < 8; i++) {
+        srapi_display_info_t displays[16];
+        size_t probed = 0;
+        int has_display = 0;
+        srapi_i915_info_t i915;
+        int supports_i915;
+        int i915_accel;
+        int score;
+
+        snprintf(path, sizeof(path), "/dev/dri/card%d", i);
+        if (access(path, R_OK) != 0) {
+            continue;
+        }
+
+        if (srapi_display_probe_drm(path, displays, 16, &probed) == SRAPI_OK) {
+            for (size_t j = 0; j < probed && j < 16; j++) {
+                if (displays[j].connected) {
+                    has_display = 1;
+                    break;
+                }
+            }
+        }
+
+        memset(&i915, 0, sizeof(i915));
+        supports_i915 = srapi_probe_i915(path, &i915) == SRAPI_OK && i915.available;
+        i915_accel = supports_i915 && i915.has_gem && i915.has_execbuf2 && i915.has_blt;
+
+        score = 1;
+        if (has_display) score += 10;
+        if (i915_accel) score += 5;
+        else if (supports_i915) score += 2;
+
+        srapi_debugf("drm recommend: %s score=%d display=%d i915=%d accel=%d",
+                     path, score, has_display, supports_i915, i915_accel);
+
+        if (score > best_score) {
+            best_score = score;
+            found = 1;
+            snprintf(out->path, sizeof(out->path), "%s", path);
+            out->has_display = has_display;
+            out->supports_gpu = 1;
+            out->supports_i915 = i915_accel;
+            out->score = (uint32_t)score;
+            snprintf(out->message, sizeof(out->message),
+                     "%s%s",
+                     has_display ? "connected display" : "no connected display",
+                     i915_accel ? " + i915 acceleration"
+                                : (supports_i915 ? " + i915 (limited)" : ""));
+        }
+    }
+
+    if (!found) {
+        srapi_set_error("drm: no readable /dev/dri/card* nodes");
+        return SRAPI_ERROR_UNSUPPORTED;
+    }
+    return SRAPI_OK;
+}

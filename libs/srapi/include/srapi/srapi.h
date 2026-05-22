@@ -628,6 +628,17 @@ srapi_result_t srapi_display_list_modes_drm(
     size_t *written
 );
 
+typedef struct {
+    char path[64];
+    char message[128];
+    uint32_t has_display;
+    uint32_t supports_gpu;
+    uint32_t supports_i915;
+    uint32_t score;
+} srapi_drm_recommendation_t;
+
+srapi_result_t srapi_drm_recommend(srapi_drm_recommendation_t *out);
+
 typedef struct srapi_input_context srapi_input_context_t;
 
 typedef enum {

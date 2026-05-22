@@ -468,6 +468,11 @@ static void load_embedded_tool_form(onetool_form_t *form, const struct onetool_t
     } else if (strcmp(tool->name, "userc") == 0) {
         copy_string(form->title, sizeof(form->title), "User Control");
         copy_string(form->summary, sizeof(form->summary), "Interactive tool to manage system users (add, delete, edit).");
+    } else if (strcmp(tool->name, "click") == 0) {
+        copy_string(form->title, sizeof(form->title), "Click — minigame");
+        copy_string(form->summary, sizeof(form->summary), "SRAPI minigame: click cubes that appear on screen. 15s round; cubes expire after 3s.");
+        add_text_field(form, "drm", "DRM device", "--drm", "", "/dev/dri/card0", "Optional DRM card path. Auto-detected if empty.");
+        add_toggle_field(form, "gpu", "Use GPU", "--gpu", 0, "Render via GPU/i915 BLT path when available.");
     } else {
         form->has_config = 0;
     }
