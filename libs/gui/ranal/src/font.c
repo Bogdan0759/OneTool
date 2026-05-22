@@ -123,7 +123,7 @@ int32_t ranal_text_height(void) {
 }
 
 void ranal_text_render_(int32_t x, int32_t y, const char *text, ranal_color_t color) {
-    if (text == NULL || g_ranal.cmd == NULL) {
+    if (text == NULL || g_ranal->cmd == NULL) {
         return;
     }
     int32_t cx = x;
@@ -138,7 +138,7 @@ void ranal_text_render_(int32_t x, int32_t y, const char *text, ranal_color_t co
             uint8_t bits = glyph[row];
             for (int col = 0; col < RANAL_GLYPH_W; col++) {
                 if (bits & (1u << (RANAL_GLYPH_W - 1 - col))) {
-                    srapi_cmd_fill_rect(g_ranal.cmd,
+                    srapi_cmd_fill_rect(g_ranal->cmd,
                         cx + col, y + row, 1, 1, color);
                 }
             }
@@ -152,24 +152,24 @@ void ranal_draw_text(int32_t x, int32_t y, const char *text, ranal_color_t color
 }
 
 void ranal_draw_pixel(int32_t x, int32_t y, ranal_color_t color) {
-    if (g_ranal.cmd == NULL) return;
-    srapi_cmd_fill_rect(g_ranal.cmd, x, y, 1, 1, color);
+    if (g_ranal->cmd == NULL) return;
+    srapi_cmd_fill_rect(g_ranal->cmd, x, y, 1, 1, color);
 }
 
 void ranal_draw_rect(int32_t x, int32_t y, int32_t w, int32_t h, ranal_color_t color) {
-    if (g_ranal.cmd == NULL || w <= 0 || h <= 0) return;
-    srapi_cmd_fill_rect(g_ranal.cmd, x, y, (uint32_t)w, (uint32_t)h, color);
+    if (g_ranal->cmd == NULL || w <= 0 || h <= 0) return;
+    srapi_cmd_fill_rect(g_ranal->cmd, x, y, (uint32_t)w, (uint32_t)h, color);
 }
 
 void ranal_draw_rect_lines(int32_t x, int32_t y, int32_t w, int32_t h, int32_t t, ranal_color_t color) {
-    if (g_ranal.cmd == NULL || w <= 0 || h <= 0 || t <= 0) return;
-    srapi_cmd_fill_rect(g_ranal.cmd, x, y, (uint32_t)w, (uint32_t)t, color);                        /* top */
-    srapi_cmd_fill_rect(g_ranal.cmd, x, y + h - t, (uint32_t)w, (uint32_t)t, color);                /* bottom */
-    srapi_cmd_fill_rect(g_ranal.cmd, x, y + t, (uint32_t)t, (uint32_t)(h - 2 * t), color);          /* left */
-    srapi_cmd_fill_rect(g_ranal.cmd, x + w - t, y + t, (uint32_t)t, (uint32_t)(h - 2 * t), color);  /* right */
+    if (g_ranal->cmd == NULL || w <= 0 || h <= 0 || t <= 0) return;
+    srapi_cmd_fill_rect(g_ranal->cmd, x, y, (uint32_t)w, (uint32_t)t, color);                        /* top */
+    srapi_cmd_fill_rect(g_ranal->cmd, x, y + h - t, (uint32_t)w, (uint32_t)t, color);                /* bottom */
+    srapi_cmd_fill_rect(g_ranal->cmd, x, y + t, (uint32_t)t, (uint32_t)(h - 2 * t), color);          /* left */
+    srapi_cmd_fill_rect(g_ranal->cmd, x + w - t, y + t, (uint32_t)t, (uint32_t)(h - 2 * t), color);  /* right */
 }
 
 void ranal_draw_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, ranal_color_t color) {
-    if (g_ranal.cmd == NULL) return;
-    srapi_cmd_draw_line(g_ranal.cmd, x0, y0, x1, y1, color);
+    if (g_ranal->cmd == NULL) return;
+    srapi_cmd_draw_line(g_ranal->cmd, x0, y0, x1, y1, color);
 }

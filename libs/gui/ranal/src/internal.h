@@ -86,15 +86,27 @@ struct ranal_widget {
     ranal_widget_data_t data;
 };
 
-typedef struct {
+struct ranal_surface {
+    int32_t width;
+    int32_t height;
+    int32_t pitch;
+    uint32_t *pixels;
+    srapi_framebuffer_t *fb;
+    int owns_fb;
+};
+
+struct ranal_context {
     int initialized;
     srapi_drm_display_t *drm;
     srapi_context_t *ctx;
     srapi_cmd_buffer_t *cmd;
     srapi_input_context_t *input;
+    int targets_drm;
+    struct ranal_surface *target;
     int32_t width;
     int32_t height;
     ranal_widget_t *root;
+    ranal_widget_t *popups;
     ranal_widget_t *focused;
     int32_t mouse_x;
     int32_t mouse_y;
@@ -108,9 +120,10 @@ typedef struct {
     int presented;
     const ranal_theme_t *theme;
     char error_buffer[256];
-} ranal_state_t;
+};
 
-extern ranal_state_t g_ranal;
+typedef struct ranal_context ranal_state_t;
+extern ranal_state_t *g_ranal;
 void ranal_set_error_(const char *fmt, ...);
 ranal_widget_t *ranal_widget_alloc_(ranal_widget_kind_t kind, ranal_widget_t *parent);
 void ranal_widget_attach_(ranal_widget_t *parent, ranal_widget_t *child);
