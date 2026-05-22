@@ -33,6 +33,7 @@ implemented tools:
 - `nsetup` - simple network setup via DHCP
 - `size` - prints elf sections size
 - `nm` - prints elf symbols
+- `click` - SRAPI click-the-cube minigame (15s round)
 framework parts:
 
 - `libs/net` - network library for URL parsing, HTTP and transport
