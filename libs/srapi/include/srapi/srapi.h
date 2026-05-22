@@ -628,4 +628,234 @@ srapi_result_t srapi_display_list_modes_drm(
     size_t *written
 );
 
+typedef struct srapi_input_context srapi_input_context_t;
+
+typedef enum {
+    SRAPI_INPUT_EVENT_NONE = 0,
+    SRAPI_INPUT_EVENT_KEY_DOWN = 1,
+    SRAPI_INPUT_EVENT_KEY_UP = 2,
+    SRAPI_INPUT_EVENT_MOUSE_MOTION = 3,
+    SRAPI_INPUT_EVENT_MOUSE_BUTTON_DOWN = 4,
+    SRAPI_INPUT_EVENT_MOUSE_BUTTON_UP = 5,
+    SRAPI_INPUT_EVENT_MOUSE_WHEEL = 6,
+    SRAPI_INPUT_EVENT_DEVICE_ADDED = 7,
+    SRAPI_INPUT_EVENT_DEVICE_REMOVED = 8,
+} srapi_input_event_type_t;
+
+typedef enum {
+    SRAPI_SCANCODE_UNKNOWN = 0,
+    SRAPI_SCANCODE_A = 4,
+    SRAPI_SCANCODE_B = 5,
+    SRAPI_SCANCODE_C = 6,
+    SRAPI_SCANCODE_D = 7,
+    SRAPI_SCANCODE_E = 8,
+    SRAPI_SCANCODE_F = 9,
+    SRAPI_SCANCODE_G = 10,
+    SRAPI_SCANCODE_H = 11,
+    SRAPI_SCANCODE_I = 12,
+    SRAPI_SCANCODE_J = 13,
+    SRAPI_SCANCODE_K = 14,
+    SRAPI_SCANCODE_L = 15,
+    SRAPI_SCANCODE_M = 16,
+    SRAPI_SCANCODE_N = 17,
+    SRAPI_SCANCODE_O = 18,
+    SRAPI_SCANCODE_P = 19,
+    SRAPI_SCANCODE_Q = 20,
+    SRAPI_SCANCODE_R = 21,
+    SRAPI_SCANCODE_S = 22,
+    SRAPI_SCANCODE_T = 23,
+    SRAPI_SCANCODE_U = 24,
+    SRAPI_SCANCODE_V = 25,
+    SRAPI_SCANCODE_W = 26,
+    SRAPI_SCANCODE_X = 27,
+    SRAPI_SCANCODE_Y = 28,
+    SRAPI_SCANCODE_Z = 29,
+    SRAPI_SCANCODE_1 = 30,
+    SRAPI_SCANCODE_2 = 31,
+    SRAPI_SCANCODE_3 = 32,
+    SRAPI_SCANCODE_4 = 33,
+    SRAPI_SCANCODE_5 = 34,
+    SRAPI_SCANCODE_6 = 35,
+    SRAPI_SCANCODE_7 = 36,
+    SRAPI_SCANCODE_8 = 37,
+    SRAPI_SCANCODE_9 = 38,
+    SRAPI_SCANCODE_0 = 39,
+    SRAPI_SCANCODE_RETURN = 40,
+    SRAPI_SCANCODE_ESCAPE = 41,
+    SRAPI_SCANCODE_BACKSPACE = 42,
+    SRAPI_SCANCODE_TAB = 43,
+    SRAPI_SCANCODE_SPACE = 44,
+    SRAPI_SCANCODE_MINUS = 45,
+    SRAPI_SCANCODE_EQUALS = 46,
+    SRAPI_SCANCODE_LEFTBRACKET = 47,
+    SRAPI_SCANCODE_RIGHTBRACKET = 48,
+    SRAPI_SCANCODE_BACKSLASH = 49,
+    SRAPI_SCANCODE_SEMICOLON = 51,
+    SRAPI_SCANCODE_APOSTROPHE = 52,
+    SRAPI_SCANCODE_GRAVE = 53,
+    SRAPI_SCANCODE_COMMA = 54,
+    SRAPI_SCANCODE_PERIOD = 55,
+    SRAPI_SCANCODE_SLASH = 56,
+    SRAPI_SCANCODE_CAPSLOCK = 57,
+    SRAPI_SCANCODE_F1 = 58,
+    SRAPI_SCANCODE_F2 = 59,
+    SRAPI_SCANCODE_F3 = 60,
+    SRAPI_SCANCODE_F4 = 61,
+    SRAPI_SCANCODE_F5 = 62,
+    SRAPI_SCANCODE_F6 = 63,
+    SRAPI_SCANCODE_F7 = 64,
+    SRAPI_SCANCODE_F8 = 65,
+    SRAPI_SCANCODE_F9 = 66,
+    SRAPI_SCANCODE_F10 = 67,
+    SRAPI_SCANCODE_F11 = 68,
+    SRAPI_SCANCODE_F12 = 69,
+    SRAPI_SCANCODE_PRINTSCREEN = 70,
+    SRAPI_SCANCODE_SCROLLLOCK = 71,
+    SRAPI_SCANCODE_PAUSE = 72,
+    SRAPI_SCANCODE_INSERT = 73,
+    SRAPI_SCANCODE_HOME = 74,
+    SRAPI_SCANCODE_PAGEUP = 75,
+    SRAPI_SCANCODE_DELETE = 76,
+    SRAPI_SCANCODE_END = 77,
+    SRAPI_SCANCODE_PAGEDOWN = 78,
+    SRAPI_SCANCODE_RIGHT = 79,
+    SRAPI_SCANCODE_LEFT = 80,
+    SRAPI_SCANCODE_DOWN = 81,
+    SRAPI_SCANCODE_UP = 82,
+    SRAPI_SCANCODE_NUMLOCK = 83,
+    SRAPI_SCANCODE_KP_DIVIDE = 84,
+    SRAPI_SCANCODE_KP_MULTIPLY = 85,
+    SRAPI_SCANCODE_KP_MINUS = 86,
+    SRAPI_SCANCODE_KP_PLUS = 87,
+    SRAPI_SCANCODE_KP_ENTER = 88,
+    SRAPI_SCANCODE_KP_1 = 89,
+    SRAPI_SCANCODE_KP_2 = 90,
+    SRAPI_SCANCODE_KP_3 = 91,
+    SRAPI_SCANCODE_KP_4 = 92,
+    SRAPI_SCANCODE_KP_5 = 93,
+    SRAPI_SCANCODE_KP_6 = 94,
+    SRAPI_SCANCODE_KP_7 = 95,
+    SRAPI_SCANCODE_KP_8 = 96,
+    SRAPI_SCANCODE_KP_9 = 97,
+    SRAPI_SCANCODE_KP_0 = 98,
+    SRAPI_SCANCODE_KP_PERIOD = 99,
+    SRAPI_SCANCODE_LCTRL = 224,
+    SRAPI_SCANCODE_LSHIFT = 225,
+    SRAPI_SCANCODE_LALT = 226,
+    SRAPI_SCANCODE_LGUI = 227,
+    SRAPI_SCANCODE_RCTRL = 228,
+    SRAPI_SCANCODE_RSHIFT = 229,
+    SRAPI_SCANCODE_RALT = 230,
+    SRAPI_SCANCODE_RGUI = 231,
+    SRAPI_SCANCODE_COUNT = 256,
+} srapi_scancode_t;
+
+typedef enum {
+    SRAPI_KMOD_NONE = 0,
+    SRAPI_KMOD_LSHIFT = 1u << 0,
+    SRAPI_KMOD_RSHIFT = 1u << 1,
+    SRAPI_KMOD_LCTRL  = 1u << 2,
+    SRAPI_KMOD_RCTRL  = 1u << 3,
+    SRAPI_KMOD_LALT   = 1u << 4,
+    SRAPI_KMOD_RALT   = 1u << 5,
+    SRAPI_KMOD_LGUI   = 1u << 6,
+    SRAPI_KMOD_RGUI   = 1u << 7,
+    SRAPI_KMOD_CAPS   = 1u << 8,
+    SRAPI_KMOD_NUM    = 1u << 9,
+    SRAPI_KMOD_SHIFT  = SRAPI_KMOD_LSHIFT | SRAPI_KMOD_RSHIFT,
+    SRAPI_KMOD_CTRL   = SRAPI_KMOD_LCTRL  | SRAPI_KMOD_RCTRL,
+    SRAPI_KMOD_ALT    = SRAPI_KMOD_LALT   | SRAPI_KMOD_RALT,
+    SRAPI_KMOD_GUI    = SRAPI_KMOD_LGUI   | SRAPI_KMOD_RGUI,
+} srapi_keymod_t;
+
+typedef enum {
+    SRAPI_MOUSE_BUTTON_LEFT        = 1,
+    SRAPI_MOUSE_BUTTON_MIDDLE      = 2,
+    SRAPI_MOUSE_BUTTON_RIGHT       = 3,
+    SRAPI_MOUSE_BUTTON_X1          = 4,
+    SRAPI_MOUSE_BUTTON_X2          = 5,
+    SRAPI_MOUSE_BUTTON_WHEEL_LEFT  = 6,
+    SRAPI_MOUSE_BUTTON_WHEEL_RIGHT = 7,
+} srapi_mouse_button_t;
+
+#define SRAPI_MOUSE_BUTTON_MASK(n) (1u << ((n) - 1))
+
+typedef struct {
+    srapi_scancode_t scancode;
+    uint32_t modifiers;
+    uint32_t repeat;
+} srapi_input_key_data_t;
+
+typedef struct {
+    int32_t x;
+    int32_t y;
+    int32_t dx;
+    int32_t dy;
+    uint32_t buttons;
+} srapi_input_mouse_motion_data_t;
+
+typedef struct {
+    uint32_t button;
+    int32_t x;
+    int32_t y;
+    uint32_t modifiers;
+} srapi_input_mouse_button_data_t;
+
+typedef struct {
+    int32_t dx;
+    int32_t dy;
+    int32_t x;
+    int32_t y;
+} srapi_input_mouse_wheel_data_t;
+
+typedef struct {
+    char path[64];
+    char name[64];
+} srapi_input_device_data_t;
+
+typedef struct {
+    srapi_input_event_type_t type;
+    uint64_t timestamp_us;
+    uint32_t device_id;
+    union {
+        srapi_input_key_data_t key;
+        srapi_input_mouse_motion_data_t mouse_motion;
+        srapi_input_mouse_button_data_t mouse_button;
+        srapi_input_mouse_wheel_data_t mouse_wheel;
+        srapi_input_device_data_t device;
+    };
+} srapi_input_event_t;
+
+typedef struct {
+    int auto_discover;
+    int grab;
+    int32_t initial_mouse_x;
+    int32_t initial_mouse_y;
+} srapi_input_desc_t;
+
+typedef struct {
+    char path[64];
+    char name[64];
+    uint32_t has_keyboard;
+    uint32_t has_mouse;
+} srapi_input_device_info_t;
+
+srapi_result_t srapi_input_create(const srapi_input_desc_t *desc, srapi_input_context_t **out);
+void srapi_input_destroy(srapi_input_context_t *ctx);
+
+srapi_result_t srapi_input_add_device(srapi_input_context_t *ctx, const char *path, uint32_t *out_device_id);
+srapi_result_t srapi_input_remove_device(srapi_input_context_t *ctx, uint32_t device_id);
+srapi_result_t srapi_input_probe(srapi_input_device_info_t *out, size_t out_count, size_t *written);
+
+int srapi_input_poll(srapi_input_context_t *ctx, srapi_input_event_t *out_event);
+int srapi_input_wait(srapi_input_context_t *ctx, srapi_input_event_t *out_event, int timeout_ms);
+void srapi_input_flush(srapi_input_context_t *ctx);
+
+uint32_t srapi_input_modifiers(const srapi_input_context_t *ctx);
+int srapi_input_key_pressed(const srapi_input_context_t *ctx, srapi_scancode_t scancode);
+uint32_t srapi_input_mouse_buttons(const srapi_input_context_t *ctx);
+void srapi_input_mouse_position(const srapi_input_context_t *ctx, int32_t *out_x, int32_t *out_y);
+srapi_result_t srapi_input_set_bounds(srapi_input_context_t *ctx, int32_t width, int32_t height);
+const char *srapi_scancode_name(srapi_scancode_t scancode);
+
 #endif
