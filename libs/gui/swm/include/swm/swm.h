@@ -7,10 +7,18 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-#define SWM_MAX_CLIENTS  16
-#define SWM_MAX_SURFACES 32
+#define SWM_MAX_CLIENTS   16
+#define SWM_MAX_SURFACES  32
+#define SWM_TITLEBAR_H    22
+#define SWM_BORDER        2
+#define SWM_BTN_SIZE      14
 
 typedef struct swm_client swm_client_t;
+
+typedef enum {
+    SWM_INTERACT_NONE = 0,
+    SWM_INTERACT_MOVE = 1,
+} swm_interact_t;
 
 typedef struct swm_surface {
     int in_use;
@@ -25,8 +33,15 @@ typedef struct swm_surface {
     void *buf_map;
     int has_pending;
     int committed;
+    int minimized;
+    int maximized;
+    int wants_frame;
     int32_t pos_x;
     int32_t pos_y;
+    int32_t saved_pos_x;
+    int32_t saved_pos_y;
+    int z;
+    char title[128];
 } swm_surface_t;
 
 struct swm_client {
@@ -48,10 +63,19 @@ typedef struct {
     uint32_t display_h;
     int32_t mouse_x;
     int32_t mouse_y;
+    uint32_t modifiers;
+    int mouse_left_down;
+    swm_interact_t interaction;
+    swm_surface_t *grab_surface;
+    int32_t grab_offset_x;
+    int32_t grab_offset_y;
     int should_quit;
     uint32_t next_surface_id;
     int32_t next_cascade_x;
     int32_t next_cascade_y;
+    int next_z;
+    uint64_t frame_count;
+    uint64_t start_ms;
     swm_client_t clients[SWM_MAX_CLIENTS];
     swm_surface_t surfaces[SWM_MAX_SURFACES];
 } swm_state_t;

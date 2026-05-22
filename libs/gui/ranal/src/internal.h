@@ -103,6 +103,9 @@ struct ranal_context {
     srapi_input_context_t *input;
     int targets_drm;
     struct ranal_surface *target;
+    void *sprot_conn;
+    void *sprot_surface;
+    int sprot_pending_frame;
     int32_t width;
     int32_t height;
     ranal_widget_t *root;
@@ -135,5 +138,7 @@ void ranal_event_pass_(void);
 void ranal_render_pass_(ranal_widget_t *root);
 ranal_widget_t *ranal_hit_test_(ranal_widget_t *root, int32_t mx, int32_t my);
 char ranal_scancode_to_char_(srapi_scancode_t sc, uint32_t modifiers);
+void ranal_swm_pump_events_(void);
+void ranal_swm_present_(void);
 
 #endif

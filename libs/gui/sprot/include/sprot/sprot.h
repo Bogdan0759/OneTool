@@ -5,10 +5,11 @@
 #include <stdint.h>
 
 #define SPROT_VERSION_MAJOR  0
-#define SPROT_VERSION_MINOR  1
+#define SPROT_VERSION_MINOR  2
 #define SPROT_DEFAULT_SOCKET "/tmp/swm.sock"
 #define SPROT_MAX_MESSAGE    4096
 #define SPROT_PIXEL_FORMAT_BGRA8888  0u
+#define SPROT_MAX_TITLE      127
 
 typedef struct {
     uint16_t type;
@@ -27,13 +28,20 @@ typedef enum {
     SPROT_REQ_SURFACE_DAMAGE   = 0x0012,
     SPROT_REQ_SURFACE_COMMIT   = 0x0013,
     SPROT_REQ_SURFACE_DESTROY  = 0x0014,
+    SPROT_REQ_SURFACE_FRAME    = 0x0015,
+    SPROT_REQ_SURFACE_SET_TITLE = 0x0016,
     SPROT_REQ_PING             = 0x0080,
 
     SPROT_EVT_WELCOME          = 0x4001,
     SPROT_EVT_SURFACE_CREATED  = 0x4010,
+    SPROT_EVT_SURFACE_CONFIGURE = 0x4011,
+    SPROT_EVT_SURFACE_CLOSE    = 0x4012,
+    SPROT_EVT_SURFACE_FRAME    = 0x4013,
     SPROT_EVT_POINTER_MOTION   = 0x4020,
     SPROT_EVT_POINTER_BUTTON   = 0x4021,
     SPROT_EVT_KEY              = 0x4022,
+    SPROT_EVT_POINTER_ENTER    = 0x4023,
+    SPROT_EVT_POINTER_LEAVE    = 0x4024,
     SPROT_EVT_PONG             = 0x4080,
     SPROT_EVT_ERROR            = 0x40FF,
 } sprot_msg_type_t;
@@ -97,11 +105,32 @@ typedef struct {
     uint32_t length;
 } sprot_body_error_t;
 
+typedef struct {
+    uint32_t length;
+} sprot_body_set_title_t;
+
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+    uint32_t state;
+    uint32_t serial;
+} sprot_body_configure_t;
+
+typedef struct {
+    uint32_t time_ms;
+    uint32_t serial;
+} sprot_body_frame_t;
+
 #define SPROT_BUTTON_STATE_RELEASED  0u
 #define SPROT_BUTTON_STATE_PRESSED   1u
 
 #define SPROT_KEY_STATE_RELEASED  0u
 #define SPROT_KEY_STATE_PRESSED   1u
+
+#define SPROT_SURFACE_STATE_NORMAL     0u
+#define SPROT_SURFACE_STATE_MAXIMIZED  (1u << 0)
+#define SPROT_SURFACE_STATE_MINIMIZED  (1u << 1)
+#define SPROT_SURFACE_STATE_FOCUSED    (1u << 2)
 
 #define SPROT_ERROR_PROTOCOL       0x0001
 #define SPROT_ERROR_INVALID_ARG    0x0002

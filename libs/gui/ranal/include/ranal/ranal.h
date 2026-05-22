@@ -162,4 +162,8 @@ ranal_context_t *ranal_default_context(void);
 
 ranal_widget_t *ranal_popup(int32_t x, int32_t y);
 void ranal_popup_close(ranal_widget_t *popup);
+
+ranal_result_t ranal_init_swm(const char *title, int32_t width, int32_t height);
+ranal_result_t ranal_set_window_title(const char *title);
+int ranal_is_swm_mode(void);
 #endif

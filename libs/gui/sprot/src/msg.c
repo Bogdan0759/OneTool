@@ -166,20 +166,27 @@ int sprot_recv_message(int sock_fd, sprot_header_t *header_out, void *body_out, 
 
 const char *sprot_msg_type_name(uint16_t type) {
     switch (type) {
-        case SPROT_REQ_HELLO:           return "REQ_HELLO";
-        case SPROT_REQ_SURFACE_CREATE:  return "REQ_SURFACE_CREATE";
-        case SPROT_REQ_SURFACE_ATTACH:  return "REQ_SURFACE_ATTACH";
-        case SPROT_REQ_SURFACE_DAMAGE:  return "REQ_SURFACE_DAMAGE";
-        case SPROT_REQ_SURFACE_COMMIT:  return "REQ_SURFACE_COMMIT";
-        case SPROT_REQ_SURFACE_DESTROY: return "REQ_SURFACE_DESTROY";
-        case SPROT_REQ_PING:            return "REQ_PING";
-        case SPROT_EVT_WELCOME:         return "EVT_WELCOME";
-        case SPROT_EVT_SURFACE_CREATED: return "EVT_SURFACE_CREATED";
-        case SPROT_EVT_POINTER_MOTION:  return "EVT_POINTER_MOTION";
-        case SPROT_EVT_POINTER_BUTTON:  return "EVT_POINTER_BUTTON";
-        case SPROT_EVT_KEY:             return "EVT_KEY";
-        case SPROT_EVT_PONG:            return "EVT_PONG";
-        case SPROT_EVT_ERROR:           return "EVT_ERROR";
-        default:                        return "UNKNOWN";
+        case SPROT_REQ_HELLO:             return "REQ_HELLO";
+        case SPROT_REQ_SURFACE_CREATE:    return "REQ_SURFACE_CREATE";
+        case SPROT_REQ_SURFACE_ATTACH:    return "REQ_SURFACE_ATTACH";
+        case SPROT_REQ_SURFACE_DAMAGE:    return "REQ_SURFACE_DAMAGE";
+        case SPROT_REQ_SURFACE_COMMIT:    return "REQ_SURFACE_COMMIT";
+        case SPROT_REQ_SURFACE_DESTROY:   return "REQ_SURFACE_DESTROY";
+        case SPROT_REQ_SURFACE_FRAME:     return "REQ_SURFACE_FRAME";
+        case SPROT_REQ_SURFACE_SET_TITLE: return "REQ_SURFACE_SET_TITLE";
+        case SPROT_REQ_PING:              return "REQ_PING";
+        case SPROT_EVT_WELCOME:           return "EVT_WELCOME";
+        case SPROT_EVT_SURFACE_CREATED:   return "EVT_SURFACE_CREATED";
+        case SPROT_EVT_SURFACE_CONFIGURE: return "EVT_SURFACE_CONFIGURE";
+        case SPROT_EVT_SURFACE_CLOSE:     return "EVT_SURFACE_CLOSE";
+        case SPROT_EVT_SURFACE_FRAME:     return "EVT_SURFACE_FRAME";
+        case SPROT_EVT_POINTER_MOTION:    return "EVT_POINTER_MOTION";
+        case SPROT_EVT_POINTER_BUTTON:    return "EVT_POINTER_BUTTON";
+        case SPROT_EVT_POINTER_ENTER:     return "EVT_POINTER_ENTER";
+        case SPROT_EVT_POINTER_LEAVE:     return "EVT_POINTER_LEAVE";
+        case SPROT_EVT_KEY:               return "EVT_KEY";
+        case SPROT_EVT_PONG:              return "EVT_PONG";
+        case SPROT_EVT_ERROR:             return "EVT_ERROR";
+        default:                          return "UNKNOWN";
     }
 }
