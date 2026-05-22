@@ -1,5 +1,7 @@
 #include "internal.h"
 
+#include <sprot/client.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +15,26 @@ static void destroy_resources(void) {
     if (g_ranal->root != NULL) {
         ranal_widget_free_recursive_(g_ranal->root);
         g_ranal->root = NULL;
+    }
+    while (g_ranal->popups != NULL) {
+        ranal_widget_t *p = g_ranal->popups;
+        g_ranal->popups = p->next_sibling;
+        ranal_widget_free_recursive_(p);
+    }
+    if (g_ranal->target != NULL) {
+        if (g_ranal->target->owns_fb && g_ranal->target->fb != NULL) {
+            srapi_destroy_framebuffer(g_ranal->target->fb);
+        }
+        free(g_ranal->target);
+        g_ranal->target = NULL;
+    }
+    if (g_ranal->sprot_surface != NULL) {
+        sprot_destroy_surface((sprot_surface_t *)g_ranal->sprot_surface);
+        g_ranal->sprot_surface = NULL;
+    }
+    if (g_ranal->sprot_conn != NULL) {
+        sprot_disconnect((sprot_connection_t *)g_ranal->sprot_conn);
+        g_ranal->sprot_conn = NULL;
     }
     if (g_ranal->input != NULL) {
         srapi_input_destroy(g_ranal->input);
@@ -376,9 +398,16 @@ static void update_slider_drags(ranal_widget_t *w, int32_t mx, int mouse_held) {
 
 void ranal_event_pass_(void) {
     srapi_input_event_t ev;
-    g_ranal->prev_mouse_left = g_ranal->curr_mouse_left;
 
-    while (srapi_input_poll(g_ranal->input, &ev) == 1) {
+    if (g_ranal->sprot_conn != NULL) {
+        ranal_swm_pump_events_();
+    } else if (g_ranal->input == NULL) {
+        return;
+    } else {
+        g_ranal->prev_mouse_left = g_ranal->curr_mouse_left;
+    }
+
+    while (g_ranal->input != NULL && srapi_input_poll(g_ranal->input, &ev) == 1) {
         g_ranal->dirty = 1;
         switch (ev.type) {
             case SRAPI_INPUT_EVENT_KEY_DOWN: {
@@ -649,7 +678,7 @@ static void draw_cursor(int32_t x, int32_t y) {
 int ranal_render(void) {
     if (!g_ranal->initialized) return 1;
     g_ranal->dt = srapi_clock_tick(&g_ranal->frame_clock);
-    if (g_ranal->targets_drm) {
+    if (g_ranal->targets_drm || g_ranal->sprot_conn != NULL) {
         ranal_event_pass_();
     }
     int frames_needed = g_ranal->presented >= 2 ? 0 : 2 - g_ranal->presented;
@@ -700,6 +729,8 @@ int ranal_present(void) {
             ranal_set_error_("ranal: present: %s", srapi_last_error());
             return 1;
         }
+    } else if (g_ranal->sprot_conn != NULL) {
+        ranal_swm_present_();
     }
     if (g_ranal->presented < 2) g_ranal->presented++;
     return g_ranal->should_close;
@@ -710,7 +741,7 @@ int ranal_frame(void) {
     int frames_needed = g_ranal->presented >= 2 ? 0 : 2 - g_ranal->presented;
     if (!g_ranal->dirty && frames_needed == 0) {
         g_ranal->dt = srapi_clock_tick(&g_ranal->frame_clock);
-        if (g_ranal->targets_drm) {
+        if (g_ranal->targets_drm || g_ranal->sprot_conn != NULL) {
             ranal_event_pass_();
         }
         struct timespec ts = { 0, 8 * 1000 * 1000 };

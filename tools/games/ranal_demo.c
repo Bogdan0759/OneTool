@@ -103,11 +103,15 @@ static void build_offscreen(demo_state_t *s) {
 int main(int argc, char *argv[]) {
     const char *record_path = NULL;
     uint32_t record_fps = 30;
+    int swm_mode = 0;
+    int32_t swm_w = 480;
+    int32_t swm_h = 360;
+    const char *swm_title = "ranal demo";
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             printf("ranal_demo - demo of the ranal GUI library on top of srapi\n");
-            printf("usage: %s [--record file.srvid] [--record-fps n] --debug\n", argv[0]);
+            printf("usage: %s [--record file.srvid] [--record-fps n] [--debug] [--swm [WxH]] [--title TITLE]\n", argv[0]);
             return 0;
         } else if (strcmp(argv[i], "--record") == 0 && i + 1 < argc) {
             record_path = argv[++i];
@@ -121,20 +125,42 @@ int main(int argc, char *argv[]) {
             record_fps = (uint32_t)v;
         } else if (strcmp(argv[i], "--debug") == 0) {
             srapi = 1;
+        } else if (strcmp(argv[i], "--swm") == 0) {
+            swm_mode = 1;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                int w = 0, h = 0;
+                if (sscanf(argv[i + 1], "%dx%d", &w, &h) == 2 && w > 0 && h > 0) {
+                    swm_w = w; swm_h = h;
+                    i++;
+                }
+            }
+        } else if (strcmp(argv[i], "--title") == 0 && i + 1 < argc) {
+            swm_title = argv[++i];
         }
     }
-    ranal_window_desc_t desc = { .width = 0, .height = 0, .title = "ranal demo" };
-    if (ranal_init(&desc) != RANAL_OK) {
-        fprintf(stderr, "ranal_demo: %s\n", ranal_last_error());
-        return 1;
+    if (swm_mode) {
+        if (ranal_init_swm(swm_title, swm_w, swm_h) != RANAL_OK) {
+            fprintf(stderr, "ranal_demo: %s\n", ranal_last_error());
+            return 1;
+        }
+        fprintf(stderr, "ranal_demo: swm mode %dx%d title='%s'\n", swm_w, swm_h, swm_title);
+    } else {
+        ranal_window_desc_t desc = { .width = 0, .height = 0, .title = "ranal demo" };
+        if (ranal_init(&desc) != RANAL_OK) {
+            fprintf(stderr, "ranal_demo: %s\n", ranal_last_error());
+            return 1;
+        }
     }
     if (record_path != NULL) {
-        if (ranal_record_start(record_path, record_fps) != RANAL_OK) {
+        if (swm_mode) {
+            fprintf(stderr, "ranal_demo: --record ignored in --swm mode (DRM-only feature)\n");
+        } else if (ranal_record_start(record_path, record_fps) != RANAL_OK) {
             fprintf(stderr, "ranal_demo: %s\n", ranal_last_error());
             ranal_shutdown();
             return 1;
+        } else {
+            fprintf(stderr, "ranal_demo: recording -> %s @ %u fps\n", record_path, record_fps);
         }
-        fprintf(stderr, "ranal_demo: recording -> %s @ %u fps\n", record_path, record_fps);
     }
     memset(&g_state, 0, sizeof(g_state));
     g_state.volume = 0.5f;

@@ -485,8 +485,10 @@ static void load_embedded_tool_form(onetool_form_t *form, const struct onetool_t
         add_text_field(form, "record_fps", "Record FPS", "--record-fps", "", "30", "Target recording fps (default 30).");
     } else if (strcmp(tool->name, "ranal_demo") == 0) {
         copy_string(form->title, sizeof(form->title), "ranal — GUI demo");
-        copy_string(form->summary, sizeof(form->summary), "Demo of the ranal GUI library (built on top of srapi). Shows panels, labels, buttons, sliders, checkboxes, and a textbox.");
-        add_text_field(form, "record", "Record", "--record", "", "ranal.srvid", "Optional .srvid output file to record the session.");
+        copy_string(form->summary, sizeof(form->summary), "Demo of the ranal GUI library (built on top of srapi). With --swm runs as a sprot client window inside swm instead of taking over DRM.");
+        add_toggle_field(form, "swm", "Run inside swm", "--swm", 0, "Connect to swm and render as a window instead of owning DRM directly.");
+        add_text_field(form, "title", "Window title", "--title", "", "ranal demo", "Title shown in the swm titlebar (with --swm).");
+        add_text_field(form, "record", "Record", "--record", "", "ranal.srvid", "Optional .srvid output file to record the session (DRM mode only).");
         add_text_field(form, "record_fps", "Record FPS", "--record-fps", "", "30", "Target recording fps (default 30).");
     } else if (strcmp(tool->name, "swm") == 0) {
         copy_string(form->title, sizeof(form->title), "swm — compositor");

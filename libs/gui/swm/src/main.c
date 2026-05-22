@@ -202,6 +202,8 @@ static int handle_surface_create(swm_client_t *c, const sprot_header_t *hdr, con
     g_swm.next_cascade_y += 32;
     if (g_swm.next_cascade_x + 100 > (int32_t)g_swm.display_w) g_swm.next_cascade_x = 32;
     if (g_swm.next_cascade_y + 100 > (int32_t)g_swm.display_h) g_swm.next_cascade_y = 32;
+    s->z = ++g_swm.next_z;
+    snprintf(s->title, sizeof(s->title), "client #%d", c->sock);
 
     c->surfaces[c->surface_count++] = s;
 
@@ -280,7 +282,37 @@ static int handle_surface_destroy(swm_client_t *c, const sprot_header_t *hdr) {
         return 0;
     }
     logf_("surface %u destroyed", s->id);
+    if (g_swm.grab_surface == s) {
+        g_swm.grab_surface = NULL;
+        g_swm.interaction = SWM_INTERACT_NONE;
+    }
     free_surface(s);
+    return 0;
+}
+
+static int handle_surface_set_title(swm_client_t *c, const sprot_header_t *hdr, const void *body, size_t blen) {
+    if (blen < sizeof(sprot_body_set_title_t)) {
+        send_error(c->sock, SPROT_ERROR_PROTOCOL, "short SET_TITLE");
+        return -1;
+    }
+    sprot_body_set_title_t b;
+    memcpy(&b, body, sizeof(b));
+    if (b.length > SPROT_MAX_TITLE || sizeof(b) + b.length > blen) {
+        send_error(c->sock, SPROT_ERROR_PROTOCOL, "bad SET_TITLE length");
+        return -1;
+    }
+    swm_surface_t *s = find_surface(hdr->object_id);
+    if (s == NULL || s->owner != c) return 0;
+    if (b.length > sizeof(s->title) - 1) b.length = sizeof(s->title) - 1;
+    memcpy(s->title, (const uint8_t *)body + sizeof(b), b.length);
+    s->title[b.length] = '\0';
+    return 0;
+}
+
+static int handle_surface_frame(swm_client_t *c, const sprot_header_t *hdr) {
+    swm_surface_t *s = find_surface(hdr->object_id);
+    if (s == NULL || s->owner != c) return 0;
+    s->wants_frame = 1;
     return 0;
 }
 
@@ -316,6 +348,8 @@ static int dispatch_message(swm_client_t *c) {
         case SPROT_REQ_SURFACE_COMMIT:  rc = handle_surface_commit(c, &hdr); break;
         case SPROT_REQ_SURFACE_DESTROY: rc = handle_surface_destroy(c, &hdr); break;
         case SPROT_REQ_SURFACE_DAMAGE:  /* no-op v1, full-frame composite */ break;
+        case SPROT_REQ_SURFACE_FRAME:   rc = handle_surface_frame(c, &hdr); break;
+        case SPROT_REQ_SURFACE_SET_TITLE: rc = handle_surface_set_title(c, &hdr, body, blen); break;
         case SPROT_REQ_PING:            rc = handle_ping(c, &hdr); break;
         default:
             logf_("unknown msg type 0x%x from fd=%d", hdr.type, c->sock);
@@ -326,16 +360,217 @@ static int dispatch_message(swm_client_t *c) {
     return rc;
 }
 
-static void composite_surfaces(srapi_framebuffer_t *fb) {
+static int z_compare_asc(const void *a, const void *b) {
+    const swm_surface_t * const *sa = a;
+    const swm_surface_t * const *sb = b;
+    if ((*sa)->z < (*sb)->z) return -1;
+    if ((*sa)->z > (*sb)->z) return 1;
+    return 0;
+}
+
+static int collect_surfaces_z_asc(swm_surface_t **out, int max) {
+    int n = 0;
+    for (int i = 0; i < SWM_MAX_SURFACES && n < max; i++) {
+        swm_surface_t *s = &g_swm.surfaces[i];
+        if (!s->in_use || !s->committed || s->minimized) continue;
+        out[n++] = s;
+    }
+    qsort(out, (size_t)n, sizeof(*out), z_compare_asc);
+    return n;
+}
+
+static void raise_surface(swm_surface_t *s) {
+    if (s == NULL) return;
+    s->z = ++g_swm.next_z;
+}
+
+typedef enum {
+    SWM_HIT_NONE = 0,
+    SWM_HIT_CONTENT,
+    SWM_HIT_TITLEBAR,
+    SWM_HIT_BTN_MIN,
+    SWM_HIT_BTN_MAX,
+    SWM_HIT_BTN_CLOSE,
+} swm_hit_region_t;
+
+static void surface_outer_rect(const swm_surface_t *s, int32_t *ox, int32_t *oy, int32_t *ow, int32_t *oh) {
+    *ox = s->pos_x - SWM_BORDER;
+    *oy = s->pos_y - SWM_TITLEBAR_H - SWM_BORDER;
+    *ow = (int32_t)s->width + 2 * SWM_BORDER;
+    *oh = (int32_t)s->height + SWM_TITLEBAR_H + 2 * SWM_BORDER;
+}
+
+static void titlebar_button_rects(const swm_surface_t *s,
+                                  int32_t *min_x, int32_t *max_x, int32_t *close_x,
+                                  int32_t *btn_y) {
+    int32_t outer_x, outer_y, outer_w, outer_h;
+    surface_outer_rect(s, &outer_x, &outer_y, &outer_w, &outer_h);
+    int32_t bar_right = outer_x + outer_w - SWM_BORDER;
+    *close_x = bar_right - 4 - SWM_BTN_SIZE;
+    *max_x   = *close_x - 4 - SWM_BTN_SIZE;
+    *min_x   = *max_x   - 4 - SWM_BTN_SIZE;
+    *btn_y = outer_y + SWM_BORDER + (SWM_TITLEBAR_H - SWM_BTN_SIZE) / 2;
+}
+
+static swm_hit_region_t hit_test(int32_t mx, int32_t my, swm_surface_t **out_surface) {
+    swm_surface_t *list[SWM_MAX_SURFACES];
+    int n = collect_surfaces_z_asc(list, SWM_MAX_SURFACES);
+    for (int i = n - 1; i >= 0; i--) {
+        swm_surface_t *s = list[i];
+        int32_t ox, oy, ow, oh;
+        surface_outer_rect(s, &ox, &oy, &ow, &oh);
+        if (mx < ox || mx >= ox + ow || my < oy || my >= oy + oh) continue;
+
+        if (my >= s->pos_y && my < s->pos_y + (int32_t)s->height &&
+            mx >= s->pos_x && mx < s->pos_x + (int32_t)s->width) {
+            *out_surface = s;
+            return SWM_HIT_CONTENT;
+        }
+        int32_t bmin, bmax, bclose, by;
+        titlebar_button_rects(s, &bmin, &bmax, &bclose, &by);
+        if (my >= by && my < by + SWM_BTN_SIZE) {
+            if (mx >= bclose && mx < bclose + SWM_BTN_SIZE) { *out_surface = s; return SWM_HIT_BTN_CLOSE; }
+            if (mx >= bmax   && mx < bmax   + SWM_BTN_SIZE) { *out_surface = s; return SWM_HIT_BTN_MAX; }
+            if (mx >= bmin   && mx < bmin   + SWM_BTN_SIZE) { *out_surface = s; return SWM_HIT_BTN_MIN; }
+        }
+        *out_surface = s;
+        return SWM_HIT_TITLEBAR;
+    }
+    *out_surface = NULL;
+    return SWM_HIT_NONE;
+}
+
+static swm_surface_t *topmost_surface(void) {
+    swm_surface_t *list[SWM_MAX_SURFACES];
+    int n = collect_surfaces_z_asc(list, SWM_MAX_SURFACES);
+    return n > 0 ? list[n - 1] : NULL;
+}
+
+static void fill_rect(uint32_t *dst, int32_t dst_w, int32_t dst_h, int32_t dst_pitch_px,
+                      int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {
+    if (x < 0) { w += x; x = 0; }
+    if (y < 0) { h += y; y = 0; }
+    if (x + w > dst_w) w = dst_w - x;
+    if (y + h > dst_h) h = dst_h - y;
+    if (w <= 0 || h <= 0) return;
+    for (int32_t row = 0; row < h; row++) {
+        uint32_t *dr = dst + (y + row) * dst_pitch_px + x;
+        for (int32_t col = 0; col < w; col++) dr[col] = color;
+    }
+}
+
+static const uint8_t SWM_FONT_5x7[95][7];
+
+static void draw_glyph(uint32_t *dst, int32_t dst_w, int32_t dst_h, int32_t dst_pitch_px,
+                       int32_t x, int32_t y, char c, uint32_t color) {
+    int idx = (c >= 32 && c <= 126) ? (c - 32) : ('?' - 32);
+    const uint8_t *g = SWM_FONT_5x7[idx];
+    for (int gy = 0; gy < 7; gy++) {
+        uint8_t row = g[gy];
+        for (int gx = 0; gx < 5; gx++) {
+            if (row & (1 << (4 - gx))) {
+                int32_t px = x + gx, py = y + gy;
+                if (px >= 0 && px < dst_w && py >= 0 && py < dst_h) {
+                    dst[py * dst_pitch_px + px] = color;
+                }
+            }
+        }
+    }
+}
+
+static int32_t draw_text(uint32_t *dst, int32_t dst_w, int32_t dst_h, int32_t dst_pitch_px,
+                         int32_t x, int32_t y, const char *s, uint32_t color, int32_t max_w) {
+    int32_t cur = x;
+    for (; *s; s++) {
+        if (cur + 5 > x + max_w) break;
+        draw_glyph(dst, dst_w, dst_h, dst_pitch_px, cur, y, *s, color);
+        cur += 6;
+    }
+    return cur;
+}
+
+static void draw_cursor(uint32_t *dst, int32_t dst_w, int32_t dst_h, int32_t dst_pitch_px,
+                        int32_t cx, int32_t cy) {
+    static const uint8_t arrow[16][12] = {
+        {1,0,0,0,0,0,0,0,0,0,0,0},
+        {1,1,0,0,0,0,0,0,0,0,0,0},
+        {1,2,1,0,0,0,0,0,0,0,0,0},
+        {1,2,2,1,0,0,0,0,0,0,0,0},
+        {1,2,2,2,1,0,0,0,0,0,0,0},
+        {1,2,2,2,2,1,0,0,0,0,0,0},
+        {1,2,2,2,2,2,1,0,0,0,0,0},
+        {1,2,2,2,2,2,2,1,0,0,0,0},
+        {1,2,2,2,2,2,2,2,1,0,0,0},
+        {1,2,2,2,2,2,1,1,1,1,0,0},
+        {1,2,2,1,2,2,1,0,0,0,0,0},
+        {1,2,1,0,1,2,2,1,0,0,0,0},
+        {1,1,0,0,1,2,2,1,0,0,0,0},
+        {0,0,0,0,0,1,2,2,1,0,0,0},
+        {0,0,0,0,0,1,2,2,1,0,0,0},
+        {0,0,0,0,0,0,1,1,0,0,0,0},
+    };
+    for (int y = 0; y < 16; y++) {
+        for (int x = 0; x < 12; x++) {
+            uint8_t v = arrow[y][x];
+            if (v == 0) continue;
+            int32_t px = cx + x, py = cy + y;
+            if (px < 0 || px >= dst_w || py < 0 || py >= dst_h) continue;
+            dst[py * dst_pitch_px + px] = (v == 1) ? 0xFF000000u : 0xFFFFFFFFu;
+        }
+    }
+}
+
+static void draw_titlebar_chrome(uint32_t *dst, int32_t dst_w, int32_t dst_h, int32_t dst_pitch_px,
+                                 swm_surface_t *s, int is_focused) {
+    uint32_t bar_color    = is_focused ? 0xFF3A6CB0u : 0xFF333742u;
+    uint32_t border_color = is_focused ? 0xFF5AA0F0u : 0xFF4A4F5Bu;
+    uint32_t text_color   = is_focused ? 0xFFFFFFFFu : 0xFFB5BAC4u;
+    int32_t outer_x, outer_y, outer_w, outer_h;
+    surface_outer_rect(s, &outer_x, &outer_y, &outer_w, &outer_h);
+
+    fill_rect(dst, dst_w, dst_h, dst_pitch_px, outer_x, outer_y, outer_w, SWM_BORDER, border_color);
+    fill_rect(dst, dst_w, dst_h, dst_pitch_px, outer_x, outer_y + outer_h - SWM_BORDER, outer_w, SWM_BORDER, border_color);
+    fill_rect(dst, dst_w, dst_h, dst_pitch_px, outer_x, outer_y, SWM_BORDER, outer_h, border_color);
+    fill_rect(dst, dst_w, dst_h, dst_pitch_px, outer_x + outer_w - SWM_BORDER, outer_y, SWM_BORDER, outer_h, border_color);
+    fill_rect(dst, dst_w, dst_h, dst_pitch_px,
+              outer_x + SWM_BORDER, outer_y + SWM_BORDER,
+              outer_w - 2 * SWM_BORDER, SWM_TITLEBAR_H, bar_color);
+
+    int32_t bmin, bmax, bclose, by;
+    titlebar_button_rects(s, &bmin, &bmax, &bclose, &by);
+    fill_rect(dst, dst_w, dst_h, dst_pitch_px, bmin,   by, SWM_BTN_SIZE, SWM_BTN_SIZE, 0xFFD0B040u);
+    fill_rect(dst, dst_w, dst_h, dst_pitch_px, bmax,   by, SWM_BTN_SIZE, SWM_BTN_SIZE, 0xFF40C060u);
+    fill_rect(dst, dst_w, dst_h, dst_pitch_px, bclose, by, SWM_BTN_SIZE, SWM_BTN_SIZE, 0xFFE05050u);
+
+    int32_t title_x = outer_x + SWM_BORDER + 6;
+    int32_t title_y = outer_y + SWM_BORDER + (SWM_TITLEBAR_H - 7) / 2;
+    int32_t title_max = bmin - title_x - 6;
+    if (title_max > 0) {
+        draw_text(dst, dst_w, dst_h, dst_pitch_px, title_x, title_y, s->title, text_color, title_max);
+    }
+}
+
+static void composite_surfaces(srapi_framebuffer_t *fb, uint32_t bg_color) {
     uint32_t *dst = srapi_framebuffer_pixels(fb);
     int32_t dst_w = (int32_t)srapi_framebuffer_width(fb);
     int32_t dst_h = (int32_t)srapi_framebuffer_height(fb);
     int32_t dst_pitch_px = (int32_t)(srapi_framebuffer_pitch(fb) / 4u);
     if (dst == NULL) return;
 
-    for (int i = 0; i < SWM_MAX_SURFACES; i++) {
-        swm_surface_t *s = &g_swm.surfaces[i];
-        if (!s->in_use || !s->committed || s->buf_map == NULL) continue;
+    for (int32_t y = 0; y < dst_h; y++) {
+        uint32_t *row = dst + (size_t)y * dst_pitch_px;
+        for (int32_t x = 0; x < dst_w; x++) row[x] = bg_color;
+    }
+
+    swm_surface_t *list[SWM_MAX_SURFACES];
+    int n = collect_surfaces_z_asc(list, SWM_MAX_SURFACES);
+    swm_surface_t *focused = n > 0 ? list[n - 1] : NULL;
+
+    for (int i = 0; i < n; i++) {
+        swm_surface_t *s = list[i];
+        draw_titlebar_chrome(dst, dst_w, dst_h, dst_pitch_px, s, s == focused);
+
+        if (s->buf_map == NULL) continue;
         int32_t sx0 = 0, sy0 = 0;
         int32_t w = (int32_t)s->width;
         int32_t h = (int32_t)s->height;
@@ -354,28 +589,57 @@ static void composite_surfaces(srapi_framebuffer_t *fb) {
             memcpy(dr, sr, (size_t)w * 4u);
         }
     }
+    draw_cursor(dst, dst_w, dst_h, dst_pitch_px, g_swm.mouse_x, g_swm.mouse_y);
 }
 
-static swm_surface_t *surface_under(int32_t x, int32_t y) {
-    swm_surface_t *hit = NULL;
-    for (int i = 0; i < SWM_MAX_SURFACES; i++) {
-        swm_surface_t *s = &g_swm.surfaces[i];
-        if (!s->in_use || !s->committed) continue;
-        if (x >= s->pos_x && x < s->pos_x + (int32_t)s->width &&
-            y >= s->pos_y && y < s->pos_y + (int32_t)s->height) {
-            hit = s;
-        }
+static void send_close_to(swm_surface_t *s) {
+    if (s == NULL || s->owner == NULL) return;
+    sprot_header_t hdr = { .type = SPROT_EVT_SURFACE_CLOSE, .object_id = s->id };
+    sprot_send_message(s->owner->sock, &hdr, NULL, 0, -1);
+}
+
+static void send_configure_to(swm_surface_t *s, uint32_t state_flags) {
+    if (s == NULL || s->owner == NULL) return;
+    sprot_body_configure_t body = {
+        .width = s->width,
+        .height = s->height,
+        .state = state_flags,
+        .serial = ++g_swm.next_z,
+    };
+    sprot_header_t hdr = { .type = SPROT_EVT_SURFACE_CONFIGURE, .object_id = s->id, .serial = body.serial };
+    sprot_send_message(s->owner->sock, &hdr, &body, sizeof(body), -1);
+}
+
+static void toggle_maximize(swm_surface_t *s) {
+    if (s->maximized) {
+        s->pos_x = s->saved_pos_x;
+        s->pos_y = s->saved_pos_y;
+        s->maximized = 0;
+    } else {
+        s->saved_pos_x = s->pos_x;
+        s->saved_pos_y = s->pos_y;
+        s->pos_x = SWM_BORDER;
+        s->pos_y = SWM_TITLEBAR_H + SWM_BORDER;
+        s->maximized = 1;
     }
-    return hit;
+    send_configure_to(s, (s->maximized ? SPROT_SURFACE_STATE_MAXIMIZED : 0) | SPROT_SURFACE_STATE_FOCUSED);
 }
 
 static void forward_input(const srapi_input_event_t *ev) {
+    swm_surface_t *s = NULL;
+    swm_hit_region_t region;
+
     switch (ev->type) {
         case SRAPI_INPUT_EVENT_MOUSE_MOTION: {
             g_swm.mouse_x = ev->mouse_motion.x;
             g_swm.mouse_y = ev->mouse_motion.y;
-            swm_surface_t *s = surface_under(g_swm.mouse_x, g_swm.mouse_y);
-            if (s != NULL && s->owner != NULL) {
+            if (g_swm.interaction == SWM_INTERACT_MOVE && g_swm.grab_surface != NULL) {
+                g_swm.grab_surface->pos_x = g_swm.mouse_x - g_swm.grab_offset_x;
+                g_swm.grab_surface->pos_y = g_swm.mouse_y - g_swm.grab_offset_y;
+                return;
+            }
+            region = hit_test(g_swm.mouse_x, g_swm.mouse_y, &s);
+            if (region == SWM_HIT_CONTENT && s != NULL && s->owner != NULL) {
                 sprot_body_pointer_motion_t body = {
                     .x = g_swm.mouse_x - s->pos_x,
                     .y = g_swm.mouse_y - s->pos_y,
@@ -384,14 +648,55 @@ static void forward_input(const srapi_input_event_t *ev) {
             }
             break;
         }
-        case SRAPI_INPUT_EVENT_MOUSE_BUTTON_DOWN:
-        case SRAPI_INPUT_EVENT_MOUSE_BUTTON_UP: {
-            swm_surface_t *s = surface_under(g_swm.mouse_x, g_swm.mouse_y);
-            if (s != NULL && s->owner != NULL) {
+        case SRAPI_INPUT_EVENT_MOUSE_BUTTON_DOWN: {
+            g_swm.mouse_left_down = (ev->mouse_button.button == SRAPI_MOUSE_BUTTON_LEFT);
+            region = hit_test(g_swm.mouse_x, g_swm.mouse_y, &s);
+            if (s != NULL) raise_surface(s);
+            int alt_held = (g_swm.modifiers & SRAPI_KMOD_ALT) != 0;
+            if (region == SWM_HIT_BTN_CLOSE) {
+                send_close_to(s);
+                return;
+            }
+            if (region == SWM_HIT_BTN_MIN) {
+                s->minimized = 1;
+                return;
+            }
+            if (region == SWM_HIT_BTN_MAX) {
+                toggle_maximize(s);
+                return;
+            }
+            if ((region == SWM_HIT_TITLEBAR ||
+                 (region == SWM_HIT_CONTENT && alt_held)) && s != NULL &&
+                ev->mouse_button.button == SRAPI_MOUSE_BUTTON_LEFT && !s->maximized) {
+                g_swm.interaction = SWM_INTERACT_MOVE;
+                g_swm.grab_surface = s;
+                g_swm.grab_offset_x = g_swm.mouse_x - s->pos_x;
+                g_swm.grab_offset_y = g_swm.mouse_y - s->pos_y;
+                return;
+            }
+            if (region == SWM_HIT_CONTENT && s != NULL && s->owner != NULL) {
                 sprot_body_pointer_button_t body = {
                     .button = ev->mouse_button.button,
-                    .state = ev->type == SRAPI_INPUT_EVENT_MOUSE_BUTTON_DOWN
-                             ? SPROT_BUTTON_STATE_PRESSED : SPROT_BUTTON_STATE_RELEASED,
+                    .state = SPROT_BUTTON_STATE_PRESSED,
+                };
+                send_event(s->owner->sock, SPROT_EVT_POINTER_BUTTON, s->id, 0, &body, sizeof(body));
+            }
+            break;
+        }
+        case SRAPI_INPUT_EVENT_MOUSE_BUTTON_UP: {
+            if (ev->mouse_button.button == SRAPI_MOUSE_BUTTON_LEFT) {
+                g_swm.mouse_left_down = 0;
+                if (g_swm.interaction == SWM_INTERACT_MOVE) {
+                    g_swm.interaction = SWM_INTERACT_NONE;
+                    g_swm.grab_surface = NULL;
+                    return;
+                }
+            }
+            region = hit_test(g_swm.mouse_x, g_swm.mouse_y, &s);
+            if (region == SWM_HIT_CONTENT && s != NULL && s->owner != NULL) {
+                sprot_body_pointer_button_t body = {
+                    .button = ev->mouse_button.button,
+                    .state = SPROT_BUTTON_STATE_RELEASED,
                 };
                 send_event(s->owner->sock, SPROT_EVT_POINTER_BUTTON, s->id, 0, &body, sizeof(body));
             }
@@ -399,20 +704,22 @@ static void forward_input(const srapi_input_event_t *ev) {
         }
         case SRAPI_INPUT_EVENT_KEY_DOWN:
         case SRAPI_INPUT_EVENT_KEY_UP: {
+            g_swm.modifiers = ev->key.modifiers;
             if (ev->type == SRAPI_INPUT_EVENT_KEY_DOWN &&
-                ev->key.scancode == SRAPI_SCANCODE_ESCAPE) {
+                ev->key.scancode == SRAPI_SCANCODE_ESCAPE &&
+                (ev->key.modifiers & (SRAPI_KMOD_CTRL | SRAPI_KMOD_ALT)) != 0) {
                 g_swm.should_quit = 1;
                 break;
             }
-            swm_surface_t *s = surface_under(g_swm.mouse_x, g_swm.mouse_y);
-            if (s != NULL && s->owner != NULL) {
+            swm_surface_t *focused = topmost_surface();
+            if (focused != NULL && focused->owner != NULL) {
                 sprot_body_key_t body = {
                     .scancode = ev->key.scancode,
                     .state = ev->type == SRAPI_INPUT_EVENT_KEY_DOWN
                              ? SPROT_KEY_STATE_PRESSED : SPROT_KEY_STATE_RELEASED,
                     .modifiers = ev->key.modifiers,
                 };
-                send_event(s->owner->sock, SPROT_EVT_KEY, s->id, 0, &body, sizeof(body));
+                send_event(focused->owner->sock, SPROT_EVT_KEY, focused->id, 0, &body, sizeof(body));
             }
             break;
         }
@@ -421,11 +728,26 @@ static void forward_input(const srapi_input_event_t *ev) {
     }
 }
 
+static void deliver_frame_callbacks(void) {
+    uint64_t now_ms = (uint64_t)g_swm.frame_count * 16u;
+    for (int i = 0; i < SWM_MAX_SURFACES; i++) {
+        swm_surface_t *s = &g_swm.surfaces[i];
+        if (!s->in_use || !s->wants_frame || s->owner == NULL) continue;
+        s->wants_frame = 0;
+        sprot_body_frame_t body = { .time_ms = (uint32_t)now_ms, .serial = (uint32_t)g_swm.frame_count };
+        sprot_header_t hdr = { .type = SPROT_EVT_SURFACE_FRAME, .object_id = s->id, .serial = body.serial };
+        sprot_send_message(s->owner->sock, &hdr, &body, sizeof(body), -1);
+    }
+}
+
 static void usage(const char *argv0) {
     printf("swm - simple window manager / compositor (sprot v%d.%d)\n",
            SPROT_VERSION_MAJOR, SPROT_VERSION_MINOR);
     printf("usage: %s [--socket /path/swm.sock] [--debug] [--bg RRGGBB]\n", argv0);
-    printf("press Esc inside the compositor TTY to quit.\n");
+    printf("controls inside swm:\n");
+    printf("  drag titlebar / Alt+LMB drag = move window\n");
+    printf("  yellow btn = minimize, green = maximize, red = close\n");
+    printf("  Ctrl+Alt+Esc = quit compositor\n");
 }
 
 static uint32_t parse_hex_color(const char *s, uint32_t fallback) {
@@ -574,15 +896,11 @@ int main(int argc, char *argv[]) {
         }
         if (g_swm.should_quit) break;
 
-        srapi_cmd_reset(g_swm.cmd);
-        srapi_cmd_emit(g_swm.cmd, &(srapi_command_t){
-            .kind = SRAPI_COMMAND_CLEAR,
-            .color = bg_color,
-        });
         srapi_framebuffer_t *fb = srapi_drm_backbuffer(g_swm.drm);
-        srapi_submit(g_swm.srctx, fb, g_swm.cmd);
-        composite_surfaces(fb);
+        composite_surfaces(fb, bg_color);
         srapi_drm_present(g_swm.drm);
+        g_swm.frame_count++;
+        deliver_frame_callbacks();
     }
 
     logf_("shutting down");
@@ -599,3 +917,55 @@ int main(int argc, char *argv[]) {
     srapi_drm_close(g_swm.drm);
     return 0;
 }
+
+#define GS(a,b,c,d,e,f,g) { a,b,c,d,e,f,g }
+static const uint8_t SWM_FONT_5x7[95][7] = {
+    GS(0x00,0x00,0x00,0x00,0x00,0x00,0x00), GS(0x04,0x04,0x04,0x04,0x04,0x00,0x04),
+    GS(0x0A,0x0A,0x00,0x00,0x00,0x00,0x00), GS(0x0A,0x1F,0x0A,0x0A,0x0A,0x1F,0x0A),
+    GS(0x04,0x0F,0x14,0x0E,0x05,0x1E,0x04), GS(0x19,0x19,0x02,0x04,0x08,0x13,0x13),
+    GS(0x0C,0x12,0x14,0x08,0x15,0x12,0x0D), GS(0x04,0x04,0x00,0x00,0x00,0x00,0x00),
+    GS(0x02,0x04,0x08,0x08,0x08,0x04,0x02), GS(0x08,0x04,0x02,0x02,0x02,0x04,0x08),
+    GS(0x00,0x0A,0x04,0x1F,0x04,0x0A,0x00), GS(0x00,0x04,0x04,0x1F,0x04,0x04,0x00),
+    GS(0x00,0x00,0x00,0x00,0x00,0x04,0x08), GS(0x00,0x00,0x00,0x1F,0x00,0x00,0x00),
+    GS(0x00,0x00,0x00,0x00,0x00,0x00,0x04), GS(0x01,0x02,0x02,0x04,0x08,0x08,0x10),
+    GS(0x0E,0x11,0x13,0x15,0x19,0x11,0x0E), GS(0x04,0x0C,0x04,0x04,0x04,0x04,0x0E),
+    GS(0x0E,0x11,0x01,0x02,0x04,0x08,0x1F), GS(0x1E,0x01,0x01,0x0E,0x01,0x01,0x1E),
+    GS(0x02,0x06,0x0A,0x12,0x1F,0x02,0x02), GS(0x1F,0x10,0x1E,0x01,0x01,0x01,0x1E),
+    GS(0x0E,0x10,0x10,0x1E,0x11,0x11,0x0E), GS(0x1F,0x01,0x02,0x04,0x08,0x10,0x10),
+    GS(0x0E,0x11,0x11,0x0E,0x11,0x11,0x0E), GS(0x0E,0x11,0x11,0x0F,0x01,0x01,0x0E),
+    GS(0x00,0x04,0x00,0x00,0x00,0x04,0x00), GS(0x00,0x04,0x00,0x00,0x00,0x04,0x08),
+    GS(0x01,0x02,0x04,0x08,0x04,0x02,0x01), GS(0x00,0x00,0x1F,0x00,0x1F,0x00,0x00),
+    GS(0x10,0x08,0x04,0x02,0x04,0x08,0x10), GS(0x0E,0x11,0x01,0x02,0x04,0x00,0x04),
+    GS(0x0E,0x11,0x17,0x15,0x17,0x10,0x0E), GS(0x0E,0x11,0x11,0x1F,0x11,0x11,0x11),
+    GS(0x1E,0x11,0x11,0x1E,0x11,0x11,0x1E), GS(0x0F,0x10,0x10,0x10,0x10,0x10,0x0F),
+    GS(0x1E,0x11,0x11,0x11,0x11,0x11,0x1E), GS(0x1F,0x10,0x10,0x1E,0x10,0x10,0x1F),
+    GS(0x1F,0x10,0x10,0x1E,0x10,0x10,0x10), GS(0x0F,0x10,0x10,0x13,0x11,0x11,0x0F),
+    GS(0x11,0x11,0x11,0x1F,0x11,0x11,0x11), GS(0x0E,0x04,0x04,0x04,0x04,0x04,0x0E),
+    GS(0x01,0x01,0x01,0x01,0x01,0x11,0x0E), GS(0x11,0x12,0x14,0x18,0x14,0x12,0x11),
+    GS(0x10,0x10,0x10,0x10,0x10,0x10,0x1F), GS(0x11,0x1B,0x15,0x15,0x11,0x11,0x11),
+    GS(0x11,0x19,0x15,0x13,0x11,0x11,0x11), GS(0x0E,0x11,0x11,0x11,0x11,0x11,0x0E),
+    GS(0x1E,0x11,0x11,0x1E,0x10,0x10,0x10), GS(0x0E,0x11,0x11,0x11,0x15,0x12,0x0D),
+    GS(0x1E,0x11,0x11,0x1E,0x14,0x12,0x11), GS(0x0F,0x10,0x10,0x0E,0x01,0x01,0x1E),
+    GS(0x1F,0x04,0x04,0x04,0x04,0x04,0x04), GS(0x11,0x11,0x11,0x11,0x11,0x11,0x0E),
+    GS(0x11,0x11,0x11,0x11,0x11,0x0A,0x04), GS(0x11,0x11,0x11,0x11,0x15,0x15,0x0A),
+    GS(0x11,0x11,0x0A,0x04,0x0A,0x11,0x11), GS(0x11,0x11,0x0A,0x04,0x04,0x04,0x04),
+    GS(0x1F,0x01,0x02,0x04,0x08,0x10,0x1F), GS(0x0E,0x08,0x08,0x08,0x08,0x08,0x0E),
+    GS(0x10,0x08,0x08,0x04,0x02,0x02,0x01), GS(0x0E,0x02,0x02,0x02,0x02,0x02,0x0E),
+    GS(0x04,0x0A,0x11,0x00,0x00,0x00,0x00), GS(0x00,0x00,0x00,0x00,0x00,0x00,0x1F),
+    GS(0x08,0x04,0x00,0x00,0x00,0x00,0x00), GS(0x00,0x00,0x0E,0x01,0x0F,0x11,0x0F),
+    GS(0x10,0x10,0x1E,0x11,0x11,0x11,0x1E), GS(0x00,0x00,0x0F,0x10,0x10,0x10,0x0F),
+    GS(0x01,0x01,0x0F,0x11,0x11,0x11,0x0F), GS(0x00,0x00,0x0E,0x11,0x1F,0x10,0x0E),
+    GS(0x06,0x09,0x08,0x1C,0x08,0x08,0x08), GS(0x00,0x00,0x0F,0x11,0x0F,0x01,0x0E),
+    GS(0x10,0x10,0x1E,0x11,0x11,0x11,0x11), GS(0x04,0x00,0x0C,0x04,0x04,0x04,0x0E),
+    GS(0x02,0x00,0x06,0x02,0x02,0x12,0x0C), GS(0x10,0x10,0x12,0x14,0x18,0x14,0x12),
+    GS(0x0C,0x04,0x04,0x04,0x04,0x04,0x0E), GS(0x00,0x00,0x1A,0x15,0x15,0x15,0x15),
+    GS(0x00,0x00,0x1E,0x11,0x11,0x11,0x11), GS(0x00,0x00,0x0E,0x11,0x11,0x11,0x0E),
+    GS(0x00,0x00,0x1E,0x11,0x1E,0x10,0x10), GS(0x00,0x00,0x0F,0x11,0x0F,0x01,0x01),
+    GS(0x00,0x00,0x16,0x19,0x10,0x10,0x10), GS(0x00,0x00,0x0F,0x10,0x0E,0x01,0x1E),
+    GS(0x08,0x08,0x1C,0x08,0x08,0x09,0x06), GS(0x00,0x00,0x11,0x11,0x11,0x11,0x0F),
+    GS(0x00,0x00,0x11,0x11,0x11,0x0A,0x04), GS(0x00,0x00,0x11,0x11,0x15,0x15,0x0A),
+    GS(0x00,0x00,0x11,0x0A,0x04,0x0A,0x11), GS(0x00,0x00,0x11,0x11,0x0F,0x01,0x0E),
+    GS(0x00,0x00,0x1F,0x02,0x04,0x08,0x1F), GS(0x02,0x04,0x04,0x08,0x04,0x04,0x02),
+    GS(0x04,0x04,0x04,0x04,0x04,0x04,0x04), GS(0x08,0x04,0x04,0x02,0x04,0x04,0x08),
+    GS(0x09,0x15,0x12,0x00,0x00,0x00,0x00),
+};

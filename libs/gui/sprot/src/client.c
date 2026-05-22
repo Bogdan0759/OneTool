@@ -309,6 +309,37 @@ int sprot_damage(sprot_surface_t *surface, int32_t x, int32_t y, uint32_t w, uin
     return sprot_send_message(surface->conn->fd, &hdr, &body, sizeof(body), -1);
 }
 
+int sprot_request_frame(sprot_surface_t *surface) {
+    if (surface == NULL || surface->conn == NULL || surface->id == 0) {
+        return -1;
+    }
+    sprot_header_t hdr = {
+        .type = SPROT_REQ_SURFACE_FRAME,
+        .object_id = surface->id,
+        .serial = surface->conn->serial++,
+    };
+    return sprot_send_message(surface->conn->fd, &hdr, NULL, 0, -1);
+}
+
+int sprot_set_title(sprot_surface_t *surface, const char *title) {
+    if (surface == NULL || surface->conn == NULL || surface->id == 0) {
+        return -1;
+    }
+    if (title == NULL) title = "";
+    size_t tlen = strlen(title);
+    if (tlen > SPROT_MAX_TITLE) tlen = SPROT_MAX_TITLE;
+    uint8_t buf[sizeof(sprot_body_set_title_t) + SPROT_MAX_TITLE];
+    sprot_body_set_title_t hdr_body = { .length = (uint32_t)tlen };
+    memcpy(buf, &hdr_body, sizeof(hdr_body));
+    memcpy(buf + sizeof(hdr_body), title, tlen);
+    sprot_header_t hdr = {
+        .type = SPROT_REQ_SURFACE_SET_TITLE,
+        .object_id = surface->id,
+        .serial = surface->conn->serial++,
+    };
+    return sprot_send_message(surface->conn->fd, &hdr, buf, sizeof(hdr_body) + tlen, -1);
+}
+
 int sprot_ping(sprot_connection_t *conn, uint32_t serial) {
     if (conn == NULL) return -1;
     sprot_header_t hdr = { .type = SPROT_REQ_PING, .serial = serial };
@@ -387,9 +418,28 @@ int sprot_poll_event(sprot_connection_t *conn, sprot_event_t *out_event, int tim
             memcpy(&out_event->u.pointer_button, body, sizeof(sprot_body_pointer_button_t));
             out_event->kind = SPROT_EVENT_POINTER_BUTTON;
             break;
+        case SPROT_EVT_POINTER_ENTER:
+            out_event->kind = SPROT_EVENT_POINTER_ENTER;
+            break;
+        case SPROT_EVT_POINTER_LEAVE:
+            out_event->kind = SPROT_EVENT_POINTER_LEAVE;
+            break;
         case SPROT_EVT_KEY:
             memcpy(&out_event->u.key, body, sizeof(sprot_body_key_t));
             out_event->kind = SPROT_EVENT_KEY;
+            break;
+        case SPROT_EVT_SURFACE_CONFIGURE:
+            memcpy(&out_event->u.configure, body, sizeof(sprot_body_configure_t));
+            out_event->kind = SPROT_EVENT_SURFACE_CONFIGURE;
+            break;
+        case SPROT_EVT_SURFACE_CLOSE:
+            out_event->kind = SPROT_EVENT_SURFACE_CLOSE;
+            break;
+        case SPROT_EVT_SURFACE_FRAME:
+            if (hdr.length - sizeof(hdr) >= sizeof(sprot_body_frame_t)) {
+                memcpy(&out_event->u.frame, body, sizeof(sprot_body_frame_t));
+            }
+            out_event->kind = SPROT_EVENT_SURFACE_FRAME;
             break;
         case SPROT_EVT_PONG:
             out_event->kind = SPROT_EVENT_PONG;

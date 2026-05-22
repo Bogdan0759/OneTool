@@ -12,8 +12,13 @@ typedef enum {
     SPROT_EVENT_NONE = 0,
     SPROT_EVENT_WELCOME,
     SPROT_EVENT_SURFACE_CREATED,
+    SPROT_EVENT_SURFACE_CONFIGURE,
+    SPROT_EVENT_SURFACE_CLOSE,
+    SPROT_EVENT_SURFACE_FRAME,
     SPROT_EVENT_POINTER_MOTION,
     SPROT_EVENT_POINTER_BUTTON,
+    SPROT_EVENT_POINTER_ENTER,
+    SPROT_EVENT_POINTER_LEAVE,
     SPROT_EVENT_KEY,
     SPROT_EVENT_PONG,
     SPROT_EVENT_ERROR,
@@ -27,6 +32,8 @@ typedef struct {
     union {
         sprot_body_welcome_t welcome;
         sprot_body_surface_created_t surface_created;
+        sprot_body_configure_t configure;
+        sprot_body_frame_t frame;
         sprot_body_pointer_motion_t pointer_motion;
         sprot_body_pointer_button_t pointer_button;
         sprot_body_key_t key;
@@ -51,6 +58,8 @@ uint32_t sprot_surface_stride(const sprot_surface_t *surface);
 uint32_t sprot_surface_id(const sprot_surface_t *surface);
 int sprot_commit(sprot_surface_t *surface);
 int sprot_damage(sprot_surface_t *surface, int32_t x, int32_t y, uint32_t w, uint32_t h);
+int sprot_request_frame(sprot_surface_t *surface);
+int sprot_set_title(sprot_surface_t *surface, const char *title);
 
 int sprot_poll_event(sprot_connection_t *conn, sprot_event_t *out_event, int timeout_ms);
 int sprot_ping(sprot_connection_t *conn, uint32_t serial);
