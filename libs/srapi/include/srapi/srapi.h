@@ -858,4 +858,14 @@ void srapi_input_mouse_position(const srapi_input_context_t *ctx, int32_t *out_x
 srapi_result_t srapi_input_set_bounds(srapi_input_context_t *ctx, int32_t width, int32_t height);
 const char *srapi_scancode_name(srapi_scancode_t scancode);
 
+typedef struct {
+    uint64_t start_us;
+    uint64_t last_us;
+} srapi_clock_t;
+
+uint64_t srapi_time_now_us(void);
+void srapi_clock_init(srapi_clock_t *clock);
+float srapi_clock_tick(srapi_clock_t *clock);
+float srapi_clock_elapsed(const srapi_clock_t *clock);
+
 #endif
