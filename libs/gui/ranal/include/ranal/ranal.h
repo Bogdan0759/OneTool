@@ -148,6 +148,16 @@ int32_t ranal_text_height(void);
 #define RANAL_FONT_ADVANCE_X 6
 #define RANAL_FONT_ADVANCE_Y 8
 const uint8_t *ranal_font_glyph(char c);
+/* Glyph lookup by Unicode codepoint. Returns the 5x7 bitmap (RANAL_GLYPH_HEIGHT
+ * bytes, MSB-left) for printable ASCII (32..126), Cyrillic (Russian) letters
+ * А-Я / а-я plus Ё/ё. Falls back to the bitmap for '?' for unknown codepoints.
+ * Never returns NULL when 'codepoint' >= 0. */
+const uint8_t *ranal_font_glyph_u(uint32_t codepoint);
+/* Decode one UTF-8 codepoint from 's' (NUL-terminated). On success returns
+ * the number of bytes consumed (1..4) and writes the codepoint to *out_cp.
+ * On invalid input writes 0xFFFD and returns 1 (skip a single byte). Returns
+ * 0 if 's' is empty. */
+int ranal_utf8_decode(const char *s, uint32_t *out_cp);
 
 ranal_surface_t *ranal_surface_create(int32_t width, int32_t height);
 void ranal_surface_destroy(ranal_surface_t *surface);
