@@ -806,10 +806,15 @@ static void usage(const char *argv0) {
     printf("swm - simple window manager / compositor (sprot v%d.%d)\n",
            SPROT_VERSION_MAJOR, SPROT_VERSION_MINOR);
     printf("usage: %s [--socket /path/swm.sock] [--debug] [--bg RRGGBB]\n", argv0);
+    printf("           [--record file.srvid] [--record-fps N]\n");
     printf("controls inside swm:\n");
     printf("  drag titlebar / Alt+LMB drag = move window\n");
     printf("  yellow btn = minimize, green = maximize, red = close\n");
     printf("  Ctrl+Alt+Esc = quit compositor\n");
+    printf("recording:\n");
+    printf("  --record FILE       capture the whole compositor to FILE (.srvid)\n");
+    printf("  --record-fps N      target frames-per-second (default: 30)\n");
+    printf("  convert later with: srvid2mp4 FILE out.mp4\n");
 }
 
 static uint32_t parse_hex_color(const char *s, uint32_t fallback) {
@@ -824,6 +829,8 @@ int main(int argc, char *argv[]) {
     const char *socket_path = SPROT_DEFAULT_SOCKET;
     int debug = 0;
     uint32_t bg_color = 0xFF101418u;
+    const char *record_path = NULL;
+    uint32_t record_fps = 30;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
@@ -835,6 +842,16 @@ int main(int argc, char *argv[]) {
             debug = 1;
         } else if (strcmp(argv[i], "--bg") == 0 && i + 1 < argc) {
             bg_color = parse_hex_color(argv[++i], bg_color);
+        } else if (strcmp(argv[i], "--record") == 0 && i + 1 < argc) {
+            record_path = argv[++i];
+        } else if (strcmp(argv[i], "--record-fps") == 0 && i + 1 < argc) {
+            char *end = NULL;
+            unsigned long v = strtoul(argv[++i], &end, 10);
+            if (end == NULL || *end != '\0' || v == 0 || v > 240) {
+                fprintf(stderr, "swm: bad --record-fps (must be 1..240)\n");
+                return 1;
+            }
+            record_fps = (uint32_t)v;
         }
     }
     if (debug) srapi = 1;
@@ -900,6 +917,14 @@ int main(int argc, char *argv[]) {
     g_swm.de = de_create(&g_swm);
     if (g_swm.de == NULL) {
         logf_("de: failed to initialize (continuing without DE)");
+    }
+
+    if (record_path != NULL) {
+        if (srapi_drm_record_start(g_swm.drm, record_path, record_fps * 1000u) != SRAPI_OK) {
+            logf_("record: %s (continuing without recording)", srapi_last_error());
+        } else {
+            logf_("recording to %s @ %u fps (BGRA8888 srvid)", record_path, record_fps);
+        }
     }
 
     logf_("ready. press Esc to quit.");
@@ -972,6 +997,10 @@ int main(int argc, char *argv[]) {
     }
 
     logf_("shutting down");
+    if (srapi_drm_is_recording(g_swm.drm)) {
+        logf_("record: flushing");
+        srapi_drm_record_stop(g_swm.drm);
+    }
     if (g_swm.de != NULL) {
         de_destroy(g_swm.de);
         g_swm.de = NULL;
