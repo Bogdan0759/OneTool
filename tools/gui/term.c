@@ -52,7 +52,7 @@
 #define ATTR_DIM     0x08
 
 typedef struct {
-    char    ch;
+    uint32_t ch;      /* Unicode codepoint (0 == empty cell) */
     uint8_t fg;       /* palette index 0..15 */
     uint8_t bg;       /* palette index 0..15 */
     uint8_t attrs;
@@ -89,6 +89,11 @@ typedef struct {
     char     osc_buf[256];
     int      osc_len;
     int      osc_kind;
+
+    /* In-progress UTF-8 sequence. We accumulate continuation bytes until a
+       full codepoint is assembled and then put_glyph it. */
+    uint32_t utf8_cp;
+    int      utf8_remaining;
 
     /* Our own pixel buffer. ranal's draw commands are wiped by
        srapi_cmd_reset inside ranal_render, so we paint into this surface
@@ -136,11 +141,8 @@ static const uint32_t palette[16] = {
 #define DEFAULT_BG 0
 
 static cell_t make_blank(const term_t *t) {
-    cell_t c = { ' ', t->cur_fg, t->cur_bg, 0 };
+    cell_t c = { (uint32_t)' ', DEFAULT_FG, DEFAULT_BG, 0 };
     (void)t;
-    c.fg = DEFAULT_FG;
-    c.bg = DEFAULT_BG;
-    c.attrs = 0;
     return c;
 }
 
@@ -241,7 +243,7 @@ static void clamp_cursor(term_t *t) {
     if (t->cy >= t->rows) t->cy = t->rows - 1;
 }
 
-static void put_glyph(term_t *t, char ch) {
+static void put_glyph(term_t *t, uint32_t cp) {
     if (t->cx >= t->cols) {
         t->cx = 0;
         t->cy++;
@@ -251,7 +253,7 @@ static void put_glyph(term_t *t, char ch) {
         }
     }
     cell_t *c = cell_at(t, t->cy, t->cx);
-    c->ch = ch;
+    c->ch = cp;
     c->fg = t->cur_fg;
     c->bg = t->cur_bg;
     c->attrs = t->cur_attrs;
@@ -516,8 +518,43 @@ static void feed_byte(term_t *t, unsigned char b) {
         if (b == '\a') return;
         if (b == 0x0e || b == 0x0f) return;
         if (b < 0x20) return;
-        if (b >= 0x80) b = '?';
-        put_glyph(t, (char)b);
+        if (b < 0x80) {
+            /* Plain ASCII. Reset any stale multi-byte state. */
+            t->utf8_remaining = 0;
+            put_glyph(t, (uint32_t)b);
+            return;
+        }
+        if ((b & 0xC0) == 0x80) {
+            /* Continuation byte. */
+            if (t->utf8_remaining > 0) {
+                t->utf8_cp = (t->utf8_cp << 6) | (uint32_t)(b & 0x3F);
+                t->utf8_remaining--;
+                if (t->utf8_remaining == 0) {
+                    put_glyph(t, t->utf8_cp);
+                    t->utf8_cp = 0;
+                }
+            }
+            /* Stray continuation byte — drop. */
+            return;
+        }
+        if ((b & 0xE0) == 0xC0) {
+            t->utf8_cp = (uint32_t)(b & 0x1F);
+            t->utf8_remaining = 1;
+            return;
+        }
+        if ((b & 0xF0) == 0xE0) {
+            t->utf8_cp = (uint32_t)(b & 0x0F);
+            t->utf8_remaining = 2;
+            return;
+        }
+        if ((b & 0xF8) == 0xF0) {
+            t->utf8_cp = (uint32_t)(b & 0x07);
+            t->utf8_remaining = 3;
+            return;
+        }
+        /* Invalid leading byte. */
+        t->utf8_remaining = 0;
+        put_glyph(t, 0xFFFD);
         return;
     case P_ESC:
         if (b == '[') {
@@ -855,8 +892,8 @@ static void fill_rect_px(uint32_t *px, int pitch_px, int sw, int sh,
 }
 
 static void draw_glyph_px(uint32_t *px, int pitch_px, int sw, int sh,
-                          int x, int y, char ch, uint32_t color) {
-    const uint8_t *g = ranal_font_glyph(ch);
+                          int x, int y, uint32_t cp, uint32_t color) {
+    const uint8_t *g = ranal_font_glyph_u(cp);
     if (g == NULL) return;
     for (int gy = 0; gy < RANAL_GLYPH_HEIGHT; gy++) {
         uint8_t bits = g[gy];
