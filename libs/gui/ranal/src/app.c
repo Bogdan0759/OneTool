@@ -150,6 +150,16 @@ int ranal_should_close(void) {
     return g_ranal->should_close;
 }
 
+void ranal_set_key_hook(ranal_key_hook_fn fn, void *user) {
+    if (g_ranal == NULL) return;
+    g_ranal->key_hook = fn;
+    g_ranal->key_hook_user = user;
+}
+
+char ranal_scancode_to_char(uint32_t scancode, uint32_t modifiers) {
+    return ranal_scancode_to_char_((srapi_scancode_t)scancode, modifiers);
+}
+
 void ranal_request_close(void) {
     g_ranal->should_close = 1;
 }
@@ -411,6 +421,12 @@ void ranal_event_pass_(void) {
         g_ranal->dirty = 1;
         switch (ev.type) {
             case SRAPI_INPUT_EVENT_KEY_DOWN: {
+                if (g_ranal->key_hook != NULL &&
+                    g_ranal->key_hook((uint32_t)ev.key.scancode,
+                                      ev.key.modifiers, 1,
+                                      g_ranal->key_hook_user)) {
+                    break;
+                }
                 if (ev.key.scancode == SRAPI_SCANCODE_ESCAPE) {
                     g_ranal->should_close = 1;
                     break;
@@ -428,6 +444,14 @@ void ranal_event_pass_(void) {
                             textbox_insert_char(g_ranal->focused, ch);
                         }
                     }
+                }
+                break;
+            }
+            case SRAPI_INPUT_EVENT_KEY_UP: {
+                if (g_ranal->key_hook != NULL) {
+                    g_ranal->key_hook((uint32_t)ev.key.scancode,
+                                      ev.key.modifiers, 0,
+                                      g_ranal->key_hook_user);
                 }
                 break;
             }

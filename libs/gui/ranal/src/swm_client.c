@@ -183,7 +183,15 @@ void ranal_swm_pump_events_(void) {
                 }
                 break;
             case SPROT_EVENT_KEY: {
-                if (ev.u.key.state == SPROT_KEY_STATE_PRESSED &&
+                int pressed = (ev.u.key.state == SPROT_KEY_STATE_PRESSED);
+                if (g_ranal->key_hook != NULL &&
+                    g_ranal->key_hook(ev.u.key.scancode,
+                                      ev.u.key.modifiers,
+                                      pressed,
+                                      g_ranal->key_hook_user)) {
+                    break;
+                }
+                if (pressed &&
                     g_ranal->focused != NULL &&
                     g_ranal->focused->kind == RANAL_WIDGET_TEXTBOX) {
                     if (ev.u.key.scancode == 42 /* BACKSPACE */) {

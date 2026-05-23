@@ -172,4 +172,13 @@ void ranal_popup_close(ranal_widget_t *popup);
 ranal_result_t ranal_init_swm(const char *title, int32_t width, int32_t height);
 ranal_result_t ranal_set_window_title(const char *title);
 int ranal_is_swm_mode(void);
+
+/* Raw key/text input hooks. Return 1 from the hook to consume the event and
+ * skip ranal's built-in widget routing (textbox typing, ESC=close, etc.).
+ * Return 0 to let ranal process it normally. */
+typedef int (*ranal_key_hook_fn)(uint32_t scancode, uint32_t modifiers,
+                                 int pressed, void *user);
+void ranal_set_key_hook(ranal_key_hook_fn fn, void *user);
+char ranal_scancode_to_char(uint32_t scancode, uint32_t modifiers);
+
 #endif
