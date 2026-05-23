@@ -544,6 +544,15 @@ void ranal_event_pass_(void) {
             update_slider_drags(p, g_ranal->mouse_x, 1);
         }
     }
+
+    if (g_ranal->sprot_conn != NULL && g_ranal->sprot_surface != NULL) {
+        uint32_t cursor = 0; // SPROT_CURSOR_ARROW
+        if (hot != NULL && hot->enabled) {
+            if (hot->kind == RANAL_WIDGET_TEXTBOX) cursor = 1; // SPROT_CURSOR_IBEAM
+            else if (hot->kind == RANAL_WIDGET_BUTTON || hot->kind == RANAL_WIDGET_CHECKBOX) cursor = 2; // SPROT_CURSOR_HAND
+        }
+        sprot_set_cursor((sprot_surface_t *)g_ranal->sprot_surface, cursor);
+    }
 }
 
 
@@ -720,6 +729,9 @@ int ranal_render(void) {
     });
     ranal_render_pass_(g_ranal->root);
     for (ranal_widget_t *p = g_ranal->popups; p != NULL; p = p->next_sibling) {
+        if (!g_ranal->targets_drm && g_ranal->sprot_conn != NULL) {
+            continue; // rendered separately in ranal_swm_present_
+        }
         ranal_render_pass_(p);
     }
     if (g_ranal->targets_drm) {

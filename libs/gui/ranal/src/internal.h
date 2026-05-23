@@ -83,6 +83,8 @@ struct ranal_widget {
     ranal_color_t fg_color;
     int has_bg;
     int has_fg;
+    void *sprot_popup_surface;
+    struct ranal_surface *popup_target;
     ranal_widget_data_t data;
 };
 

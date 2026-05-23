@@ -19,6 +19,7 @@ typedef enum {
     SPROT_EVENT_POINTER_BUTTON,
     SPROT_EVENT_POINTER_ENTER,
     SPROT_EVENT_POINTER_LEAVE,
+    SPROT_EVENT_POINTER_AXIS,
     SPROT_EVENT_KEY,
     SPROT_EVENT_PONG,
     SPROT_EVENT_ERROR,
@@ -36,6 +37,7 @@ typedef struct {
         sprot_body_frame_t frame;
         sprot_body_pointer_motion_t pointer_motion;
         sprot_body_pointer_button_t pointer_button;
+        sprot_body_pointer_axis_t pointer_axis;
         sprot_body_key_t key;
         struct {
             uint32_t code;
@@ -60,6 +62,8 @@ int sprot_commit(sprot_surface_t *surface);
 int sprot_damage(sprot_surface_t *surface, int32_t x, int32_t y, uint32_t w, uint32_t h);
 int sprot_request_frame(sprot_surface_t *surface);
 int sprot_set_title(sprot_surface_t *surface, const char *title);
+int sprot_set_role(sprot_surface_t *surface, uint32_t role, uint32_t parent_id, int32_t x, int32_t y);
+int sprot_set_cursor(sprot_surface_t *surface, uint32_t cursor_type);
 
 int sprot_poll_event(sprot_connection_t *conn, sprot_event_t *out_event, int timeout_ms);
 int sprot_ping(sprot_connection_t *conn, uint32_t serial);

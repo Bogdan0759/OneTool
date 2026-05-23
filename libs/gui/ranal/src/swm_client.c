@@ -182,6 +182,9 @@ void ranal_swm_pump_events_(void) {
                     g_ranal->curr_mouse_left = (ev.u.pointer_button.state == SPROT_BUTTON_STATE_PRESSED);
                 }
                 break;
+            case SPROT_EVENT_POINTER_AXIS:
+                // could map to slider if we wanted
+                break;
             case SPROT_EVENT_KEY: {
                 int pressed = (ev.u.key.state == SPROT_KEY_STATE_PRESSED);
                 if (g_ranal->key_hook != NULL &&
@@ -233,15 +236,57 @@ void ranal_swm_present_(void) {
     sprot_surface_t *surf = (sprot_surface_t *)g_ranal->sprot_surface;
     uint32_t *src = g_ranal->target->pixels;
     uint32_t *dst = sprot_surface_pixels(surf);
-    if (src == NULL || dst == NULL) return;
-    int32_t src_pitch_px = g_ranal->target->pitch / 4;
-    int32_t dst_pitch_px = (int32_t)(sprot_surface_stride(surf) / 4u);
-    for (int32_t row = 0; row < g_ranal->height; row++) {
-        memcpy(dst + row * dst_pitch_px,
-               src + row * src_pitch_px,
-               (size_t)g_ranal->width * 4u);
+    if (src != NULL && dst != NULL) {
+        int32_t src_pitch_px = g_ranal->target->pitch / 4;
+        int32_t dst_pitch_px = (int32_t)(sprot_surface_stride(surf) / 4u);
+        for (int32_t row = 0; row < g_ranal->height; row++) {
+            memcpy(dst + row * dst_pitch_px,
+                   src + row * src_pitch_px,
+                   (size_t)g_ranal->width * 4u);
+        }
+        sprot_commit(surf);
+        sprot_request_frame(surf);
     }
-    sprot_commit(surf);
-    sprot_request_frame(surf);
+    
+    for (ranal_widget_t *p = g_ranal->popups; p != NULL; p = p->next_sibling) {
+        if (p->sprot_popup_surface == NULL) {
+            sprot_surface_t *psurf = sprot_create_surface((sprot_connection_t *)g_ranal->sprot_conn, p->computed_w, p->computed_h);
+            if (psurf != NULL) {
+                sprot_set_role(psurf, SPROT_SURFACE_ROLE_POPUP, sprot_surface_id(surf), p->x, p->y);
+                p->sprot_popup_surface = psurf;
+            }
+        }
+        if (p->sprot_popup_surface != NULL) {
+            if (p->popup_target == NULL || p->popup_target->width != p->computed_w || p->popup_target->height != p->computed_h) {
+                if (p->popup_target != NULL) ranal_surface_destroy(p->popup_target);
+                p->popup_target = ranal_surface_create(p->computed_w, p->computed_h);
+            }
+            if (p->popup_target != NULL) {
+                srapi_cmd_reset(g_ranal->cmd);
+                srapi_cmd_emit(g_ranal->cmd, &(srapi_command_t){
+                    .kind = SRAPI_COMMAND_CLEAR,
+                    .color = p->has_bg ? p->bg_color : ranal_get_theme()->bg,
+                });
+                int32_t old_x = p->computed_x, old_y = p->computed_y;
+                p->computed_x = 0; p->computed_y = 0;
+                ranal_render_pass_(p);
+                p->computed_x = old_x; p->computed_y = old_y;
+                srapi_submit(g_ranal->ctx, p->popup_target->fb, g_ranal->cmd);
+                
+                sprot_surface_t *psurf = (sprot_surface_t *)p->sprot_popup_surface;
+                uint32_t *pdst = sprot_surface_pixels(psurf);
+                uint32_t *psrc = p->popup_target->pixels;
+                if (pdst != NULL && psrc != NULL) {
+                    int32_t ppitch_src = p->popup_target->pitch / 4;
+                    int32_t ppitch_dst = (int32_t)(sprot_surface_stride(psurf) / 4u);
+                    for (int32_t row = 0; row < p->computed_h; row++) {
+                        memcpy(pdst + row * ppitch_dst, psrc + row * ppitch_src, (size_t)p->computed_w * 4u);
+                    }
+                    sprot_commit(psurf);
+                }
+            }
+        }
+    }
+    
     g_ranal->sprot_pending_frame = 1;
 }
