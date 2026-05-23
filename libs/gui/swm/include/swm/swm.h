@@ -14,6 +14,7 @@
 #define SWM_BTN_SIZE      14
 
 typedef struct swm_client swm_client_t;
+typedef struct de de_t;
 
 typedef enum {
     SWM_INTERACT_NONE = 0,
@@ -78,6 +79,7 @@ typedef struct {
     uint64_t start_ms;
     swm_client_t clients[SWM_MAX_CLIENTS];
     swm_surface_t surfaces[SWM_MAX_SURFACES];
+    de_t *de;
 } swm_state_t;
 
 #endif

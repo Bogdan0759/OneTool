@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include <swm/swm.h>
+#include "de/de.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -201,7 +202,14 @@ static int handle_surface_create(swm_client_t *c, const sprot_header_t *hdr, con
     g_swm.next_cascade_x += 32;
     g_swm.next_cascade_y += 32;
     if (g_swm.next_cascade_x + 100 > (int32_t)g_swm.display_w) g_swm.next_cascade_x = 32;
-    if (g_swm.next_cascade_y + 100 > (int32_t)g_swm.display_h) g_swm.next_cascade_y = 32;
+    {
+        int32_t bottom_limit = (int32_t)g_swm.display_h;
+        if (g_swm.de != NULL) {
+            int32_t top = de_workspace_height(g_swm.de);
+            if (top > 0 && top < bottom_limit) bottom_limit = top;
+        }
+        if (g_swm.next_cascade_y + 100 > bottom_limit) g_swm.next_cascade_y = 32;
+    }
     s->z = ++g_swm.next_z;
     snprintf(s->title, sizeof(s->title), "client #%d", c->sock);
 
@@ -394,11 +402,16 @@ typedef enum {
 } swm_hit_region_t;
 
 static void surface_effective_rect(const swm_surface_t *s, int32_t *ex, int32_t *ey, int32_t *ew, int32_t *eh) {
+    int32_t workspace_h = (int32_t)g_swm.display_h;
+    if (g_swm.de != NULL) {
+        int32_t top = de_workspace_height(g_swm.de);
+        if (top > 0 && top < workspace_h) workspace_h = top;
+    }
     if (s->maximized) {
         *ex = SWM_BORDER;
         *ey = SWM_TITLEBAR_H + SWM_BORDER;
         *ew = (int32_t)g_swm.display_w - 2 * SWM_BORDER;
-        *eh = (int32_t)g_swm.display_h - SWM_TITLEBAR_H - 2 * SWM_BORDER;
+        *eh = workspace_h - SWM_TITLEBAR_H - 2 * SWM_BORDER;
     } else {
         *ex = s->pos_x;
         *ey = s->pos_y;
@@ -628,6 +641,9 @@ static void composite_surfaces(srapi_framebuffer_t *fb, uint32_t bg_color) {
             }
         }
     }
+    if (g_swm.de != NULL) {
+        de_render(g_swm.de, fb);
+    }
     draw_cursor(dst, dst_w, dst_h, dst_pitch_px, g_swm.mouse_x, g_swm.mouse_y);
 }
 
@@ -667,6 +683,12 @@ static void forward_input(const srapi_input_event_t *ev) {
                 g_swm.grab_surface->pos_y = g_swm.mouse_y - g_swm.grab_offset_y;
                 return;
             }
+            if (g_swm.de != NULL) {
+                de_on_mouse_motion(g_swm.de, g_swm.mouse_x, g_swm.mouse_y);
+                if (de_point_in_panel(g_swm.de, g_swm.mouse_x, g_swm.mouse_y)) {
+                    return;
+                }
+            }
             region = hit_test(g_swm.mouse_x, g_swm.mouse_y, &s);
             if (region == SWM_HIT_CONTENT && s != NULL && s->owner != NULL) {
                 int32_t ex, ey, ew, eh;
@@ -680,6 +702,11 @@ static void forward_input(const srapi_input_event_t *ev) {
         }
         case SRAPI_INPUT_EVENT_MOUSE_BUTTON_DOWN: {
             g_swm.mouse_left_down = (ev->mouse_button.button == SRAPI_MOUSE_BUTTON_LEFT);
+            if (g_swm.de != NULL &&
+                de_on_mouse_button(g_swm.de, g_swm.mouse_x, g_swm.mouse_y,
+                                   ev->mouse_button.button, 1)) {
+                return;
+            }
             region = hit_test(g_swm.mouse_x, g_swm.mouse_y, &s);
             if (s != NULL) raise_surface(s);
             int alt_held = (g_swm.modifiers & SRAPI_KMOD_ALT) != 0;
@@ -721,6 +748,11 @@ static void forward_input(const srapi_input_event_t *ev) {
                     g_swm.grab_surface = NULL;
                     return;
                 }
+            }
+            if (g_swm.de != NULL &&
+                de_on_mouse_button(g_swm.de, g_swm.mouse_x, g_swm.mouse_y,
+                                   ev->mouse_button.button, 0)) {
+                return;
             }
             region = hit_test(g_swm.mouse_x, g_swm.mouse_y, &s);
             if (region == SWM_HIT_CONTENT && s != NULL && s->owner != NULL) {
@@ -865,6 +897,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    g_swm.de = de_create(&g_swm);
+    if (g_swm.de == NULL) {
+        logf_("de: failed to initialize (continuing without DE)");
+    }
+
     logf_("ready. press Esc to quit.");
     while (!g_swm.should_quit && !g_signal_quit) {
         struct pollfd pfds[1 + SWM_MAX_CLIENTS];
@@ -927,6 +964,7 @@ int main(int argc, char *argv[]) {
         if (g_swm.should_quit) break;
 
         srapi_framebuffer_t *fb = srapi_drm_backbuffer(g_swm.drm);
+        if (g_swm.de != NULL) de_tick(g_swm.de, g_swm.frame_count);
         composite_surfaces(fb, bg_color);
         srapi_drm_present(g_swm.drm);
         g_swm.frame_count++;
@@ -934,6 +972,10 @@ int main(int argc, char *argv[]) {
     }
 
     logf_("shutting down");
+    if (g_swm.de != NULL) {
+        de_destroy(g_swm.de);
+        g_swm.de = NULL;
+    }
     for (int i = 0; i < SWM_MAX_CLIENTS; i++) {
         if (g_swm.clients[i].in_use) {
             drop_client(&g_swm.clients[i], "shutdown");
