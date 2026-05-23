@@ -773,6 +773,14 @@ static void forward_input(const srapi_input_event_t *ev) {
                 g_swm.should_quit = 1;
                 break;
             }
+            if (ev->key.scancode == SRAPI_SCANCODE_LGUI || ev->key.scancode == SRAPI_SCANCODE_RGUI) {
+                if (ev->type == SRAPI_INPUT_EVENT_KEY_DOWN) {
+                    if (g_swm.de != NULL) {
+                        de_toggle_menu(g_swm.de);
+                    }
+                }
+                break;
+            }
             swm_surface_t *focused = topmost_surface();
             if (focused != NULL && focused->owner != NULL) {
                 sprot_body_key_t body = {
@@ -896,6 +904,7 @@ int main(int argc, char *argv[]) {
     }
     if (srapi_input_create(&(srapi_input_desc_t){
             .auto_discover = 1,
+            .grab = 1,
             .initial_mouse_x = g_swm.mouse_x,
             .initial_mouse_y = g_swm.mouse_y,
         }, &g_swm.input) != SRAPI_OK) {

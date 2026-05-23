@@ -52,6 +52,8 @@ struct srapi_input_context {
     int32_t bounds_h;
 
     int grab;
+    int tty_fd;
+    int saved_kb_mode;
 };
 
 srapi_scancode_t srapi_input_evdev_to_scancode(uint16_t evdev_code);

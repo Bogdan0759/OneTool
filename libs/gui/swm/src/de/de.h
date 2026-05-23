@@ -42,6 +42,8 @@ int de_point_in_panel(const de_t *de, int32_t mx, int32_t my);
 void de_on_mouse_motion(de_t *de, int32_t mx, int32_t my);
 int  de_on_mouse_button(de_t *de, int32_t mx, int32_t my, uint32_t button, uint32_t state);
 
+void de_toggle_menu(de_t *de);
+
 void de_tick(de_t *de, uint64_t frame_count);
 
 void de_render(de_t *de, struct srapi_framebuffer *fb);

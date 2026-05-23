@@ -824,6 +824,13 @@ int de_on_mouse_button(de_t *de, int32_t mx, int32_t my, uint32_t button, uint32
     return 0;
 }
 
+void de_toggle_menu(de_t *de) {
+    if (de == NULL) return;
+    de->menu_open = !de->menu_open;
+    de->menu_dirty = 1;
+    de->taskbar_dirty = 1;
+}
+
 static void blit_surface_into_fb(ranal_surface_t *src,
                                  struct srapi_framebuffer *fb,
                                  int32_t dst_x, int32_t dst_y) {
