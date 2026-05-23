@@ -11,32 +11,32 @@ one executable, one CLI entrypoint, many capabilities implemented from scratch i
 
 implemented tools:
 
-- `lastmod` - prints the last modification time of a file
+- `lastmod` - prints the last modification time of a file (lastmod = last modification)
 - `reboot` - reboot the system
 - `shutdown` - shut down the system
-- `exec` - execute file
-- `down` - HTTP downloader
+- `exec` - execute file (exec = execute)
+- `down` - HTTP downloader (down = downloader)
 - `ping` - ICMP ping with stats
 - `lmake` - run bundled lmake build tool
-- `lpack` - pack lua script into ELF runtime
-- `mlink` - minimalistic ELF64 x86-64 linker
-- `taskmng` - TUI task manager with process control
-- `gapi_supported` - check available graphics API
+- `lpack` - pack lua script into ELF runtime (lpack = lua packager)
+- `mlink` - minimalistic ELF64 x86-64 linker (mlink = minimalistic linker)
+- `taskmng` - TUI task manager with process control (taskmng = task manager)
+- `gapi_supported` - check available graphics API (gapi_supported = graphics api supported)
 - `srapi_demo` - render a test frame with SRAPI
 - `srvid2mp4` - convert .srvid screen recordings to mp4/webm via ffmpeg
-- `fsinfo` - filesystem info
-- `fsize` - print file size
-- `ls` - list files
+- `fsinfo` - filesystem info (fsinfo = filesystem info)
+- `fsize` - print file size (fsize = file size)
+- `ls` - list files (ls = list)
 - `cat` - print files content
 - `free` - show memory usage
 - `yap` - YAP language interpreter
-- `userc` - interactive user control (add/del/edit users)
-- `nsetup` - simple network setup via DHCP
+- `userc` - interactive user control (add/del/edit users) (userc = user control)
+- `nsetup` - simple network setup via DHCP (nsetup = network setup)
 - `size` - prints elf sections size
 - `nm` - prints elf symbols
 - `click` - SRAPI click-the-cube minigame (15s round)
 - `ranal_demo` - demo of the ranal GUI library
-- `swm` - simple window manager / compositor (sprot v0.1)
+- `swm` - simple window manager / compositor (sprot v0.1) (swm = simple window manager)
 - `sprot_hello` - minimal sprot client (draws a colored rectangle)
 - `term` - GUI terminal built on ranal (standalone or as a swm client via `--swm`)
 framework parts:
@@ -45,10 +45,10 @@ framework parts:
 - `libs/TUI` - TUI library
 - `libs/elf` - ELF parser lib
 - `libs/memory` - checked allocation helpers
-- `libs/srapi` - simple rendering API
-- `libs/gui/ranal` - retained-mode GUI library on top of srapi
-- `libs/gui/sprot` - simple wire protocol for compositor/client comms (unix socket + memfd buffers)
-- `libs/gui/swm` - simple window manager / compositor (sprot v0.1)
+- `libs/srapi` - simple rendering API (srapi = simple rendering api)
+- `libs/gui/ranal` - retained-mode GUI library on top of srapi (ranal = raylib analog (name deprecated))
+- `libs/gui/sprot` - simple wire protocol for compositor/client comms (unix socket + memfd buffers) (sprot = simple protocol)
+- `libs/gui/swm` - simple window manager / compositor (sprot v0.1) (swm = simple window manager)
 ## build
 
 requirement:
