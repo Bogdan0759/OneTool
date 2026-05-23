@@ -17,19 +17,25 @@
 #include <ranal/ranal.h>
 #include <srapi/srapi.h>
 
+#include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <time.h>
+#include <unistd.h>
 
 typedef enum {
-    DE_MENU_TILE = 0,
+    DE_MENU_TERM = 0,
+    DE_MENU_TILE,
     DE_MENU_CASCADE,
     DE_MENU_MINIMIZE_ALL,
     DE_MENU_QUIT,
 } de_menu_action_t;
 
 static const char *k_menu_labels[DE_MENU_ENTRIES] = {
+    "Term",
     "Tile windows",
     "Cascade",
     "Minimize all",
@@ -680,8 +686,47 @@ static void de_action_quit(de_t *de) {
     de->swm->should_quit = 1;
 }
 
+static void de_action_term(de_t *de) {
+    (void)de;
+    pid_t pid = fork();
+    if (pid < 0) return;
+    if (pid == 0) {
+        /* Grandchild trick: orphan the term process so swm doesn't have to
+           reap it. The intermediate child exits immediately. */
+        pid_t inner = fork();
+        if (inner < 0) _exit(127);
+        if (inner == 0) {
+            /* Detach stdio so a launched terminal doesn't share swm's
+               controlling tty noise. */
+            int devnull = open("/dev/null", O_RDWR | O_CLOEXEC);
+            if (devnull >= 0) {
+                dup2(devnull, 0);
+                dup2(devnull, 1);
+                dup2(devnull, 2);
+                if (devnull > 2) close(devnull);
+            }
+            setsid();
+            signal(SIGCHLD, SIG_DFL);
+            char self_path[256];
+            ssize_t n = readlink("/proc/self/exe", self_path, sizeof(self_path) - 1);
+            if (n <= 0) _exit(127);
+            self_path[n] = '\0';
+            char *args[] = {
+                self_path, (char *)"term", (char *)"--swm",
+                (char *)"--title", (char *)"term", NULL,
+            };
+            execv(self_path, args);
+            _exit(127);
+        }
+        _exit(0);
+    }
+    int status = 0;
+    waitpid(pid, &status, 0);
+}
+
 static void run_menu_action(de_t *de, int idx) {
     switch (idx) {
+        case DE_MENU_TERM:         de_action_term(de); break;
         case DE_MENU_TILE:         de_action_tile(de); break;
         case DE_MENU_CASCADE:      de_action_cascade(de); break;
         case DE_MENU_MINIMIZE_ALL: de_action_minimize_all(de); break;

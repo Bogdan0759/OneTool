@@ -35,6 +35,7 @@ int ck(int argc, char *argv[]);
 int rd(int argc, char *argv[]);
 int sw(int argc, char *argv[]);
 int sh(int argc, char *argv[]);
+int tr(int argc, char *argv[]);
 int tui_main(const char *onetool_argv0);
 const char onetool_version[] = "1.8.0";
 
@@ -81,6 +82,8 @@ const struct onetool_tool onetool_builtin_tools[] = {
     {"swm", sw, "simple window manager / compositor (sprot v0.1)",
      ONETOOL_ARGV0_TOOL_NAME},
     {"sprot_hello", sh, "minimal sprot test client (draws a rectangle)",
+     ONETOOL_ARGV0_TOOL_NAME},
+    {"term", tr, "GUI terminal (ranal; use --swm to run as swm client)",
      ONETOOL_ARGV0_TOOL_NAME},
 };
 

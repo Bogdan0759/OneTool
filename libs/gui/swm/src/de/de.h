@@ -15,7 +15,7 @@
 #define DE_MAX_ITEMS        12
 #define DE_MENU_W           180
 #define DE_MENU_ITEM_H      22
-#define DE_MENU_ENTRIES     4
+#define DE_MENU_ENTRIES     5
 #define DE_TOOLTIP_FADE_SEC 0.18f
 #define DE_TOOLTIP_GAP      8
 #define DE_TOOLTIP_PAD_X    8

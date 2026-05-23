@@ -122,6 +122,8 @@ struct ranal_context {
     int dirty;
     int presented;
     const ranal_theme_t *theme;
+    ranal_key_hook_fn key_hook;
+    void *key_hook_user;
     char error_buffer[256];
 };
 
