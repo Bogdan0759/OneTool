@@ -143,6 +143,12 @@ void ranal_draw_text(int32_t x, int32_t y, const char *text, ranal_color_t color
 int32_t ranal_text_width(const char *text);
 int32_t ranal_text_height(void);
 
+#define RANAL_GLYPH_WIDTH    5
+#define RANAL_GLYPH_HEIGHT   7
+#define RANAL_FONT_ADVANCE_X 6
+#define RANAL_FONT_ADVANCE_Y 8
+const uint8_t *ranal_font_glyph(char c);
+
 ranal_surface_t *ranal_surface_create(int32_t width, int32_t height);
 void ranal_surface_destroy(ranal_surface_t *surface);
 uint32_t *ranal_surface_pixels(ranal_surface_t *surface);

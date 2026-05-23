@@ -112,6 +112,10 @@ const uint8_t *ranal_font_glyph_(char c) {
     return k_glyphs[c - 32];
 }
 
+const uint8_t *ranal_font_glyph(char c) {
+    return ranal_font_glyph_(c);
+}
+
 int32_t ranal_text_width(const char *text) {
     if (text == NULL) return 0;
     int32_t len = (int32_t)strlen(text);
