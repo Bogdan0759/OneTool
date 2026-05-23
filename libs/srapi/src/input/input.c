@@ -6,6 +6,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <linux/kd.h>
+#include <sys/ioctl.h>
 
 void srapi_set_error(const char *fmt, ...);
 void srapi_debugf(const char *fmt, ...);
@@ -84,6 +87,21 @@ srapi_result_t srapi_input_create(const srapi_input_desc_t *desc, srapi_input_co
         return SRAPI_ERROR_OOM;
     }
 
+    ctx->tty_fd = -1;
+    if (desc != NULL && desc->grab) {
+        int tty = open("/dev/tty", O_RDWR | O_NOCTTY);
+        if (tty >= 0) {
+            int kb_mode = 0;
+            if (ioctl(tty, KDGKBMODE, &kb_mode) == 0) {
+                ctx->saved_kb_mode = kb_mode;
+                ioctl(tty, KDSKBMODE, K_OFF);
+                ctx->tty_fd = tty;
+            } else {
+                close(tty);
+            }
+        }
+    }
+
     if (desc != NULL) {
         ctx->grab = desc->grab;
         ctx->mouse_x = desc->initial_mouse_x;
@@ -107,6 +125,10 @@ void srapi_input_destroy(srapi_input_context_t *ctx) {
                  ctx->device_count, ctx->queue_count);
     for (size_t i = 0; i < ctx->device_count; i++) {
         srapi_input_close_evdev(&ctx->devices[i]);
+    }
+    if (ctx->tty_fd >= 0) {
+        ioctl(ctx->tty_fd, KDSKBMODE, ctx->saved_kb_mode);
+        close(ctx->tty_fd);
     }
     free(ctx->devices);
     free(ctx->queue);

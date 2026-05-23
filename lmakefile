@@ -426,7 +426,7 @@ task build() {
     }
     if (@is_outdated(CLICK_OBJ, CLICK_SRC, SRAPI_HDR)) {
         @echo("[CC] %s", CLICK_SRC);
-        @run("%s %s %s -Dmain=ck -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, CLICK_SRC, CLICK_OBJ);
+        @run("%s %s %s %s -Dmain=ck -c %s -o %s", CC, CFLAGS, SRAPI_CFLAGS, SPROT_CFLAGS, CLICK_SRC, CLICK_OBJ);
     }
     if (@is_outdated(RANAL_DEMO_OBJ, RANAL_DEMO_SRC, RANAL_HDR)) {
         @echo("[CC] %s", RANAL_DEMO_SRC);

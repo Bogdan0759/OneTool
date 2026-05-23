@@ -1,4 +1,5 @@
 #include <srapi/srapi.h>
+#include <sprot/client.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -148,14 +149,16 @@ int main(int argc, char *argv[]) {
     uint32_t record_fps = 30;
     int debug = 0;
     int use_gpu = 0;
+    int swm_mode = 0;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             printf("click - SRAPI click-the-cube minigame\n");
-            printf("usage: %s [--drm /dev/dri/cardN] [--gpu] [--debug] [--record file.srvid] [--record-fps n]\n", argv[0]);
+            printf("usage: %s [--drm /dev/dri/cardN] [--gpu] [--debug] [--record file.srvid] [--record-fps n] [--swm]\n", argv[0]);
             printf("you have 15 seconds. cubes spawn and live for 3 seconds.\n");
             printf("click them with the left mouse button. Esc to abort.\n");
             printf("--gpu  use GPU/i915 BLT path when available (otherwise CPU rasterizer).\n");
+            printf("--swm  run as a window in swm instead of DRM mode.\n");
             return 0;
         } else if (strcmp(argv[i], "--drm") == 0 && i + 1 < argc) {
             drm_device = argv[++i];
@@ -163,6 +166,8 @@ int main(int argc, char *argv[]) {
             use_gpu = 1;
         } else if (strcmp(argv[i], "--debug") == 0) {
             debug = 1;
+        } else if (strcmp(argv[i], "--swm") == 0) {
+            swm_mode = 1;
         } else if (strcmp(argv[i], "--record") == 0 && i + 1 < argc) {
             record_path = argv[++i];
         } else if (strcmp(argv[i], "--record-fps") == 0 && i + 1 < argc) {
@@ -180,6 +185,9 @@ int main(int argc, char *argv[]) {
     }
 
     srapi_drm_display_t *drm = NULL;
+    sprot_connection_t *swm_conn = NULL;
+    sprot_surface_t *swm_surf = NULL;
+    srapi_framebuffer_t *swm_fb = NULL;
     srapi_context_t *ctx = NULL;
     srapi_cmd_buffer_t *cmd = NULL;
     srapi_input_context_t *input = NULL;
@@ -187,45 +195,79 @@ int main(int argc, char *argv[]) {
     srapi_queue_t *gpu_queue = NULL;
     srapi_result_t r;
     srapi_drm_recommendation_t rec;
+    uint32_t width = 0;
+    uint32_t height = 0;
 
-    if (drm_device == NULL) {
-        if (srapi_drm_recommend(&rec) == SRAPI_OK) {
-            drm_device = rec.path;
-            printf("click: auto-selected %s (%s, score=%u)\n",
-                   rec.path, rec.message, rec.score);
-            if (use_gpu && !rec.supports_i915) {
-                printf("click: note: --gpu requested but %s has no i915 acceleration; using basic GPU dumb-buffer path\n", rec.path);
+    if (swm_mode) {
+        swm_conn = sprot_connect(NULL);
+        if (swm_conn == NULL) {
+            fprintf(stderr, "click: swm connect failed: %s\n", sprot_last_error());
+            return 1;
+        }
+        width = 640;
+        height = 480;
+        swm_surf = sprot_create_surface(swm_conn, width, height);
+        if (swm_surf == NULL) {
+            fprintf(stderr, "click: swm create surface failed: %s\n", sprot_last_error());
+            sprot_disconnect(swm_conn);
+            return 1;
+        }
+        sprot_set_title(swm_surf, "click");
+        
+        int got_id = 0;
+        sprot_event_t sev;
+        for (int tries = 0; tries < 80 && !got_id; tries++) {
+            if (sprot_poll_event(swm_conn, &sev, 50) > 0) {
+                if (sev.kind == SPROT_EVENT_SURFACE_CREATED) got_id = 1;
+                else if (sev.kind == SPROT_EVENT_DISCONNECT) break;
             }
-        } else {
-            fprintf(stderr, "click: %s\n", srapi_last_error());
-            fprintf(stderr, "hint: pass --drm /dev/dri/cardN explicitly\n");
+        }
+        if (!got_id) {
+            fprintf(stderr, "click: server did not confirm surface\n");
+            sprot_destroy_surface(swm_surf);
+            sprot_disconnect(swm_conn);
             return 1;
         }
-    }
+    } else {
+        if (drm_device == NULL) {
+            if (srapi_drm_recommend(&rec) == SRAPI_OK) {
+                drm_device = rec.path;
+                printf("click: auto-selected %s (%s, score=%u)\n",
+                       rec.path, rec.message, rec.score);
+                if (use_gpu && !rec.supports_i915) {
+                    printf("click: note: --gpu requested but %s has no i915 acceleration; using basic GPU dumb-buffer path\n", rec.path);
+                }
+            } else {
+                fprintf(stderr, "click: %s\n", srapi_last_error());
+                fprintf(stderr, "hint: pass --drm /dev/dri/cardN explicitly\n");
+                return 1;
+            }
+        }
 
-    r = srapi_drm_open_display(&(srapi_drm_display_desc_t){
-        .device_path = drm_device,
-    }, &drm);
-    if (r != SRAPI_OK) {
-        fprintf(stderr, "click: drm open failed: %s\n", srapi_last_error());
-        fprintf(stderr, "hint: run from a TTY, or pass --drm /dev/dri/cardN\n");
-        return 1;
-    }
-    uint32_t width = srapi_drm_width(drm);
-    uint32_t height = srapi_drm_height(drm);
-
-    if (record_path != NULL) {
-        r = srapi_drm_record_start(drm, record_path, record_fps * 1000);
+        r = srapi_drm_open_display(&(srapi_drm_display_desc_t){
+            .device_path = drm_device,
+        }, &drm);
         if (r != SRAPI_OK) {
-            fprintf(stderr, "click: drm record start failed: %s\n", srapi_last_error());
-            srapi_drm_close(drm);
+            fprintf(stderr, "click: drm open failed: %s\n", srapi_last_error());
+            fprintf(stderr, "hint: run from a TTY, or pass --drm /dev/dri/cardN\n");
             return 1;
         }
-        fprintf(stderr, "click: recording -> %s @ %u fps\n", record_path, record_fps);
+        width = srapi_drm_width(drm);
+        height = srapi_drm_height(drm);
+
+        if (record_path != NULL) {
+            r = srapi_drm_record_start(drm, record_path, record_fps * 1000);
+            if (r != SRAPI_OK) {
+                fprintf(stderr, "click: drm record start failed: %s\n", srapi_last_error());
+                srapi_drm_close(drm);
+                return 1;
+            }
+            fprintf(stderr, "click: recording -> %s @ %u fps\n", record_path, record_fps);
+        }
     }
 
-    srapi_backend_t render_backend = SRAPI_BACKEND_GPU;
-    if (use_gpu) {
+    srapi_backend_t render_backend = swm_mode ? SRAPI_BACKEND_CPU : SRAPI_BACKEND_GPU;
+    if (use_gpu && !swm_mode) {
         r = srapi_create_device(&(srapi_device_desc_t){
             .backend = SRAPI_BACKEND_GPU,
             .device_path = srapi_drm_device_path(drm),
@@ -256,9 +298,14 @@ int main(int argc, char *argv[]) {
     }, &ctx);
     if (r != SRAPI_OK) {
         fprintf(stderr, "click: context: %s\n", srapi_last_error());
-        srapi_destroy_queue(gpu_queue);
-        srapi_destroy_device(gpu_device);
-        srapi_drm_close(drm);
+        if (swm_mode) {
+            sprot_destroy_surface(swm_surf);
+            sprot_disconnect(swm_conn);
+        } else {
+            srapi_destroy_queue(gpu_queue);
+            srapi_destroy_device(gpu_device);
+            srapi_drm_close(drm);
+        }
         return 1;
     }
 
@@ -266,28 +313,48 @@ int main(int argc, char *argv[]) {
     if (r != SRAPI_OK) {
         fprintf(stderr, "click: cmd buffer: %s\n", srapi_last_error());
         srapi_destroy_context(ctx);
-        srapi_destroy_queue(gpu_queue);
-        srapi_destroy_device(gpu_device);
-        srapi_drm_close(drm);
+        if (swm_mode) {
+            sprot_destroy_surface(swm_surf);
+            sprot_disconnect(swm_conn);
+        } else {
+            srapi_destroy_queue(gpu_queue);
+            srapi_destroy_device(gpu_device);
+            srapi_drm_close(drm);
+        }
         return 1;
     }
 
-    srapi_input_desc_t in_desc = {
-        .auto_discover = 1,
-        .initial_mouse_x = (int32_t)(width / 2),
-        .initial_mouse_y = (int32_t)(height / 2),
-    };
-    r = srapi_input_create(&in_desc, &input);
-    if (r != SRAPI_OK) {
-        fprintf(stderr, "click: input: %s\n", srapi_last_error());
-        srapi_destroy_cmd_buffer(cmd);
-        srapi_destroy_context(ctx);
-        srapi_destroy_queue(gpu_queue);
-        srapi_destroy_device(gpu_device);
-        srapi_drm_close(drm);
-        return 1;
+    if (swm_mode) {
+        r = srapi_create_framebuffer(ctx, &(srapi_framebuffer_desc_t){
+            .width = width,
+            .height = height,
+        }, &swm_fb);
+        if (r != SRAPI_OK) {
+            fprintf(stderr, "click: swm framebuffer: %s\n", srapi_last_error());
+            srapi_destroy_cmd_buffer(cmd);
+            srapi_destroy_context(ctx);
+            sprot_destroy_surface(swm_surf);
+            sprot_disconnect(swm_conn);
+            return 1;
+        }
+    } else {
+        srapi_input_desc_t in_desc = {
+            .auto_discover = 1,
+            .initial_mouse_x = (int32_t)(width / 2),
+            .initial_mouse_y = (int32_t)(height / 2),
+        };
+        r = srapi_input_create(&in_desc, &input);
+        if (r != SRAPI_OK) {
+            fprintf(stderr, "click: input: %s\n", srapi_last_error());
+            srapi_destroy_cmd_buffer(cmd);
+            srapi_destroy_context(ctx);
+            srapi_destroy_queue(gpu_queue);
+            srapi_destroy_device(gpu_device);
+            srapi_drm_close(drm);
+            return 1;
+        }
+        srapi_input_set_bounds(input, (int32_t)width, (int32_t)height);
     }
-    srapi_input_set_bounds(input, (int32_t)width, (int32_t)height);
 
     srand((unsigned)time(NULL));
 
@@ -300,6 +367,11 @@ int main(int argc, char *argv[]) {
     int quit = 0;
     int32_t mouse_x = (int32_t)(width / 2);
     int32_t mouse_y = (int32_t)(height / 2);
+    int started = 0;
+    int32_t start_btn_w = 120;
+    int32_t start_btn_h = 40;
+    int32_t start_btn_x = (width - start_btn_w) / 2;
+    int32_t start_btn_y = (height - start_btn_h) / 2;
 
     srapi_clock_t clock;
     srapi_clock_init(&clock);
@@ -308,48 +380,91 @@ int main(int argc, char *argv[]) {
 
     while (!quit && elapsed < GAME_DURATION_SEC) {
         float dt = srapi_clock_tick(&clock);
-        elapsed += dt;
-        spawn_timer += dt;
+        
+        if (started) {
+            elapsed += dt;
+            spawn_timer += dt;
+        }
 
-        srapi_input_event_t ev;
-        while (srapi_input_poll(input, &ev) == 1) {
-            switch (ev.type) {
-                case SRAPI_INPUT_EVENT_KEY_DOWN:
-                    if (ev.key.scancode == SRAPI_SCANCODE_ESCAPE) {
+        if (swm_mode) {
+            sprot_event_t sev;
+            while (sprot_poll_event(swm_conn, &sev, 0) > 0) {
+                if (sev.kind == SPROT_EVENT_KEY && sev.u.key.state == SPROT_KEY_STATE_PRESSED) {
+                    if (sev.u.key.scancode == 41 /* SRAPI_SCANCODE_ESCAPE */) {
                         quit = 1;
                     }
-                    break;
-                case SRAPI_INPUT_EVENT_MOUSE_MOTION:
-                    mouse_x = ev.mouse_motion.x;
-                    mouse_y = ev.mouse_motion.y;
-                    break;
-                case SRAPI_INPUT_EVENT_MOUSE_BUTTON_DOWN:
-                    if (ev.mouse_button.button == SRAPI_MOUSE_BUTTON_LEFT) {
-                        if (try_hit(cubes, ev.mouse_button.x, ev.mouse_button.y)) {
-                            score++;
+                } else if (sev.kind == SPROT_EVENT_POINTER_MOTION) {
+                    mouse_x = sev.u.pointer_motion.x;
+                    mouse_y = sev.u.pointer_motion.y;
+                } else if (sev.kind == SPROT_EVENT_POINTER_BUTTON && sev.u.pointer_button.state == SPROT_BUTTON_STATE_PRESSED) {
+                    if (sev.u.pointer_button.button == 1) {
+                        if (!started) {
+                            if (mouse_x >= start_btn_x && mouse_x < start_btn_x + start_btn_w &&
+                                mouse_y >= start_btn_y && mouse_y < start_btn_y + start_btn_h) {
+                                started = 1;
+                            }
                         } else {
-                            misclicks++;
+                            if (try_hit(cubes, mouse_x, mouse_y)) {
+                                score++;
+                            } else {
+                                misclicks++;
+                            }
                         }
                     }
-                    break;
-                default:
-                    break;
+                } else if (sev.kind == SPROT_EVENT_SURFACE_CLOSE) {
+                    quit = 1;
+                }
+            }
+        } else {
+            srapi_input_event_t ev;
+            while (srapi_input_poll(input, &ev) == 1) {
+                switch (ev.type) {
+                    case SRAPI_INPUT_EVENT_KEY_DOWN:
+                        if (ev.key.scancode == SRAPI_SCANCODE_ESCAPE) {
+                            quit = 1;
+                        }
+                        break;
+                    case SRAPI_INPUT_EVENT_MOUSE_MOTION:
+                        mouse_x = ev.mouse_motion.x;
+                        mouse_y = ev.mouse_motion.y;
+                        break;
+                    case SRAPI_INPUT_EVENT_MOUSE_BUTTON_DOWN:
+                        if (ev.mouse_button.button == SRAPI_MOUSE_BUTTON_LEFT) {
+                            if (!started) {
+                                if (ev.mouse_button.x >= start_btn_x && ev.mouse_button.x < start_btn_x + start_btn_w &&
+                                    ev.mouse_button.y >= start_btn_y && ev.mouse_button.y < start_btn_y + start_btn_h) {
+                                    started = 1;
+                                }
+                            } else {
+                                if (try_hit(cubes, ev.mouse_button.x, ev.mouse_button.y)) {
+                                    score++;
+                                } else {
+                                    misclicks++;
+                                }
+                            }
+                        }
+                        break;
+                    default:
+                        break;
+                }
             }
         }
 
-        while (spawn_timer >= SPAWN_INTERVAL_SEC) {
-            spawn_timer -= SPAWN_INTERVAL_SEC;
-            spawn_cube(cubes, width, height);
-            spawned++;
-        }
-
-        for (int i = 0; i < MAX_CUBES; i++) {
-            if (!cubes[i].active) {
-                continue;
+        if (started) {
+            while (spawn_timer >= SPAWN_INTERVAL_SEC) {
+                spawn_timer -= SPAWN_INTERVAL_SEC;
+                spawn_cube(cubes, width, height);
+                spawned++;
             }
-            cubes[i].age_sec += dt;
-            if (cubes[i].age_sec >= CUBE_LIFETIME_SEC) {
-                cubes[i].active = 0;
+
+            for (int i = 0; i < MAX_CUBES; i++) {
+                if (!cubes[i].active) {
+                    continue;
+                }
+                cubes[i].age_sec += dt;
+                if (cubes[i].age_sec >= CUBE_LIFETIME_SEC) {
+                    cubes[i].active = 0;
+                }
             }
         }
 
@@ -359,18 +474,29 @@ int main(int argc, char *argv[]) {
             .color = srapi_rgba(18, 22, 32, 255),
         });
 
-        draw_time_bar(cmd, width, GAME_DURATION_SEC - elapsed);
-        draw_score_pips(cmd, width, score);
+        if (!started) {
+            srapi_color_t btn_fill = srapi_rgba(90, 220, 120, 255);
+            srapi_color_t btn_border = srapi_rgba(40, 160, 70, 255);
+            if (mouse_x >= start_btn_x && mouse_x < start_btn_x + start_btn_w &&
+                mouse_y >= start_btn_y && mouse_y < start_btn_y + start_btn_h) {
+                btn_fill = srapi_rgba(110, 240, 140, 255);
+            }
+            srapi_cmd_fill_rect(cmd, start_btn_x, start_btn_y, start_btn_w, start_btn_h, btn_border);
+            srapi_cmd_fill_rect(cmd, start_btn_x + 4, start_btn_y + 4, start_btn_w - 8, start_btn_h - 8, btn_fill);
+        } else {
+            draw_time_bar(cmd, width, GAME_DURATION_SEC - elapsed);
+            draw_score_pips(cmd, width, score);
 
-        for (int i = 0; i < MAX_CUBES; i++) {
-            if (cubes[i].active) {
-                draw_cube(cmd, &cubes[i]);
+            for (int i = 0; i < MAX_CUBES; i++) {
+                if (cubes[i].active) {
+                    draw_cube(cmd, &cubes[i]);
+                }
             }
         }
 
         draw_cursor(cmd, mouse_x, mouse_y);
 
-        srapi_framebuffer_t *fb = srapi_drm_backbuffer(drm);
+        srapi_framebuffer_t *fb = swm_mode ? swm_fb : srapi_drm_backbuffer(drm);
         if (gpu_queue != NULL) {
             r = srapi_queue_submit(gpu_queue, fb, cmd);
         } else {
@@ -380,10 +506,25 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "click: submit: %s\n", srapi_last_error());
             break;
         }
-        r = srapi_drm_present(drm);
-        if (r != SRAPI_OK) {
-            fprintf(stderr, "click: present: %s\n", srapi_last_error());
-            break;
+
+        if (swm_mode) {
+            uint32_t *src = srapi_framebuffer_pixels(swm_fb);
+            uint32_t *dst = sprot_surface_pixels(swm_surf);
+            int32_t src_pitch_px = (int32_t)(srapi_framebuffer_pitch(swm_fb) / 4);
+            int32_t dst_pitch_px = (int32_t)(sprot_surface_stride(swm_surf) / 4);
+            for (int32_t row = 0; row < (int32_t)height; row++) {
+                memcpy(dst + row * dst_pitch_px,
+                       src + row * src_pitch_px,
+                       width * 4);
+            }
+            sprot_commit(swm_surf);
+            sprot_request_frame(swm_surf);
+        } else {
+            r = srapi_drm_present(drm);
+            if (r != SRAPI_OK) {
+                fprintf(stderr, "click: present: %s\n", srapi_last_error());
+                break;
+            }
         }
     }
 
@@ -398,12 +539,18 @@ int main(int argc, char *argv[]) {
     int total_clicks = score + misclicks;
     float accuracy = total_clicks > 0 ? (100.0f * (float)score / (float)total_clicks) : 0.0f;
 
-    srapi_input_destroy(input);
+    if (swm_mode) {
+        srapi_destroy_framebuffer(swm_fb);
+        sprot_destroy_surface(swm_surf);
+        sprot_disconnect(swm_conn);
+    } else {
+        srapi_input_destroy(input);
+        srapi_destroy_queue(gpu_queue);
+        srapi_destroy_device(gpu_device);
+        srapi_drm_close(drm);
+    }
     srapi_destroy_cmd_buffer(cmd);
     srapi_destroy_context(ctx);
-    srapi_destroy_queue(gpu_queue);
-    srapi_destroy_device(gpu_device);
-    srapi_drm_close(drm);
 
     printf("\nresults\n");
     if (quit && elapsed < GAME_DURATION_SEC) {
