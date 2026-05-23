@@ -30,6 +30,8 @@ typedef enum {
     SPROT_REQ_SURFACE_DESTROY  = 0x0014,
     SPROT_REQ_SURFACE_FRAME    = 0x0015,
     SPROT_REQ_SURFACE_SET_TITLE = 0x0016,
+    SPROT_REQ_SURFACE_SET_ROLE = 0x0017,
+    SPROT_REQ_SET_CURSOR       = 0x0018,
     SPROT_REQ_PING             = 0x0080,
 
     SPROT_EVT_WELCOME          = 0x4001,
@@ -42,6 +44,7 @@ typedef enum {
     SPROT_EVT_KEY              = 0x4022,
     SPROT_EVT_POINTER_ENTER    = 0x4023,
     SPROT_EVT_POINTER_LEAVE    = 0x4024,
+    SPROT_EVT_POINTER_AXIS     = 0x4025,
     SPROT_EVT_PONG             = 0x4080,
     SPROT_EVT_ERROR            = 0x40FF,
 } sprot_msg_type_t;
@@ -95,6 +98,11 @@ typedef struct {
 } sprot_body_pointer_button_t;
 
 typedef struct {
+    int32_t dx;
+    int32_t dy;
+} sprot_body_pointer_axis_t;
+
+typedef struct {
     uint32_t scancode;
     uint32_t state;
     uint32_t modifiers;
@@ -108,6 +116,17 @@ typedef struct {
 typedef struct {
     uint32_t length;
 } sprot_body_set_title_t;
+
+typedef struct {
+    uint32_t role;
+    uint32_t parent_id;
+    int32_t x;
+    int32_t y;
+} sprot_body_surface_set_role_t;
+
+typedef struct {
+    uint32_t cursor_type;
+} sprot_body_set_cursor_t;
 
 typedef struct {
     uint32_t width;
@@ -126,6 +145,13 @@ typedef struct {
 
 #define SPROT_KEY_STATE_RELEASED  0u
 #define SPROT_KEY_STATE_PRESSED   1u
+
+#define SPROT_SURFACE_ROLE_TOPLEVEL 0u
+#define SPROT_SURFACE_ROLE_POPUP    1u
+
+#define SPROT_CURSOR_ARROW  0u
+#define SPROT_CURSOR_IBEAM  1u
+#define SPROT_CURSOR_HAND   2u
 
 #define SPROT_SURFACE_STATE_NORMAL     0u
 #define SPROT_SURFACE_STATE_MAXIMIZED  (1u << 0)

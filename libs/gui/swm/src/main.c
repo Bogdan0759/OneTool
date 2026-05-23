@@ -47,6 +47,13 @@ static swm_surface_t *alloc_surface(void) {
 
 static void free_surface(swm_surface_t *s) {
     if (s == NULL || !s->in_use) return;
+    if (g_swm.grab_surface == s) {
+        g_swm.grab_surface = NULL;
+        g_swm.interaction = SWM_INTERACT_NONE;
+    }
+    if (g_swm.hovered_surface == s) {
+        g_swm.hovered_surface = NULL;
+    }
     if (s->buf_map != NULL && s->buf_map != MAP_FAILED) {
         munmap(s->buf_map, s->buffer_size);
     }
@@ -290,10 +297,6 @@ static int handle_surface_destroy(swm_client_t *c, const sprot_header_t *hdr) {
         return 0;
     }
     logf_("surface %u destroyed", s->id);
-    if (g_swm.grab_surface == s) {
-        g_swm.grab_surface = NULL;
-        g_swm.interaction = SWM_INTERACT_NONE;
-    }
     free_surface(s);
     return 0;
 }
@@ -321,6 +324,40 @@ static int handle_surface_frame(swm_client_t *c, const sprot_header_t *hdr) {
     swm_surface_t *s = find_surface(hdr->object_id);
     if (s == NULL || s->owner != c) return 0;
     s->wants_frame = 1;
+    return 0;
+}
+
+static int handle_surface_set_role(swm_client_t *c, const sprot_header_t *hdr, const void *body, size_t blen) {
+    if (blen < sizeof(sprot_body_surface_set_role_t)) {
+        send_error(c->sock, SPROT_ERROR_PROTOCOL, "short SET_ROLE");
+        return -1;
+    }
+    sprot_body_surface_set_role_t b;
+    memcpy(&b, body, sizeof(b));
+    swm_surface_t *s = find_surface(hdr->object_id);
+    if (s == NULL || s->owner != c) return 0;
+    s->role = b.role;
+    if (b.role == SPROT_SURFACE_ROLE_POPUP) {
+        s->parent_id = b.parent_id;
+        s->rel_x = b.x;
+        s->rel_y = b.y;
+    }
+    return 0;
+}
+
+static int handle_set_cursor(swm_client_t *c, const sprot_header_t *hdr, const void *body, size_t blen) {
+    if (blen < sizeof(sprot_body_set_cursor_t)) {
+        send_error(c->sock, SPROT_ERROR_PROTOCOL, "short SET_CURSOR");
+        return -1;
+    }
+    sprot_body_set_cursor_t b;
+    memcpy(&b, body, sizeof(b));
+    // only update cursor if this client owns the topmost focused surface
+    // or we could just set it.
+    swm_surface_t *s = find_surface(hdr->object_id);
+    if (s == NULL || s->owner != c) return 0;
+    // to be perfectly accurate we'd check if `s` is hovered, but setting global cursor works for now.
+    g_swm.current_cursor = b.cursor_type;
     return 0;
 }
 
@@ -358,6 +395,8 @@ static int dispatch_message(swm_client_t *c) {
         case SPROT_REQ_SURFACE_DAMAGE:  /* no-op v1, full-frame composite */ break;
         case SPROT_REQ_SURFACE_FRAME:   rc = handle_surface_frame(c, &hdr); break;
         case SPROT_REQ_SURFACE_SET_TITLE: rc = handle_surface_set_title(c, &hdr, body, blen); break;
+        case SPROT_REQ_SURFACE_SET_ROLE:  rc = handle_surface_set_role(c, &hdr, body, blen); break;
+        case SPROT_REQ_SET_CURSOR:        rc = handle_set_cursor(c, &hdr, body, blen); break;
         case SPROT_REQ_PING:            rc = handle_ping(c, &hdr); break;
         default:
             logf_("unknown msg type 0x%x from fd=%d", hdr.type, c->sock);
@@ -402,6 +441,21 @@ typedef enum {
 } swm_hit_region_t;
 
 static void surface_effective_rect(const swm_surface_t *s, int32_t *ex, int32_t *ey, int32_t *ew, int32_t *eh) {
+    if (s->role == SPROT_SURFACE_ROLE_POPUP) {
+        swm_surface_t *parent = find_surface(s->parent_id);
+        if (parent != NULL) {
+            int32_t pex, pey, pew, peh;
+            surface_effective_rect(parent, &pex, &pey, &pew, &peh);
+            *ex = pex + s->rel_x;
+            *ey = pey + s->rel_y;
+        } else {
+            *ex = s->pos_x;
+            *ey = s->pos_y;
+        }
+        *ew = (int32_t)s->width;
+        *eh = (int32_t)s->height;
+        return;
+    }
     int32_t workspace_h = (int32_t)g_swm.display_h;
     if (g_swm.de != NULL) {
         int32_t top = de_workspace_height(g_swm.de);
@@ -423,6 +477,13 @@ static void surface_effective_rect(const swm_surface_t *s, int32_t *ex, int32_t 
 static void surface_outer_rect(const swm_surface_t *s, int32_t *ox, int32_t *oy, int32_t *ow, int32_t *oh) {
     int32_t ex, ey, ew, eh;
     surface_effective_rect(s, &ex, &ey, &ew, &eh);
+    if (s->role == SPROT_SURFACE_ROLE_POPUP) {
+        *ox = ex;
+        *oy = ey;
+        *ow = ew;
+        *oh = eh;
+        return;
+    }
     *ox = ex - SWM_BORDER;
     *oy = ey - SWM_TITLEBAR_H - SWM_BORDER;
     *ow = ew + 2 * SWM_BORDER;
@@ -455,6 +516,9 @@ static swm_hit_region_t hit_test(int32_t mx, int32_t my, swm_surface_t **out_sur
         if (my >= ey && my < ey + eh && mx >= ex && mx < ex + ew) {
             *out_surface = s;
             return SWM_HIT_CONTENT;
+        }
+        if (s->role == SPROT_SURFACE_ROLE_POPUP) {
+            continue;
         }
         int32_t bmin, bmax, bclose, by;
         titlebar_button_rects(s, &bmin, &bmax, &bclose, &by);
@@ -520,7 +584,7 @@ static int32_t draw_text(uint32_t *dst, int32_t dst_w, int32_t dst_h, int32_t ds
 }
 
 static void draw_cursor(uint32_t *dst, int32_t dst_w, int32_t dst_h, int32_t dst_pitch_px,
-                        int32_t cx, int32_t cy) {
+                        int32_t cx, int32_t cy, uint32_t cursor_type) {
     static const uint8_t arrow[16][12] = {
         {1,0,0,0,0,0,0,0,0,0,0,0},
         {1,1,0,0,0,0,0,0,0,0,0,0},
@@ -539,11 +603,52 @@ static void draw_cursor(uint32_t *dst, int32_t dst_w, int32_t dst_h, int32_t dst
         {0,0,0,0,0,1,2,2,1,0,0,0},
         {0,0,0,0,0,0,1,1,0,0,0,0},
     };
+    static const uint8_t ibeam[16][12] = {
+        {0,0,0,1,1,1,1,1,0,0,0,0},
+        {0,0,0,0,0,1,0,0,0,0,0,0},
+        {0,0,0,0,0,1,0,0,0,0,0,0},
+        {0,0,0,0,0,1,0,0,0,0,0,0},
+        {0,0,0,0,0,1,0,0,0,0,0,0},
+        {0,0,0,0,0,1,0,0,0,0,0,0},
+        {0,0,0,0,0,1,0,0,0,0,0,0},
+        {0,0,0,0,0,1,0,0,0,0,0,0},
+        {0,0,0,0,0,1,0,0,0,0,0,0},
+        {0,0,0,0,0,1,0,0,0,0,0,0},
+        {0,0,0,0,0,1,0,0,0,0,0,0},
+        {0,0,0,0,0,1,0,0,0,0,0,0},
+        {0,0,0,0,0,1,0,0,0,0,0,0},
+        {0,0,0,0,0,1,0,0,0,0,0,0},
+        {0,0,0,0,0,1,0,0,0,0,0,0},
+        {0,0,0,1,1,1,1,1,0,0,0,0},
+    };
+    static const uint8_t hand[16][12] = {
+        {0,0,0,0,1,1,0,0,0,0,0,0},
+        {0,0,0,1,2,2,1,0,0,0,0,0},
+        {0,0,0,1,2,2,1,0,0,0,0,0},
+        {0,0,0,1,2,2,1,0,0,0,0,0},
+        {0,0,0,1,2,2,1,1,1,0,0,0},
+        {0,0,1,1,2,2,2,2,2,1,0,0},
+        {0,1,2,2,2,2,2,2,2,2,1,0},
+        {0,1,2,2,2,2,2,2,2,2,1,0},
+        {1,2,2,2,2,2,2,2,2,2,1,0},
+        {1,2,2,2,2,2,2,2,2,2,1,0},
+        {1,2,2,2,2,2,2,2,2,2,1,0},
+        {0,1,2,2,2,2,2,2,2,1,0,0},
+        {0,0,1,2,2,2,2,2,2,1,0,0},
+        {0,0,0,1,2,2,2,2,1,0,0,0},
+        {0,0,0,0,1,2,2,1,0,0,0,0},
+        {0,0,0,0,0,1,1,0,0,0,0,0},
+    };
+    const uint8_t (*sprite)[12] = arrow;
+    int off_x = 0, off_y = 0;
+    if (cursor_type == SPROT_CURSOR_IBEAM) { sprite = ibeam; off_x = -5; off_y = -8; }
+    else if (cursor_type == SPROT_CURSOR_HAND) { sprite = hand; off_x = -4; off_y = 0; }
+
     for (int y = 0; y < 16; y++) {
         for (int x = 0; x < 12; x++) {
-            uint8_t v = arrow[y][x];
+            uint8_t v = sprite[y][x];
             if (v == 0) continue;
-            int32_t px = cx + x, py = cy + y;
+            int32_t px = cx + x + off_x, py = cy + y + off_y;
             if (px < 0 || px >= dst_w || py < 0 || py >= dst_h) continue;
             dst[py * dst_pitch_px + px] = (v == 1) ? 0xFF000000u : 0xFFFFFFFFu;
         }
@@ -598,7 +703,9 @@ static void composite_surfaces(srapi_framebuffer_t *fb, uint32_t bg_color) {
 
     for (int i = 0; i < n; i++) {
         swm_surface_t *s = list[i];
-        draw_titlebar_chrome(dst, dst_w, dst_h, dst_pitch_px, s, s == focused);
+        if (s->role != SPROT_SURFACE_ROLE_POPUP) {
+            draw_titlebar_chrome(dst, dst_w, dst_h, dst_pitch_px, s, s == focused);
+        }
 
         if (s->buf_map == NULL) continue;
         int32_t ex, ey, ew, eh;
@@ -644,7 +751,7 @@ static void composite_surfaces(srapi_framebuffer_t *fb, uint32_t bg_color) {
     if (g_swm.de != NULL) {
         de_render(g_swm.de, fb);
     }
-    draw_cursor(dst, dst_w, dst_h, dst_pitch_px, g_swm.mouse_x, g_swm.mouse_y);
+    draw_cursor(dst, dst_w, dst_h, dst_pitch_px, g_swm.mouse_x, g_swm.mouse_y, g_swm.current_cursor);
 }
 
 static void send_close_to(swm_surface_t *s) {
@@ -690,6 +797,17 @@ static void forward_input(const srapi_input_event_t *ev) {
                 }
             }
             region = hit_test(g_swm.mouse_x, g_swm.mouse_y, &s);
+            swm_surface_t *new_hover = (region == SWM_HIT_CONTENT) ? s : NULL;
+            if (g_swm.hovered_surface != new_hover) {
+                if (g_swm.hovered_surface != NULL && g_swm.hovered_surface->owner != NULL) {
+                    send_event(g_swm.hovered_surface->owner->sock, SPROT_EVT_POINTER_LEAVE, g_swm.hovered_surface->id, 0, NULL, 0);
+                }
+                g_swm.hovered_surface = new_hover;
+                if (new_hover != NULL && new_hover->owner != NULL) {
+                    send_event(new_hover->owner->sock, SPROT_EVT_POINTER_ENTER, new_hover->id, 0, NULL, 0);
+                }
+            }
+
             if (region == SWM_HIT_CONTENT && s != NULL && s->owner != NULL) {
                 int32_t ex, ey, ew, eh;
                 surface_effective_rect(s, &ex, &ey, &ew, &eh);
@@ -761,6 +879,16 @@ static void forward_input(const srapi_input_event_t *ev) {
                     .state = SPROT_BUTTON_STATE_RELEASED,
                 };
                 send_event(s->owner->sock, SPROT_EVT_POINTER_BUTTON, s->id, 0, &body, sizeof(body));
+            }
+            break;
+        }
+        case SRAPI_INPUT_EVENT_MOUSE_WHEEL: {
+            if (g_swm.hovered_surface != NULL && g_swm.hovered_surface->owner != NULL) {
+                sprot_body_pointer_axis_t body = {
+                    .dx = ev->mouse_wheel.dx,
+                    .dy = ev->mouse_wheel.dy,
+                };
+                send_event(g_swm.hovered_surface->owner->sock, SPROT_EVT_POINTER_AXIS, g_swm.hovered_surface->id, 0, &body, sizeof(body));
             }
             break;
         }

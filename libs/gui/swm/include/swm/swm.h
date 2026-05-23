@@ -36,6 +36,10 @@ typedef struct swm_surface {
     int committed;
     int minimized;
     int maximized;
+    uint32_t role;
+    uint32_t parent_id;
+    int32_t rel_x;
+    int32_t rel_y;
     int wants_frame;
     int32_t pos_x;
     int32_t pos_y;
@@ -64,10 +68,12 @@ typedef struct {
     uint32_t display_h;
     int32_t mouse_x;
     int32_t mouse_y;
+    uint32_t current_cursor;
     uint32_t modifiers;
     int mouse_left_down;
     swm_interact_t interaction;
     swm_surface_t *grab_surface;
+    swm_surface_t *hovered_surface;
     int32_t grab_offset_x;
     int32_t grab_offset_y;
     int should_quit;

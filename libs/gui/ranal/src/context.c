@@ -217,6 +217,8 @@ ranal_surface_t *ranal_context_surface(ranal_context_t *ctx) {
     return ctx != NULL ? ctx->target : NULL;
 }
 
+#include <sprot/client.h>
+
 ranal_widget_t *ranal_popup(int32_t x, int32_t y) {
     if (g_ranal == NULL || !g_ranal->initialized) {
         return NULL;
@@ -240,6 +242,7 @@ ranal_widget_t *ranal_popup(int32_t x, int32_t y) {
     p->next_sibling = g_ranal->popups;
     g_ranal->popups = p;
     g_ranal->dirty = 1;
+
     return p;
 }
 
@@ -252,6 +255,14 @@ void ranal_popup_close(ranal_widget_t *popup) {
         if (*link == popup) {
             *link = popup->next_sibling;
             popup->next_sibling = NULL;
+            if (popup->sprot_popup_surface != NULL) {
+                sprot_destroy_surface((sprot_surface_t *)popup->sprot_popup_surface);
+                popup->sprot_popup_surface = NULL;
+            }
+            if (popup->popup_target != NULL) {
+                ranal_surface_destroy(popup->popup_target);
+                popup->popup_target = NULL;
+            }
             ranal_widget_free_recursive_(popup);
             g_ranal->dirty = 1;
             return;

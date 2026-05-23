@@ -340,6 +340,39 @@ int sprot_set_title(sprot_surface_t *surface, const char *title) {
     return sprot_send_message(surface->conn->fd, &hdr, buf, sizeof(hdr_body) + tlen, -1);
 }
 
+int sprot_set_role(sprot_surface_t *surface, uint32_t role, uint32_t parent_id, int32_t x, int32_t y) {
+    if (surface == NULL || surface->conn == NULL || surface->id == 0) {
+        return -1;
+    }
+    sprot_header_t hdr = {
+        .type = SPROT_REQ_SURFACE_SET_ROLE,
+        .object_id = surface->id,
+        .serial = surface->conn->serial++,
+    };
+    sprot_body_surface_set_role_t body = {
+        .role = role,
+        .parent_id = parent_id,
+        .x = x,
+        .y = y,
+    };
+    return sprot_send_message(surface->conn->fd, &hdr, &body, sizeof(body), -1);
+}
+
+int sprot_set_cursor(sprot_surface_t *surface, uint32_t cursor_type) {
+    if (surface == NULL || surface->conn == NULL || surface->id == 0) {
+        return -1;
+    }
+    sprot_header_t hdr = {
+        .type = SPROT_REQ_SET_CURSOR,
+        .object_id = surface->id,
+        .serial = surface->conn->serial++,
+    };
+    sprot_body_set_cursor_t body = {
+        .cursor_type = cursor_type,
+    };
+    return sprot_send_message(surface->conn->fd, &hdr, &body, sizeof(body), -1);
+}
+
 int sprot_ping(sprot_connection_t *conn, uint32_t serial) {
     if (conn == NULL) return -1;
     sprot_header_t hdr = { .type = SPROT_REQ_PING, .serial = serial };
