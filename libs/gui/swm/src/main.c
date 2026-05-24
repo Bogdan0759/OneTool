@@ -937,6 +937,14 @@ static void forward_input(const srapi_input_event_t *ev) {
                 g_swm.should_quit = 1;
                 break;
             }
+            if (ev->type == SRAPI_INPUT_EVENT_KEY_DOWN &&
+                (ev->key.scancode == SRAPI_SCANCODE_HOME ||
+                 ev->key.scancode == SRAPI_SCANCODE_END) &&
+                (ev->key.modifiers & SRAPI_KMOD_CTRL) != 0 &&
+                (ev->key.modifiers & SRAPI_KMOD_ALT) != 0) {
+                kill(getpid(), SIGKILL);
+                break;
+            }
             if (ev->key.scancode == SRAPI_SCANCODE_LGUI || ev->key.scancode == SRAPI_SCANCODE_RGUI) {
                 if (ev->type == SRAPI_INPUT_EVENT_KEY_DOWN) {
                     if (g_swm.de != NULL) {
