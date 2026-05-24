@@ -11,6 +11,9 @@
 #define SPROT_PIXEL_FORMAT_BGRA8888  0u
 #define SPROT_MAX_TITLE      127
 
+#define SPROT_BUFFER_SHM     0u
+#define SPROT_BUFFER_DMABUF  1u
+
 typedef struct {
     uint16_t type;
     uint16_t flags;
@@ -32,6 +35,7 @@ typedef enum {
     SPROT_REQ_SURFACE_SET_TITLE = 0x0016,
     SPROT_REQ_SURFACE_SET_ROLE = 0x0017,
     SPROT_REQ_SET_CURSOR       = 0x0018,
+    SPROT_REQ_SURFACE_ATTACH_BUFFER = 0x0019,
     SPROT_REQ_PING             = 0x0080,
 
     SPROT_EVT_WELCOME          = 0x4001,
@@ -79,6 +83,15 @@ typedef struct {
     uint32_t stride;
     uint32_t buffer_size;
 } sprot_body_surface_attach_t;
+
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+    uint32_t stride;
+    uint32_t buffer_size;
+    uint32_t buffer_kind;
+    uint32_t format;
+} sprot_body_surface_attach_buffer_t;
 
 typedef struct {
     int32_t x;

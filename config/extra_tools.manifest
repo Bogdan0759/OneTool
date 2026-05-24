@@ -8,3 +8,4 @@
 # mytool|../path/to/mytool.c|custom tool example|tool|
 
 yap|mofl/languages/yap/yap.c|YAP language interpreter|tool|
+sprot_srapi_demo|tools/dev/sprot_srapi_demo.c|SRAPI to swm bridge demo|tool|-Ilibs/gui/sprot/include -Ilibs/srapi/include

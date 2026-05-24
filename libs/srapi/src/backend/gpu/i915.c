@@ -1191,6 +1191,26 @@ srapi_result_t srapi_i915_render_image(
                 break;
             case SRAPI_COMMAND_SET_VIEWPORT:
                 break;
+            case SRAPI_COMMAND_DRAW_LINE:
+                r = srapi_i915_render3d_line_image(
+                    device, target, op,
+                    scissor_enabled, scissor_x, scissor_y,
+                    scissor_width, scissor_height
+                );
+                if (r != SRAPI_OK) {
+                    return r;
+                }
+                break;
+            case SRAPI_COMMAND_FILL_TRIANGLE:
+                r = srapi_i915_render3d_triangle_image(
+                    device, target, op,
+                    scissor_enabled, scissor_x, scissor_y,
+                    scissor_width, scissor_height
+                );
+                if (r != SRAPI_OK) {
+                    return r;
+                }
+                break;
             case SRAPI_COMMAND_SHADE_RECT:
                 r = srapi_i915_render3d_shade_image(
                     device, target, op,
