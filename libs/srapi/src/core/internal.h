@@ -180,6 +180,7 @@ srapi_result_t srapi_tile_cache_submit_framebuffer(
     srapi_framebuffer_t *target,
     const srapi_cmd_buffer_t *cmd
 );
+int srapi_drm_ioctl(int fd, unsigned long request, void *arg);
 
 void srapi_render_clear(srapi_framebuffer_t *fb, srapi_color_t color);
 void srapi_render_fill_rect(

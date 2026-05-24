@@ -117,6 +117,44 @@ static void fill_span_mapped(srapi_framebuffer_t *target, int32_t x, int32_t y, 
     }
 }
 
+static void image_as_framebuffer(const srapi_image_t *image, srapi_framebuffer_t *fb) {
+    memset(fb, 0, sizeof(*fb));
+    fb->width = image->width;
+    fb->height = image->height;
+    fb->pitch = image->pitch;
+    fb->pixels = (uint32_t *)image->data;
+    fb->backend = image->backend;
+    fb->device = image->device;
+    fb->gpu_fd = image->device != NULL ? image->device->fd : -1;
+    fb->gpu_handle = image->gpu_handle;
+    fb->gpu_size = image->gpu_size;
+    fb->gpu_memory = image->gpu_memory;
+}
+
+srapi_result_t srapi_i915_render3d_line_image(
+    srapi_device_t *device,
+    srapi_image_t *target,
+    const srapi_command_t *op,
+    int scissor_enabled,
+    int32_t scissor_x,
+    int32_t scissor_y,
+    uint32_t scissor_width,
+    uint32_t scissor_height
+) {
+    srapi_framebuffer_t fb;
+
+    if (device == NULL || target == NULL || op == NULL ||
+        target->device != device || target->gpu_memory != 1 || target->data == NULL) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    image_as_framebuffer(target, &fb);
+    return srapi_i915_render3d_line_framebuffer(
+        device, &fb, op,
+        scissor_enabled, scissor_x, scissor_y, scissor_width, scissor_height
+    );
+}
+
 srapi_result_t srapi_i915_render3d_line_framebuffer(
     srapi_device_t *device,
     srapi_framebuffer_t *target,
@@ -176,6 +214,30 @@ srapi_result_t srapi_i915_render3d_line_framebuffer(
     (void)device;
     srapi_debugf("i915 render3d line mapped %d,%d -> %d,%d", op->x0, op->y0, op->x1, op->y1);
     return SRAPI_OK;
+}
+
+srapi_result_t srapi_i915_render3d_triangle_image(
+    srapi_device_t *device,
+    srapi_image_t *target,
+    const srapi_command_t *op,
+    int scissor_enabled,
+    int32_t scissor_x,
+    int32_t scissor_y,
+    uint32_t scissor_width,
+    uint32_t scissor_height
+) {
+    srapi_framebuffer_t fb;
+
+    if (device == NULL || target == NULL || op == NULL ||
+        target->device != device || target->gpu_memory != 1 || target->data == NULL) {
+        return SRAPI_ERROR_BAD_ARG;
+    }
+
+    image_as_framebuffer(target, &fb);
+    return srapi_i915_render3d_triangle_framebuffer(
+        device, &fb, op,
+        scissor_enabled, scissor_x, scissor_y, scissor_width, scissor_height
+    );
 }
 
 srapi_result_t srapi_i915_render3d_triangle_framebuffer(

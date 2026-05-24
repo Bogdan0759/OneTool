@@ -15,6 +15,8 @@
 
 typedef struct swm_client swm_client_t;
 typedef struct de de_t;
+typedef struct swm_output swm_output_t;
+typedef struct swm_buffer swm_buffer_t;
 
 typedef enum {
     SWM_INTERACT_NONE = 0,
@@ -30,8 +32,8 @@ typedef struct swm_surface {
     uint32_t height;
     uint32_t stride;
     size_t buffer_size;
-    int buf_fd;
-    void *buf_map;
+    uint32_t buffer_kind;
+    swm_buffer_t *buffer;
     int has_pending;
     int committed;
     int minimized;
@@ -58,9 +60,7 @@ struct swm_client {
 };
 
 typedef struct {
-    srapi_drm_display_t *drm;
-    srapi_context_t *srctx;
-    srapi_cmd_buffer_t *cmd;
+    swm_output_t *output;
     srapi_input_context_t *input;
     int listen_fd;
     char socket_path[128];

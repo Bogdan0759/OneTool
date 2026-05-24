@@ -403,6 +403,7 @@ srapi_result_t srapi_buffer_write(srapi_buffer_t *buffer, size_t offset, const v
 srapi_result_t srapi_buffer_read(const srapi_buffer_t *buffer, size_t offset, void *out, size_t size);
 srapi_result_t srapi_buffer_map(srapi_buffer_t *buffer, void **out);
 void srapi_buffer_unmap(srapi_buffer_t *buffer);
+srapi_result_t srapi_buffer_export_dmabuf(const srapi_buffer_t *buffer, int *out_fd);
 
 srapi_result_t srapi_create_image(
     srapi_device_t *device,
@@ -418,6 +419,7 @@ uint32_t srapi_image_usage(const srapi_image_t *image);
 srapi_backend_t srapi_image_backend(const srapi_image_t *image);
 srapi_result_t srapi_image_map(srapi_image_t *image, void **out, uint32_t *pitch);
 void srapi_image_unmap(srapi_image_t *image);
+srapi_result_t srapi_image_export_dmabuf(const srapi_image_t *image, int *out_fd);
 
 srapi_result_t srapi_create_image_view(
     const srapi_image_view_desc_t *desc,
@@ -474,6 +476,7 @@ uint32_t srapi_framebuffer_width(const srapi_framebuffer_t *fb);
 uint32_t srapi_framebuffer_height(const srapi_framebuffer_t *fb);
 uint32_t srapi_framebuffer_pitch(const srapi_framebuffer_t *fb);
 uint32_t *srapi_framebuffer_pixels(srapi_framebuffer_t *fb);
+srapi_result_t srapi_framebuffer_export_dmabuf(const srapi_framebuffer_t *fb, int *out_fd);
 
 srapi_result_t srapi_create_cmd_buffer(srapi_context_t *ctx, srapi_cmd_buffer_t **out);
 void srapi_destroy_cmd_buffer(srapi_cmd_buffer_t *cmd);

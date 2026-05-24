@@ -26,6 +26,8 @@ struct sprot_surface {
     int fd;
     void *map;
     int attached;
+    uint32_t attach_kind;
+    uint32_t attach_format;
     struct sprot_surface *next;
 };
 
@@ -248,6 +250,14 @@ uint32_t *sprot_surface_pixels(sprot_surface_t *surface) {
     return surface != NULL ? (uint32_t *)surface->map : NULL;
 }
 
+uint32_t sprot_surface_width(const sprot_surface_t *surface) {
+    return surface != NULL ? surface->width : 0;
+}
+
+uint32_t sprot_surface_height(const sprot_surface_t *surface) {
+    return surface != NULL ? surface->height : 0;
+}
+
 uint32_t sprot_surface_stride(const sprot_surface_t *surface) {
     return surface != NULL ? surface->stride : 0;
 }
@@ -267,22 +277,16 @@ int sprot_commit(sprot_surface_t *surface) {
     }
     sprot_connection_t *conn = surface->conn;
     if (!surface->attached) {
-        sprot_header_t hdr = {
-            .type = SPROT_REQ_SURFACE_ATTACH,
-            .object_id = surface->id,
-            .serial = conn->serial++,
-        };
-        sprot_body_surface_attach_t body = {
-            .width = surface->width,
-            .height = surface->height,
-            .stride = surface->stride,
-            .buffer_size = (uint32_t)surface->size,
-        };
-        if (sprot_send_message(conn->fd, &hdr, &body, sizeof(body), surface->fd) != 0) {
-            set_err("sprot: send SURFACE_ATTACH: %s", strerror(errno));
+        if (sprot_attach_fd(surface,
+                            surface->fd,
+                            surface->width,
+                            surface->height,
+                            surface->stride,
+                            (uint32_t)surface->size,
+                            SPROT_BUFFER_SHM,
+                            SPROT_PIXEL_FORMAT_BGRA8888) != 0) {
             return -1;
         }
-        surface->attached = 1;
     }
     sprot_header_t hdr = {
         .type = SPROT_REQ_SURFACE_COMMIT,
@@ -293,6 +297,48 @@ int sprot_commit(sprot_surface_t *surface) {
         set_err("sprot: send SURFACE_COMMIT: %s", strerror(errno));
         return -1;
     }
+    return 0;
+}
+
+int sprot_attach_fd(
+    sprot_surface_t *surface,
+    int fd,
+    uint32_t width,
+    uint32_t height,
+    uint32_t stride,
+    uint32_t buffer_size,
+    uint32_t buffer_kind,
+    uint32_t format
+) {
+    sprot_header_t hdr;
+    sprot_body_surface_attach_buffer_t body;
+
+    if (surface == NULL || surface->conn == NULL || surface->id == 0 || fd < 0) {
+        set_err("sprot: bad attach args");
+        return -1;
+    }
+
+    hdr.type = SPROT_REQ_SURFACE_ATTACH_BUFFER;
+    hdr.object_id = surface->id;
+    hdr.serial = surface->conn->serial++;
+    hdr.flags = 0;
+    hdr.length = 0;
+
+    body.width = width;
+    body.height = height;
+    body.stride = stride;
+    body.buffer_size = buffer_size;
+    body.buffer_kind = buffer_kind;
+    body.format = format;
+
+    if (sprot_send_message(surface->conn->fd, &hdr, &body, sizeof(body), fd) != 0) {
+        set_err("sprot: send SURFACE_ATTACH_BUFFER: %s", strerror(errno));
+        return -1;
+    }
+
+    surface->attached = 1;
+    surface->attach_kind = buffer_kind;
+    surface->attach_format = format;
     return 0;
 }
 

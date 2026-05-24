@@ -1,5 +1,7 @@
 #define _GNU_SOURCE
 #include <swm/swm.h>
+#include "backend/backend.h"
+#include "buffer/buffer.h"
 #include "de/de.h"
 
 #include <errno.h>
@@ -38,7 +40,6 @@ static swm_surface_t *alloc_surface(void) {
         if (!g_swm.surfaces[i].in_use) {
             memset(&g_swm.surfaces[i], 0, sizeof(g_swm.surfaces[i]));
             g_swm.surfaces[i].in_use = 1;
-            g_swm.surfaces[i].buf_fd = -1;
             return &g_swm.surfaces[i];
         }
     }
@@ -54,10 +55,7 @@ static void free_surface(swm_surface_t *s) {
     if (g_swm.hovered_surface == s) {
         g_swm.hovered_surface = NULL;
     }
-    if (s->buf_map != NULL && s->buf_map != MAP_FAILED) {
-        munmap(s->buf_map, s->buffer_size);
-    }
-    if (s->buf_fd >= 0) close(s->buf_fd);
+    swm_buffer_destroy(s->buffer);
     if (s->owner != NULL) {
         for (int i = 0; i < s->owner->surface_count; i++) {
             if (s->owner->surfaces[i] == s) {
@@ -255,23 +253,54 @@ static int handle_surface_attach(swm_client_t *c, const sprot_header_t *hdr, con
         send_error(c->sock, SPROT_ERROR_INVALID_ARG, "ATTACH dims mismatch");
         return -1;
     }
-    if (s->buf_map != NULL && s->buf_map != MAP_FAILED) {
-        munmap(s->buf_map, s->buffer_size);
-        s->buf_map = NULL;
-    }
-    if (s->buf_fd >= 0) {
-        close(s->buf_fd);
-        s->buf_fd = -1;
-    }
-    s->buf_fd = incoming_fd;
-    s->buf_map = mmap(NULL, s->buffer_size, PROT_READ, MAP_SHARED, incoming_fd, 0);
-    if (s->buf_map == MAP_FAILED) {
-        s->buf_map = NULL;
-        close(s->buf_fd);
-        s->buf_fd = -1;
+    swm_buffer_destroy(s->buffer);
+    s->buffer = swm_buffer_create(SPROT_BUFFER_SHM, incoming_fd, s->width, s->height, s->stride, s->buffer_size);
+    if (s->buffer == NULL) {
         send_error(c->sock, SPROT_ERROR_OUT_OF_MEMORY, "mmap failed");
         return -1;
     }
+    s->buffer_kind = SPROT_BUFFER_SHM;
+    s->has_pending = 1;
+    return 0;
+}
+
+static int handle_surface_attach_buffer(swm_client_t *c, const sprot_header_t *hdr, const void *body, size_t blen, int incoming_fd) {
+    sprot_body_surface_attach_buffer_t b;
+    swm_surface_t *s;
+
+    if (blen < sizeof(b)) {
+        if (incoming_fd >= 0) close(incoming_fd);
+        send_error(c->sock, SPROT_ERROR_PROTOCOL, "short SURFACE_ATTACH_BUFFER");
+        return -1;
+    }
+    if (incoming_fd < 0) {
+        send_error(c->sock, SPROT_ERROR_PROTOCOL, "SURFACE_ATTACH_BUFFER missing fd");
+        return -1;
+    }
+
+    memcpy(&b, body, sizeof(b));
+    s = find_surface(hdr->object_id);
+    if (s == NULL || s->owner != c) {
+        close(incoming_fd);
+        send_error(c->sock, SPROT_ERROR_INVALID_ARG, "bad surface id");
+        return -1;
+    }
+    if ((b.buffer_kind != SPROT_BUFFER_SHM && b.buffer_kind != SPROT_BUFFER_DMABUF) ||
+        b.format != SPROT_PIXEL_FORMAT_BGRA8888 ||
+        b.width != s->width || b.height != s->height || b.stride != s->stride ||
+        b.buffer_size != s->buffer_size) {
+        close(incoming_fd);
+        send_error(c->sock, SPROT_ERROR_INVALID_ARG, "ATTACH_BUFFER mismatch");
+        return -1;
+    }
+
+    swm_buffer_destroy(s->buffer);
+    s->buffer = swm_buffer_create(b.buffer_kind, incoming_fd, b.width, b.height, b.stride, b.buffer_size);
+    if (s->buffer == NULL) {
+        send_error(c->sock, SPROT_ERROR_OUT_OF_MEMORY, "buffer import failed");
+        return -1;
+    }
+    s->buffer_kind = b.buffer_kind;
     s->has_pending = 1;
     return 0;
 }
@@ -282,7 +311,7 @@ static int handle_surface_commit(swm_client_t *c, const sprot_header_t *hdr) {
         send_error(c->sock, SPROT_ERROR_INVALID_ARG, "bad surface id");
         return -1;
     }
-    if (s->buf_map == NULL) {
+    if (s->buffer == NULL) {
         send_error(c->sock, SPROT_ERROR_INVALID_ARG, "commit without attached buffer");
         return -1;
     }
@@ -389,6 +418,8 @@ static int dispatch_message(swm_client_t *c) {
         case SPROT_REQ_HELLO:           rc = handle_hello(c, &hdr, body, blen); break;
         case SPROT_REQ_SURFACE_CREATE:  rc = handle_surface_create(c, &hdr, body, blen); break;
         case SPROT_REQ_SURFACE_ATTACH:  rc = handle_surface_attach(c, &hdr, body, blen, incoming_fd);
+                                        incoming_fd = -1; break;
+        case SPROT_REQ_SURFACE_ATTACH_BUFFER: rc = handle_surface_attach_buffer(c, &hdr, body, blen, incoming_fd);
                                         incoming_fd = -1; break;
         case SPROT_REQ_SURFACE_COMMIT:  rc = handle_surface_commit(c, &hdr); break;
         case SPROT_REQ_SURFACE_DESTROY: rc = handle_surface_destroy(c, &hdr); break;
@@ -707,13 +738,17 @@ static void composite_surfaces(srapi_framebuffer_t *fb, uint32_t bg_color) {
             draw_titlebar_chrome(dst, dst_w, dst_h, dst_pitch_px, s, s == focused);
         }
 
-        if (s->buf_map == NULL) continue;
+        int began_read = 0;
+        if (s->buffer == NULL) continue;
         int32_t ex, ey, ew, eh;
         surface_effective_rect(s, &ex, &ey, &ew, &eh);
-        int32_t src_pitch_px = (int32_t)(s->stride / 4u);
-        const uint32_t *src = (const uint32_t *)s->buf_map;
+        int32_t src_pitch_px = (int32_t)(swm_buffer_stride(s->buffer) / 4u);
+        const uint32_t *src = (const uint32_t *)swm_buffer_pixels(s->buffer);
         int32_t src_w = (int32_t)s->width;
         int32_t src_h = (int32_t)s->height;
+        if (src == NULL) continue;
+        if (swm_buffer_begin_cpu_read(s->buffer) != 0) continue;
+        began_read = 1;
 
         if (ew == src_w && eh == src_h) {
             int32_t sx0 = 0, sy0 = 0;
@@ -747,6 +782,7 @@ static void composite_surfaces(srapi_framebuffer_t *fb, uint32_t bg_color) {
                 }
             }
         }
+        if (began_read) swm_buffer_end_cpu_read(s->buffer);
     }
     if (g_swm.de != NULL) {
         de_render(g_swm.de, fb);
@@ -993,7 +1029,6 @@ int main(int argc, char *argv[]) {
     if (debug) srapi = 1;
 
     memset(&g_swm, 0, sizeof(g_swm));
-    for (int i = 0; i < SWM_MAX_SURFACES; i++) g_swm.surfaces[i].buf_fd = -1;
     g_swm.next_cascade_x = 64;
     g_swm.next_cascade_y = 64;
 
@@ -1001,35 +1036,15 @@ int main(int argc, char *argv[]) {
     signal(SIGTERM, on_signal);
     signal(SIGPIPE, SIG_IGN);
 
-    srapi_drm_recommendation_t rec;
-    if (srapi_drm_recommend(&rec) != SRAPI_OK) {
-        logf_("drm recommend: %s", srapi_last_error());
-        return 1;
-    }
-    if (srapi_drm_open_display(&(srapi_drm_display_desc_t){ .device_path = rec.path }, &g_swm.drm) != SRAPI_OK) {
+    if (swm_output_create_default(&g_swm.output) != SRAPI_OK) {
         logf_("drm open: %s", srapi_last_error());
         return 1;
     }
-    g_swm.display_w = srapi_drm_width(g_swm.drm);
-    g_swm.display_h = srapi_drm_height(g_swm.drm);
+    g_swm.display_w = swm_output_width(g_swm.output);
+    g_swm.display_h = swm_output_height(g_swm.output);
     g_swm.mouse_x = (int32_t)g_swm.display_w / 2;
     g_swm.mouse_y = (int32_t)g_swm.display_h / 2;
     logf_("display %ux%u", g_swm.display_w, g_swm.display_h);
-
-    if (srapi_create_context(&(srapi_context_desc_t){
-            .width = g_swm.display_w, .height = g_swm.display_h,
-            .backend = SRAPI_BACKEND_CPU,
-        }, &g_swm.srctx) != SRAPI_OK) {
-        logf_("create context: %s", srapi_last_error());
-        srapi_drm_close(g_swm.drm);
-        return 1;
-    }
-    if (srapi_create_cmd_buffer(g_swm.srctx, &g_swm.cmd) != SRAPI_OK) {
-        logf_("create cmd: %s", srapi_last_error());
-        srapi_destroy_context(g_swm.srctx);
-        srapi_drm_close(g_swm.drm);
-        return 1;
-    }
     if (srapi_input_create(&(srapi_input_desc_t){
             .auto_discover = 1,
             .grab = 1,
@@ -1045,9 +1060,8 @@ int main(int argc, char *argv[]) {
     g_swm.listen_fd = setup_socket(socket_path);
     if (g_swm.listen_fd < 0) {
         if (g_swm.input != NULL) srapi_input_destroy(g_swm.input);
-        srapi_destroy_cmd_buffer(g_swm.cmd);
-        srapi_destroy_context(g_swm.srctx);
-        srapi_drm_close(g_swm.drm);
+        swm_output_destroy(g_swm.output);
+        g_swm.output = NULL;
         return 1;
     }
 
@@ -1057,7 +1071,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (record_path != NULL) {
-        if (srapi_drm_record_start(g_swm.drm, record_path, record_fps * 1000u) != SRAPI_OK) {
+        if (swm_output_record_start(g_swm.output, record_path, record_fps * 1000u) != SRAPI_OK) {
             logf_("record: %s (continuing without recording)", srapi_last_error());
         } else {
             logf_("recording to %s @ %u fps (BGRA8888 srvid)", record_path, record_fps);
@@ -1125,18 +1139,18 @@ int main(int argc, char *argv[]) {
         }
         if (g_swm.should_quit) break;
 
-        srapi_framebuffer_t *fb = srapi_drm_backbuffer(g_swm.drm);
+        srapi_framebuffer_t *fb = swm_output_backbuffer(g_swm.output);
         if (g_swm.de != NULL) de_tick(g_swm.de, g_swm.frame_count);
         composite_surfaces(fb, bg_color);
-        srapi_drm_present(g_swm.drm);
+        swm_output_present(g_swm.output);
         g_swm.frame_count++;
         deliver_frame_callbacks();
     }
 
     logf_("shutting down");
-    if (srapi_drm_is_recording(g_swm.drm)) {
+    if (swm_output_is_recording(g_swm.output)) {
         logf_("record: flushing");
-        srapi_drm_record_stop(g_swm.drm);
+        swm_output_record_stop(g_swm.output);
     }
     if (g_swm.de != NULL) {
         de_destroy(g_swm.de);
@@ -1150,9 +1164,7 @@ int main(int argc, char *argv[]) {
     if (g_swm.listen_fd >= 0) close(g_swm.listen_fd);
     if (g_swm.socket_path[0] != '\0') unlink(g_swm.socket_path);
     if (g_swm.input != NULL) srapi_input_destroy(g_swm.input);
-    srapi_destroy_cmd_buffer(g_swm.cmd);
-    srapi_destroy_context(g_swm.srctx);
-    srapi_drm_close(g_swm.drm);
+    swm_output_destroy(g_swm.output);
     return 0;
 }
 
