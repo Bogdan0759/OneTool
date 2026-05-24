@@ -86,6 +86,11 @@ typedef struct {
     swm_client_t clients[SWM_MAX_CLIENTS];
     swm_surface_t surfaces[SWM_MAX_SURFACES];
     de_t *de;
+
+    int32_t dirty_x1, dirty_y1, dirty_x2, dirty_y2;
+    int has_dirty_rect;
+    int32_t prev_cursor_x, prev_cursor_y;
 } swm_state_t;
+
 
 #endif

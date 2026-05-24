@@ -17,6 +17,8 @@
 #include <ranal/ranal.h>
 #include <srapi/srapi.h>
 
+#include "../compositor.h"
+
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
@@ -25,6 +27,7 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+
 
 typedef enum {
     DE_MENU_TERM = 0,
@@ -566,8 +569,11 @@ void de_tick(de_t *de, uint64_t frame_count) {
     }
     ranal_set_current(prev);
 
+    swm_mark_dirty_rect(de->swm, 0, de->taskbar_top, de->display_w, de->display_h);
+
     /*
      * Advance the per-item tooltip fade. Hovered item targets alpha=1, all
+
      * others target 0. We use an inverse-time-constant lerp so it eases in
      * naturally; DE_TOOLTIP_FADE_SEC sets the full-range duration.
      */
