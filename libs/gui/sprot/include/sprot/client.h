@@ -21,6 +21,7 @@ typedef enum {
     SPROT_EVENT_POINTER_LEAVE,
     SPROT_EVENT_POINTER_AXIS,
     SPROT_EVENT_KEY,
+    SPROT_EVENT_RENDER_NODE,
     SPROT_EVENT_PONG,
     SPROT_EVENT_ERROR,
     SPROT_EVENT_DISCONNECT,
@@ -39,6 +40,7 @@ typedef struct {
         sprot_body_pointer_button_t pointer_button;
         sprot_body_pointer_axis_t pointer_axis;
         sprot_body_key_t key;
+        sprot_body_render_node_t render_node;
         struct {
             uint32_t code;
             char message[128];

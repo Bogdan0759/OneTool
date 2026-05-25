@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #define SPROT_VERSION_MAJOR  0
-#define SPROT_VERSION_MINOR  2
+#define SPROT_VERSION_MINOR  3
 #define SPROT_DEFAULT_SOCKET "/tmp/swm.sock"
 #define SPROT_MAX_MESSAGE    4096
 #define SPROT_PIXEL_FORMAT_BGRA8888  0u
@@ -13,6 +13,12 @@
 
 #define SPROT_BUFFER_SHM     0u
 #define SPROT_BUFFER_DMABUF  1u
+#define SPROT_MAX_DMABUF_PLANES 4
+#define SPROT_MAX_DEVICE_PATH   96
+#define SPROT_DRM_FORMAT_ARGB8888   0x34325241u 
+#define SPROT_DRM_FORMAT_XRGB8888   0x34325258u 
+#define SPROT_DRM_FORMAT_MOD_LINEAR ((uint64_t)0)
+#define SPROT_DRM_FORMAT_MOD_INVALID ((uint64_t)0x00ffffffffffffffull)
 
 typedef struct {
     uint16_t type;
@@ -36,6 +42,8 @@ typedef enum {
     SPROT_REQ_SURFACE_SET_ROLE = 0x0017,
     SPROT_REQ_SET_CURSOR       = 0x0018,
     SPROT_REQ_SURFACE_ATTACH_BUFFER = 0x0019,
+    SPROT_REQ_SURFACE_ATTACH_DMABUF = 0x001A,
+    SPROT_REQ_QUERY_RENDER_NODE     = 0x001B,
     SPROT_REQ_PING             = 0x0080,
 
     SPROT_EVT_WELCOME          = 0x4001,
@@ -49,6 +57,7 @@ typedef enum {
     SPROT_EVT_POINTER_ENTER    = 0x4023,
     SPROT_EVT_POINTER_LEAVE    = 0x4024,
     SPROT_EVT_POINTER_AXIS     = 0x4025,
+    SPROT_EVT_RENDER_NODE      = 0x4026,
     SPROT_EVT_PONG             = 0x4080,
     SPROT_EVT_ERROR            = 0x40FF,
 } sprot_msg_type_t;
@@ -92,6 +101,28 @@ typedef struct {
     uint32_t buffer_kind;
     uint32_t format;
 } sprot_body_surface_attach_buffer_t;
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+    uint32_t drm_format;        
+    uint32_t num_planes;      
+    uint64_t modifier;          
+    uint32_t plane_offsets[SPROT_MAX_DMABUF_PLANES];
+    uint32_t plane_strides[SPROT_MAX_DMABUF_PLANES];
+    uint32_t total_size;     
+    uint32_t reserved;
+} sprot_body_surface_attach_dmabuf_t;
+
+typedef struct {
+    char     device_path[SPROT_MAX_DEVICE_PATH];      
+    char     render_node_path[SPROT_MAX_DEVICE_PATH];
+    uint32_t primary_major;
+    uint32_t primary_minor;
+    uint32_t render_major;
+    uint32_t render_minor;
+    uint32_t has_drm;  
+    uint32_t reserved;
+} sprot_body_render_node_t;
 
 typedef struct {
     int32_t x;

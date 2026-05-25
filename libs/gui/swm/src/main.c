@@ -3,6 +3,7 @@
 #include "backend/backend.h"
 #include "buffer/buffer.h"
 #include "de/de.h"
+#include "probe/render_node.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -394,6 +395,99 @@ static int handle_ping(swm_client_t *c, const sprot_header_t *hdr) {
     return send_event(c->sock, SPROT_EVT_PONG, 0, hdr->serial, NULL, 0);
 }
 
+static int handle_query_render_node(swm_client_t *c, const sprot_header_t *hdr) {
+    sprot_body_render_node_t body;
+    const char *path = swm_output_device_path(g_swm.output);
+    swm_probe_render_node(path, &body);
+    return send_event(c->sock, SPROT_EVT_RENDER_NODE, 0, hdr->serial,
+                      &body, sizeof(body));
+}
+
+static int handle_surface_attach_dmabuf(swm_client_t *c, const sprot_header_t *hdr,
+                                         const void *body, size_t blen, int incoming_fd) {
+    sprot_body_surface_attach_dmabuf_t b;
+    swm_surface_t *s;
+    uint32_t stride;
+
+    if (blen < sizeof(b)) {
+        if (incoming_fd >= 0) close(incoming_fd);
+        send_error(c->sock, SPROT_ERROR_PROTOCOL, "short SURFACE_ATTACH_DMABUF");
+        return -1;
+    }
+    if (incoming_fd < 0) {
+        send_error(c->sock, SPROT_ERROR_PROTOCOL, "SURFACE_ATTACH_DMABUF missing fd");
+        return -1;
+    }
+    memcpy(&b, body, sizeof(b));
+
+    s = find_surface(hdr->object_id);
+    if (s == NULL || s->owner != c) {
+        close(incoming_fd);
+        send_error(c->sock, SPROT_ERROR_INVALID_ARG, "bad surface id");
+        return -1;
+    }
+
+
+    if (b.modifier != SPROT_DRM_FORMAT_MOD_LINEAR) {
+        close(incoming_fd);
+        send_error(c->sock, SPROT_ERROR_INVALID_ARG,
+                   "swm only accepts DRM_FORMAT_MOD_LINEAR");
+        return -1;
+    }
+    if (b.num_planes != 1) {
+        close(incoming_fd);
+        send_error(c->sock, SPROT_ERROR_INVALID_ARG,
+                   "multi-plane dmabuf not supported");
+        return -1;
+    }
+    if (b.drm_format != SPROT_DRM_FORMAT_ARGB8888 &&
+        b.drm_format != SPROT_DRM_FORMAT_XRGB8888) {
+        close(incoming_fd);
+        send_error(c->sock, SPROT_ERROR_INVALID_ARG,
+                   "swm only accepts DRM ARGB/XRGB 8888");
+        return -1;
+    }
+    if (b.width != s->width || b.height != s->height) {
+        close(incoming_fd);
+        send_error(c->sock, SPROT_ERROR_INVALID_ARG, "ATTACH_DMABUF dims mismatch");
+        return -1;
+    }
+
+    stride = b.plane_strides[0];
+    if (stride < b.width * 4u) {
+        close(incoming_fd);
+        send_error(c->sock, SPROT_ERROR_INVALID_ARG, "plane stride too small for BGRA");
+        return -1;
+    }
+
+    if (b.plane_offsets[0] != 0) {
+        close(incoming_fd);
+        send_error(c->sock, SPROT_ERROR_INVALID_ARG,
+                   "plane offset != 0 not supported by current swm");
+        return -1;
+    }
+    uint32_t expected_min = stride * b.height;
+    if (b.total_size < expected_min) {
+        close(incoming_fd);
+        send_error(c->sock, SPROT_ERROR_INVALID_ARG, "dmabuf total_size too small");
+        return -1;
+    }
+
+    swm_buffer_destroy(s->buffer);
+    s->buffer = swm_buffer_create(SPROT_BUFFER_DMABUF, incoming_fd,
+                                  b.width, b.height, stride, (size_t)b.total_size);
+    if (s->buffer == NULL) {
+        send_error(c->sock, SPROT_ERROR_OUT_OF_MEMORY, "dmabuf import failed");
+        return -1;
+    }
+
+    s->stride       = stride;
+    s->buffer_size  = (size_t)b.total_size;
+    s->buffer_kind  = SPROT_BUFFER_DMABUF;
+    s->has_pending  = 1;
+    return 0;
+}
+
 static int dispatch_message(swm_client_t *c) {
     sprot_header_t hdr;
     uint8_t body[SPROT_MAX_MESSAGE];
@@ -421,6 +515,9 @@ static int dispatch_message(swm_client_t *c) {
                                         incoming_fd = -1; break;
         case SPROT_REQ_SURFACE_ATTACH_BUFFER: rc = handle_surface_attach_buffer(c, &hdr, body, blen, incoming_fd);
                                         incoming_fd = -1; break;
+        case SPROT_REQ_SURFACE_ATTACH_DMABUF: rc = handle_surface_attach_dmabuf(c, &hdr, body, blen, incoming_fd);
+                                        incoming_fd = -1; break;
+        case SPROT_REQ_QUERY_RENDER_NODE: rc = handle_query_render_node(c, &hdr); break;
         case SPROT_REQ_SURFACE_COMMIT:  rc = handle_surface_commit(c, &hdr); break;
         case SPROT_REQ_SURFACE_DESTROY: rc = handle_surface_destroy(c, &hdr); break;
         case SPROT_REQ_SURFACE_DAMAGE:  /* no-op v1, full-frame composite */ break;

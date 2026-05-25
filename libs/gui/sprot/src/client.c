@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include <sprot/client.h>
+#include "internal.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -41,6 +42,9 @@ struct sprot_connection {
     uint32_t version_minor;
     int welcomed;
     struct sprot_surface *surfaces;
+    sprot_event_t pending[16];
+    int           pending_head;
+    int           pending_count;
 };
 
 static char g_err[256] = "ok";
@@ -54,6 +58,55 @@ static void set_err(const char *fmt, ...) {
 
 const char *sprot_last_error(void) {
     return g_err;
+}
+void sprot_internal_set_error(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(g_err, sizeof(g_err), fmt, ap);
+    va_end(ap);
+}
+
+int sprot_internal_conn_fd(const sprot_connection_t *conn) {
+    return conn != NULL ? conn->fd : -1;
+}
+
+uint32_t sprot_internal_conn_next_serial(sprot_connection_t *conn) {
+    return conn != NULL ? conn->serial++ : 0;
+}
+
+sprot_connection_t *sprot_internal_surface_conn(sprot_surface_t *surface) {
+    return surface != NULL ? surface->conn : NULL;
+}
+
+uint32_t sprot_internal_surface_id(const sprot_surface_t *surface) {
+    return surface != NULL ? surface->id : 0;
+}
+
+void sprot_internal_surface_mark_attached(sprot_surface_t *surface,
+                                           uint32_t kind, uint32_t format) {
+    if (surface == NULL) return;
+    surface->attached = 1;
+    surface->attach_kind = kind;
+    surface->attach_format = format;
+}
+
+int sprot_internal_pending_push(sprot_connection_t *conn, const sprot_event_t *ev) {
+    if (conn == NULL || ev == NULL) return -1;
+    int cap = (int)(sizeof(conn->pending)/sizeof(conn->pending[0]));
+    if (conn->pending_count >= cap) return -1;
+    int tail = (conn->pending_head + conn->pending_count) % cap;
+    conn->pending[tail] = *ev;
+    conn->pending_count++;
+    return 0;
+}
+
+int sprot_internal_pending_pop(sprot_connection_t *conn, sprot_event_t *out) {
+    if (conn == NULL || out == NULL || conn->pending_count == 0) return 0;
+    *out = conn->pending[conn->pending_head];
+    int cap = (int)(sizeof(conn->pending)/sizeof(conn->pending[0]));
+    conn->pending_head = (conn->pending_head + 1) % cap;
+    conn->pending_count--;
+    return 1;
 }
 
 static int memfd_anon(const char *name, size_t size) {
@@ -446,6 +499,10 @@ int sprot_poll_event(sprot_connection_t *conn, sprot_event_t *out_event, int tim
     }
     memset(out_event, 0, sizeof(*out_event));
 
+    if (sprot_internal_pending_pop(conn, out_event)) {
+        return 1;
+    }
+
     pfd.fd = conn->fd;
     pfd.events = POLLIN;
     pfd.revents = 0;
@@ -503,6 +560,12 @@ int sprot_poll_event(sprot_connection_t *conn, sprot_event_t *out_event, int tim
         case SPROT_EVT_POINTER_LEAVE:
             out_event->kind = SPROT_EVENT_POINTER_LEAVE;
             break;
+        case SPROT_EVT_POINTER_AXIS:
+            if (hdr.length - sizeof(hdr) >= sizeof(sprot_body_pointer_axis_t)) {
+                memcpy(&out_event->u.pointer_axis, body, sizeof(sprot_body_pointer_axis_t));
+            }
+            out_event->kind = SPROT_EVENT_POINTER_AXIS;
+            break;
         case SPROT_EVT_KEY:
             memcpy(&out_event->u.key, body, sizeof(sprot_body_key_t));
             out_event->kind = SPROT_EVENT_KEY;
@@ -519,6 +582,12 @@ int sprot_poll_event(sprot_connection_t *conn, sprot_event_t *out_event, int tim
                 memcpy(&out_event->u.frame, body, sizeof(sprot_body_frame_t));
             }
             out_event->kind = SPROT_EVENT_SURFACE_FRAME;
+            break;
+        case SPROT_EVT_RENDER_NODE:
+            if (hdr.length - sizeof(hdr) >= sizeof(sprot_body_render_node_t)) {
+                memcpy(&out_event->u.render_node, body, sizeof(sprot_body_render_node_t));
+            }
+            out_event->kind = SPROT_EVENT_RENDER_NODE;
             break;
         case SPROT_EVT_PONG:
             out_event->kind = SPROT_EVENT_PONG;

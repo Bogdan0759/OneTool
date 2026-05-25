@@ -176,6 +176,8 @@ const char *sprot_msg_type_name(uint16_t type) {
         case SPROT_REQ_SURFACE_SET_TITLE: return "REQ_SURFACE_SET_TITLE";
         case SPROT_REQ_SURFACE_SET_ROLE:  return "REQ_SURFACE_SET_ROLE";
         case SPROT_REQ_SET_CURSOR:        return "REQ_SET_CURSOR";
+        case SPROT_REQ_SURFACE_ATTACH_DMABUF: return "REQ_SURFACE_ATTACH_DMABUF";
+        case SPROT_REQ_QUERY_RENDER_NODE: return "REQ_QUERY_RENDER_NODE";
         case SPROT_REQ_PING:              return "REQ_PING";
         case SPROT_EVT_WELCOME:           return "EVT_WELCOME";
         case SPROT_EVT_SURFACE_CREATED:   return "EVT_SURFACE_CREATED";
@@ -187,6 +189,7 @@ const char *sprot_msg_type_name(uint16_t type) {
         case SPROT_EVT_POINTER_ENTER:     return "EVT_POINTER_ENTER";
         case SPROT_EVT_POINTER_LEAVE:     return "EVT_POINTER_LEAVE";
         case SPROT_EVT_POINTER_AXIS:      return "EVT_POINTER_AXIS";
+        case SPROT_EVT_RENDER_NODE:       return "EVT_RENDER_NODE";
         case SPROT_EVT_KEY:               return "EVT_KEY";
         case SPROT_EVT_PONG:              return "EVT_PONG";
         case SPROT_EVT_ERROR:             return "EVT_ERROR";
