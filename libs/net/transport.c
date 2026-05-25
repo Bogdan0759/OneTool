@@ -3,13 +3,121 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <unistd.h>
+
+/* Long-lived SSL context shared by every TLS connection in the process.
+ *
+ * Creating a fresh SSL_CTX per connection adds ~10-30 ms (loads default
+ * ciphers, init internal tables, etc.). More importantly, OpenSSL keeps
+ * its session cache on the CTX — so a persistent CTX lets repeat
+ * requests to the same host resume the TLS session and skip a full
+ * handshake (~1 RTT saved per connection).
+ *
+ * Init is done under pthread_once so async fetcher threads racing on
+ * the first request don't both build the CTX. */
+static SSL_CTX     *g_tls_ctx = NULL;
+static pthread_once_t g_tls_ctx_once = PTHREAD_ONCE_INIT;
+
+static void tls_ctx_init(void) {
+    OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS
+                     | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);
+    g_tls_ctx = SSL_CTX_new(TLS_client_method());
+    if (g_tls_ctx == NULL) return;
+    SSL_CTX_set_min_proto_version(g_tls_ctx, TLS1_2_VERSION);
+    SSL_CTX_set_options(g_tls_ctx,
+                        SSL_OP_NO_COMPRESSION | SSL_OP_NO_RENEGOTIATION);
+    /* Enable client-side session caching so SSL_connect can resume an
+     * earlier session ticket for the same host. */
+    SSL_CTX_set_session_cache_mode(g_tls_ctx,
+        SSL_SESS_CACHE_CLIENT | SSL_SESS_CACHE_NO_INTERNAL_STORE);
+    /* No peer verification — same posture as before this change. */
+    SSL_CTX_set_verify(g_tls_ctx, SSL_VERIFY_NONE, NULL);
+}
+
+static SSL_CTX *get_tls_ctx(void) {
+    pthread_once(&g_tls_ctx_once, tls_ctx_init);
+    return g_tls_ctx;
+}
+
+/* Per-host TLS session cache — keyed by the SNI host name. Lets
+ * SSL_connect resume the TLS session of a previous connection to the
+ * same host (saves ~1 RTT and a full asymmetric crypto operation).
+ *
+ * Tiny LRU-ish array; on overflow we just stomp the oldest slot. The
+ * mutex is fine-grained because session save/load is a few pointer
+ * ops, not network I/O. */
+#define TLS_SESS_CACHE_SLOTS 16
+typedef struct {
+    char         host[128];
+    SSL_SESSION *session;
+    unsigned     gen;
+} tls_sess_slot_t;
+
+static tls_sess_slot_t g_sess_cache[TLS_SESS_CACHE_SLOTS];
+static unsigned        g_sess_gen = 0;
+static pthread_mutex_t g_sess_mtx = PTHREAD_MUTEX_INITIALIZER;
+
+static SSL_SESSION *sess_cache_get(const char *host) {
+    if (host == NULL || host[0] == '\0') return NULL;
+    SSL_SESSION *out = NULL;
+    pthread_mutex_lock(&g_sess_mtx);
+    for (int i = 0; i < TLS_SESS_CACHE_SLOTS; i++) {
+        if (g_sess_cache[i].session != NULL &&
+            strncmp(g_sess_cache[i].host, host,
+                    sizeof(g_sess_cache[i].host)) == 0) {
+            out = g_sess_cache[i].session;
+            /* Bump ref so the caller can SSL_set_session and then
+             * SSL_SESSION_free without invalidating our cached entry. */
+            SSL_SESSION_up_ref(out);
+            g_sess_cache[i].gen = ++g_sess_gen;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_sess_mtx);
+    return out;
+}
+
+static void sess_cache_put(const char *host, SSL_SESSION *sess) {
+    if (host == NULL || host[0] == '\0' || sess == NULL) return;
+    pthread_mutex_lock(&g_sess_mtx);
+    int free_idx = -1, oldest_idx = 0;
+    unsigned oldest_gen = (unsigned)-1;
+    for (int i = 0; i < TLS_SESS_CACHE_SLOTS; i++) {
+        if (g_sess_cache[i].session != NULL &&
+            strncmp(g_sess_cache[i].host, host,
+                    sizeof(g_sess_cache[i].host)) == 0) {
+            /* refresh */
+            SSL_SESSION_free(g_sess_cache[i].session);
+            g_sess_cache[i].session = sess;   /* takes ownership */
+            g_sess_cache[i].gen = ++g_sess_gen;
+            pthread_mutex_unlock(&g_sess_mtx);
+            return;
+        }
+        if (g_sess_cache[i].session == NULL && free_idx < 0) free_idx = i;
+        if (g_sess_cache[i].gen < oldest_gen) {
+            oldest_gen = g_sess_cache[i].gen;
+            oldest_idx = i;
+        }
+    }
+    int slot = free_idx >= 0 ? free_idx : oldest_idx;
+    if (g_sess_cache[slot].session != NULL) {
+        SSL_SESSION_free(g_sess_cache[slot].session);
+    }
+    strncpy(g_sess_cache[slot].host, host, sizeof(g_sess_cache[slot].host) - 1);
+    g_sess_cache[slot].host[sizeof(g_sess_cache[slot].host) - 1] = '\0';
+    g_sess_cache[slot].session = sess;       /* takes ownership */
+    g_sess_cache[slot].gen = ++g_sess_gen;
+    pthread_mutex_unlock(&g_sess_mtx);
+}
 
 static int wait_connect(int fd, int timeout_sec) {
     fd_set wfds;
@@ -70,6 +178,13 @@ static int tcp_connect(const char *host, const char *port, int timeout_sec, int 
             continue;
         }
 
+        /* Disable Nagle. Browser HTTP requests are small + interactive;
+         * waiting for ACK before sending the next packet adds ~40 ms of
+         * latency that the user perceives as the page being slow to
+         * start loading. */
+        int one = 1;
+        setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
+
         flags = fcntl(fd, F_GETFL, 0);
         if (flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
             close(fd);
@@ -105,7 +220,6 @@ static int tcp_connect(const char *host, const char *port, int timeout_sec, int 
 }
 
 int net_conn_open(net_conn_t *conn, const char *host, const char *port, int timeout_sec, int use_tls, const char *tls_server_name, int noisy) {
-    SSL_CTX *ctx = NULL;
     SSL *ssl = NULL;
     int fd;
 
@@ -123,13 +237,10 @@ int net_conn_open(net_conn_t *conn, const char *host, const char *port, int time
         return 0;
     }
 
-    SSL_load_error_strings();
-    OPENSSL_init_ssl(0, NULL);
-
-    ctx = SSL_CTX_new(TLS_client_method());
+    SSL_CTX *ctx = get_tls_ctx();
     if (ctx == NULL) {
         if (noisy) {
-            fprintf(stderr, "net: SSL_CTX_new failed\n");
+            fprintf(stderr, "net: SSL_CTX init failed\n");
         }
         close(fd);
         conn->fd = -1;
@@ -141,7 +252,6 @@ int net_conn_open(net_conn_t *conn, const char *host, const char *port, int time
         if (noisy) {
             fprintf(stderr, "net: SSL_new failed\n");
         }
-        SSL_CTX_free(ctx);
         close(fd);
         conn->fd = -1;
         return 1;
@@ -151,6 +261,14 @@ int net_conn_open(net_conn_t *conn, const char *host, const char *port, int time
         SSL_set_tlsext_host_name(ssl, tls_server_name);
         SSL_set1_host(ssl, tls_server_name);
     }
+    /* If we have a session from a previous handshake to this host,
+     * attach it so SSL_connect performs the fast resume path
+     * (one round trip with TLS 1.2 ticket; zero RTT data is not used). */
+    SSL_SESSION *prev = sess_cache_get(tls_server_name != NULL ? tls_server_name : host);
+    if (prev != NULL) {
+        SSL_set_session(ssl, prev);
+        SSL_SESSION_free(prev);
+    }
     SSL_set_fd(ssl, fd);
 
     if (SSL_connect(ssl) != 1) {
@@ -159,13 +277,18 @@ int net_conn_open(net_conn_t *conn, const char *host, const char *port, int time
             fprintf(stderr, "net: TLS handshake failed: %s\n", ERR_error_string(e, NULL));
         }
         SSL_free(ssl);
-        SSL_CTX_free(ctx);
         close(fd);
         conn->fd = -1;
         return 1;
     }
 
-    conn->ssl_ctx = ctx;
+    /* Save the negotiated session for the next request to this host. */
+    SSL_SESSION *new_sess = SSL_get1_session(ssl);
+    if (new_sess != NULL) {
+        sess_cache_put(tls_server_name != NULL ? tls_server_name : host, new_sess);
+    }
+
+    conn->ssl_ctx = NULL;     /* shared, do not free per-conn */
     conn->ssl = ssl;
     return 0;
 }
@@ -176,10 +299,8 @@ void net_conn_close(net_conn_t *conn) {
         SSL_free((SSL *)conn->ssl);
         conn->ssl = NULL;
     }
-    if (conn->ssl_ctx != NULL) {
-        SSL_CTX_free((SSL_CTX *)conn->ssl_ctx);
-        conn->ssl_ctx = NULL;
-    }
+    /* conn->ssl_ctx is the shared g_tls_ctx now; never free it here. */
+    conn->ssl_ctx = NULL;
     if (conn->fd >= 0) {
         close(conn->fd);
         conn->fd = -1;
