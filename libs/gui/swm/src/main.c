@@ -87,6 +87,27 @@ static int send_event(int fd, uint16_t type, uint32_t object_id, uint32_t serial
     return sprot_send_message(fd, &hdr, body, body_len, -1);
 }
 
+/* Non-blocking event send used by hot-path forwarders (input dispatch,
+ * frame callbacks). If the client socket isn't writable within 5 ms
+ * the event is dropped and the function returns -1 — the compositor
+ * keeps running instead of stalling on a sluggish client. Used only
+ * for "best-effort" messages where loss is recoverable; protocol
+ * replies (SURFACE_CREATED, errors) still use the blocking send_event. */
+static int send_event_nb(int fd, uint16_t type, uint32_t object_id,
+                         uint32_t serial, const void *body, size_t body_len) {
+    struct pollfd pfd = { .fd = fd, .events = POLLOUT, .revents = 0 };
+    int pr = poll(&pfd, 1, 5);
+    if (pr <= 0 || (pfd.revents & POLLOUT) == 0) {
+        return -1;
+    }
+    sprot_header_t hdr = {
+        .type = type,
+        .object_id = object_id,
+        .serial = serial,
+    };
+    return sprot_send_message(fd, &hdr, body, body_len, -1);
+}
+
 static void send_error(int fd, uint32_t code, const char *msg) {
     char buf[256];
     sprot_body_error_t body = { .code = code, .length = (uint32_t)strlen(msg) };
@@ -933,11 +954,11 @@ static void forward_input(const srapi_input_event_t *ev) {
             swm_surface_t *new_hover = (region == SWM_HIT_CONTENT) ? s : NULL;
             if (g_swm.hovered_surface != new_hover) {
                 if (g_swm.hovered_surface != NULL && g_swm.hovered_surface->owner != NULL) {
-                    send_event(g_swm.hovered_surface->owner->sock, SPROT_EVT_POINTER_LEAVE, g_swm.hovered_surface->id, 0, NULL, 0);
+                    send_event_nb(g_swm.hovered_surface->owner->sock, SPROT_EVT_POINTER_LEAVE, g_swm.hovered_surface->id, 0, NULL, 0);
                 }
                 g_swm.hovered_surface = new_hover;
                 if (new_hover != NULL && new_hover->owner != NULL) {
-                    send_event(new_hover->owner->sock, SPROT_EVT_POINTER_ENTER, new_hover->id, 0, NULL, 0);
+                    send_event_nb(new_hover->owner->sock, SPROT_EVT_POINTER_ENTER, new_hover->id, 0, NULL, 0);
                 }
             }
 
@@ -947,7 +968,7 @@ static void forward_input(const srapi_input_event_t *ev) {
                 int32_t lx = (int32_t)(((int64_t)(g_swm.mouse_x - ex) * (int64_t)s->width) / (ew > 0 ? ew : 1));
                 int32_t ly = (int32_t)(((int64_t)(g_swm.mouse_y - ey) * (int64_t)s->height) / (eh > 0 ? eh : 1));
                 sprot_body_pointer_motion_t body = { .x = lx, .y = ly };
-                send_event(s->owner->sock, SPROT_EVT_POINTER_MOTION, s->id, 0, &body, sizeof(body));
+                send_event_nb(s->owner->sock, SPROT_EVT_POINTER_MOTION, s->id, 0, &body, sizeof(body));
             }
             break;
         }
@@ -1021,7 +1042,7 @@ static void forward_input(const srapi_input_event_t *ev) {
                     .dx = ev->mouse_wheel.dx,
                     .dy = ev->mouse_wheel.dy,
                 };
-                send_event(g_swm.hovered_surface->owner->sock, SPROT_EVT_POINTER_AXIS, g_swm.hovered_surface->id, 0, &body, sizeof(body));
+                send_event_nb(g_swm.hovered_surface->owner->sock, SPROT_EVT_POINTER_AXIS, g_swm.hovered_surface->id, 0, &body, sizeof(body));
             }
             break;
         }
@@ -1066,8 +1087,13 @@ static void deliver_frame_callbacks(void) {
         if (!s->in_use || !s->wants_frame || s->owner == NULL) continue;
         s->wants_frame = 0;
         sprot_body_frame_t body = { .time_ms = (uint32_t)now_ms, .serial = (uint32_t)g_swm.frame_count };
-        sprot_header_t hdr = { .type = SPROT_EVT_SURFACE_FRAME, .object_id = s->id, .serial = body.serial };
-        sprot_send_message(s->owner->sock, &hdr, &body, sizeof(body), -1);
+        /* Best-effort: if the client is busy and can't read fast enough,
+         * drop the frame event rather than stalling the compositor. */
+        if (send_event_nb(s->owner->sock, SPROT_EVT_SURFACE_FRAME, s->id,
+                          body.serial, &body, sizeof(body)) != 0) {
+            /* Re-arm so the client can pick up the frame next tick. */
+            s->wants_frame = 1;
+        }
     }
 }
 

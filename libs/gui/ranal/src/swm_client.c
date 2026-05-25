@@ -176,14 +176,41 @@ void ranal_swm_pump_events_(void) {
             case SPROT_EVENT_POINTER_MOTION:
                 g_ranal->mouse_x = ev.u.pointer_motion.x;
                 g_ranal->mouse_y = ev.u.pointer_motion.y;
-                break;
-            case SPROT_EVENT_POINTER_BUTTON:
-                if (ev.u.pointer_button.button == 1) {
-                    g_ranal->curr_mouse_left = (ev.u.pointer_button.state == SPROT_BUTTON_STATE_PRESSED);
+                if (g_ranal->mouse_hook != NULL) {
+                    ranal_mouse_event_t me = {0};
+                    me.kind = RANAL_MOUSE_MOTION;
+                    me.x = ev.u.pointer_motion.x;
+                    me.y = ev.u.pointer_motion.y;
+                    g_ranal->mouse_hook(&me, g_ranal->mouse_hook_user);
                 }
                 break;
+            case SPROT_EVENT_POINTER_BUTTON: {
+                int pressed = (ev.u.pointer_button.state == SPROT_BUTTON_STATE_PRESSED);
+                if (ev.u.pointer_button.button == 1) {
+                    g_ranal->curr_mouse_left = pressed;
+                }
+                if (g_ranal->mouse_hook != NULL) {
+                    ranal_mouse_event_t me = {0};
+                    me.kind = pressed ? RANAL_MOUSE_BUTTON_DOWN : RANAL_MOUSE_BUTTON_UP;
+                    me.x = g_ranal->mouse_x;
+                    me.y = g_ranal->mouse_y;
+                    me.button = (int)ev.u.pointer_button.button;
+                    g_ranal->mouse_hook(&me, g_ranal->mouse_hook_user);
+                }
+                break;
+            }
             case SPROT_EVENT_POINTER_AXIS:
-                // could map to slider if we wanted
+                if (g_ranal->mouse_hook != NULL) {
+                    ranal_mouse_event_t me = {0};
+                    me.kind = RANAL_MOUSE_WHEEL;
+                    me.x = g_ranal->mouse_x;
+                    me.y = g_ranal->mouse_y;
+                    /* sprot axis value: positive = scroll down/right.
+                     * Our wheel_y convention matches srapi: positive = up. */
+                    me.wheel_x = -ev.u.pointer_axis.dx / 10;
+                    me.wheel_y = -ev.u.pointer_axis.dy / 10;
+                    g_ranal->mouse_hook(&me, g_ranal->mouse_hook_user);
+                }
                 break;
             case SPROT_EVENT_KEY: {
                 int pressed = (ev.u.key.state == SPROT_KEY_STATE_PRESSED);

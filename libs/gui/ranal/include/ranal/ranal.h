@@ -191,4 +191,30 @@ typedef int (*ranal_key_hook_fn)(uint32_t scancode, uint32_t modifiers,
 void ranal_set_key_hook(ranal_key_hook_fn fn, void *user);
 char ranal_scancode_to_char(uint32_t scancode, uint32_t modifiers);
 
+/* Mouse event hook. Reports raw motion/button/wheel events. Returning 1
+ * consumes the event so ranal's built-in widget hit-testing is skipped
+ * (useful for apps that paint their own UI on top of ranal's surface).
+ * Return 0 to let ranal handle it normally. */
+typedef enum {
+    RANAL_MOUSE_MOTION = 0,
+    RANAL_MOUSE_BUTTON_DOWN = 1,
+    RANAL_MOUSE_BUTTON_UP = 2,
+    RANAL_MOUSE_WHEEL = 3,
+} ranal_mouse_event_kind_t;
+
+typedef struct {
+    ranal_mouse_event_kind_t kind;
+    int32_t  x, y;
+    int      button;     /* 1=left, 2=middle, 3=right, 0 for motion/wheel */
+    int32_t  wheel_x;
+    int32_t  wheel_y;
+    uint32_t modifiers;
+} ranal_mouse_event_t;
+
+typedef int (*ranal_mouse_hook_fn)(const ranal_mouse_event_t *ev, void *user);
+void ranal_set_mouse_hook(ranal_mouse_hook_fn fn, void *user);
+
+/* Current mouse cursor position in window coordinates (pixels). */
+void ranal_mouse_position(int32_t *out_x, int32_t *out_y);
+
 #endif

@@ -156,6 +156,22 @@ void ranal_set_key_hook(ranal_key_hook_fn fn, void *user) {
     g_ranal->key_hook_user = user;
 }
 
+void ranal_set_mouse_hook(ranal_mouse_hook_fn fn, void *user) {
+    if (g_ranal == NULL) return;
+    g_ranal->mouse_hook = fn;
+    g_ranal->mouse_hook_user = user;
+}
+
+void ranal_mouse_position(int32_t *out_x, int32_t *out_y) {
+    if (g_ranal == NULL) {
+        if (out_x != NULL) *out_x = 0;
+        if (out_y != NULL) *out_y = 0;
+        return;
+    }
+    if (out_x != NULL) *out_x = g_ranal->mouse_x;
+    if (out_y != NULL) *out_y = g_ranal->mouse_y;
+}
+
 char ranal_scancode_to_char(uint32_t scancode, uint32_t modifiers) {
     return ranal_scancode_to_char_((srapi_scancode_t)scancode, modifiers);
 }
@@ -458,6 +474,14 @@ void ranal_event_pass_(void) {
             case SRAPI_INPUT_EVENT_MOUSE_MOTION:
                 g_ranal->mouse_x = ev.mouse_motion.x;
                 g_ranal->mouse_y = ev.mouse_motion.y;
+                if (g_ranal->mouse_hook != NULL) {
+                    ranal_mouse_event_t me = {0};
+                    me.kind = RANAL_MOUSE_MOTION;
+                    me.x = ev.mouse_motion.x;
+                    me.y = ev.mouse_motion.y;
+                    me.modifiers = 0;
+                    if (g_ranal->mouse_hook(&me, g_ranal->mouse_hook_user)) break;
+                }
                 break;
             case SRAPI_INPUT_EVENT_MOUSE_BUTTON_DOWN:
                 if (ev.mouse_button.button == SRAPI_MOUSE_BUTTON_LEFT) {
@@ -465,10 +489,40 @@ void ranal_event_pass_(void) {
                     g_ranal->mouse_x = ev.mouse_button.x;
                     g_ranal->mouse_y = ev.mouse_button.y;
                 }
+                if (g_ranal->mouse_hook != NULL) {
+                    ranal_mouse_event_t me = {0};
+                    me.kind = RANAL_MOUSE_BUTTON_DOWN;
+                    me.x = ev.mouse_button.x;
+                    me.y = ev.mouse_button.y;
+                    me.button = (int)ev.mouse_button.button;
+                    me.modifiers = ev.mouse_button.modifiers;
+                    if (g_ranal->mouse_hook(&me, g_ranal->mouse_hook_user)) break;
+                }
                 break;
             case SRAPI_INPUT_EVENT_MOUSE_BUTTON_UP:
                 if (ev.mouse_button.button == SRAPI_MOUSE_BUTTON_LEFT) {
                     g_ranal->curr_mouse_left = 0;
+                }
+                if (g_ranal->mouse_hook != NULL) {
+                    ranal_mouse_event_t me = {0};
+                    me.kind = RANAL_MOUSE_BUTTON_UP;
+                    me.x = ev.mouse_button.x;
+                    me.y = ev.mouse_button.y;
+                    me.button = (int)ev.mouse_button.button;
+                    me.modifiers = ev.mouse_button.modifiers;
+                    if (g_ranal->mouse_hook(&me, g_ranal->mouse_hook_user)) break;
+                }
+                break;
+            case SRAPI_INPUT_EVENT_MOUSE_WHEEL:
+                if (g_ranal->mouse_hook != NULL) {
+                    ranal_mouse_event_t me = {0};
+                    me.kind = RANAL_MOUSE_WHEEL;
+                    me.x = g_ranal->mouse_x;
+                    me.y = g_ranal->mouse_y;
+                    me.wheel_x = ev.mouse_wheel.dx;
+                    me.wheel_y = ev.mouse_wheel.dy;
+                    me.modifiers = 0;
+                    if (g_ranal->mouse_hook(&me, g_ranal->mouse_hook_user)) break;
                 }
                 break;
             default:

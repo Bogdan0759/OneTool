@@ -126,6 +126,8 @@ struct ranal_context {
     const ranal_theme_t *theme;
     ranal_key_hook_fn key_hook;
     void *key_hook_user;
+    ranal_mouse_hook_fn mouse_hook;
+    void *mouse_hook_user;
     char error_buffer[256];
 };
 
