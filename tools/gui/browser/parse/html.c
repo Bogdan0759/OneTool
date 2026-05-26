@@ -2,13 +2,13 @@
  * Tiny HTML tokenizer.
  *
  * Walks the input bytewise, splitting it into a stream of inline runs
- * separated by BREAK / PARAGRAPH markers. The model is intentionally
- * simple — no DOM tree, no CSS, no script. Block tags collapse into
- * paragraph breaks; inline tags push/pop a small style stack; <a href>
- * registers a link and tags the runs between <a> and </a>.
+ * separated by BREAK / PARAGRAPH markers. Alongside the runs we
+ * reconstruct a thin element tree (parent + tag + id + class + inline
+ * style) so the CSS engine has something to match against.
  *
- * &entities are decoded for a small common set. Anything else we leave
- * literal (or for "&xxx;" forms we just drop the leading '&').
+ * &entities are decoded for a small common set. <style> contents are
+ * collected into doc->css_text and <link rel=stylesheet href=...> URLs
+ * are pushed onto doc->ext_sheets[].
  */
 #include "html.h"
 
@@ -20,6 +20,7 @@
 
 #define BR_TEXT_FLUSH_CAP   (32 * 1024)
 #define BR_MAX_STYLE_STACK  16
+#define BR_MAX_ELEM_STACK   64
 
 typedef struct {
     const char *p;
@@ -30,6 +31,12 @@ typedef struct {
     int        style_depth;
     int        link_stack[BR_MAX_STYLE_STACK]; /* index into doc->links, or -1 */
     int        link_depth;
+    /* Element stack — index into doc->elements. -1 sentinel as document root. */
+    int        elem_stack[BR_MAX_ELEM_STACK];
+    int        elem_depth;
+    /* For each element on the stack, the tag name that opened it (so we
+     * pop only when the close tag matches). */
+    char       elem_tag_stack[BR_MAX_ELEM_STACK][BROWSER_ELEMENT_TAG_MAX];
     /* Block-level flags. */
     int        in_pre;
     int        in_script;
@@ -86,6 +93,25 @@ void br_doc_clear(br_doc_t *doc) {
     doc->images = NULL;
     doc->image_count = 0;
     doc->image_cap = 0;
+    for (size_t i = 0; i < doc->element_count; i++) {
+        free(doc->elements[i].inline_style);
+    }
+    free(doc->elements);
+    doc->elements = NULL;
+    doc->element_count = 0;
+    doc->element_cap = 0;
+    free(doc->css_text);
+    doc->css_text = NULL;
+    doc->css_text_len = 0;
+    doc->css_text_cap = 0;
+    for (int i = 0; i < doc->ext_sheet_count; i++) {
+        free(doc->ext_sheets[i]);
+        doc->ext_sheets[i] = NULL;
+    }
+    doc->ext_sheet_count = 0;
+    /* doc->stylesheet is freed by the CSS module; we just clear the pointer
+     * here — the caller (app) is responsible for destroying it before
+     * br_doc_clear() if needed. */
     doc->title[0] = '\0';
 }
 
@@ -113,8 +139,22 @@ static int doc_grow_links(br_doc_t *d) {
     return 0;
 }
 
+static int doc_grow_elements(br_doc_t *d) {
+    size_t want = d->element_cap == 0 ? 32 : d->element_cap * 2;
+    br_element_t *p = (br_element_t *)realloc(d->elements,
+                                              want * sizeof(br_element_t));
+    if (p == NULL) return -1;
+    d->elements = p;
+    d->element_cap = want;
+    return 0;
+}
+
+static int cur_element_index(const br_parser_t *p) {
+    return p->elem_depth > 0 ? p->elem_stack[p->elem_depth - 1] : -1;
+}
+
 static int doc_emit_text(br_doc_t *d, const char *text, br_style_t style,
-                         int link_index) {
+                         int link_index, int element_index) {
     if (text == NULL || text[0] == '\0') return 0;
     if (d->run_count == d->run_cap && doc_grow_runs(d) != 0) return -1;
     br_run_t *r = &d->runs[d->run_count++];
@@ -123,10 +163,11 @@ static int doc_emit_text(br_doc_t *d, const char *text, br_style_t style,
     r->text = strdup(text);
     r->link_index = link_index;
     r->image_index = -1;
+    r->element_index = element_index;
     return r->text == NULL ? -1 : 0;
 }
 
-static int doc_emit_marker(br_doc_t *d, br_run_kind_t kind) {
+static int doc_emit_marker(br_doc_t *d, br_run_kind_t kind, int element_index) {
     if (d->run_count == d->run_cap && doc_grow_runs(d) != 0) return -1;
     br_run_t *r = &d->runs[d->run_count++];
     r->kind = kind;
@@ -134,6 +175,7 @@ static int doc_emit_marker(br_doc_t *d, br_run_kind_t kind) {
     r->text = NULL;
     r->link_index = -1;
     r->image_index = -1;
+    r->element_index = element_index;
     return 0;
 }
 
@@ -172,7 +214,7 @@ static int doc_add_image(br_doc_t *d, const char *src, size_t src_len) {
 }
 
 static int doc_emit_image(br_doc_t *d, int image_index, const char *alt,
-                          int link_index) {
+                          int link_index, int element_index) {
     if (d->run_count == d->run_cap && doc_grow_runs(d) != 0) return -1;
     br_run_t *r = &d->runs[d->run_count++];
     r->kind = BR_RUN_IMAGE;
@@ -180,6 +222,104 @@ static int doc_emit_image(br_doc_t *d, int image_index, const char *alt,
     r->text = (alt != NULL && alt[0] != '\0') ? strdup(alt) : NULL;
     r->link_index = link_index;
     r->image_index = image_index;
+    r->element_index = element_index;
+    return 0;
+}
+
+static int doc_append_css(br_doc_t *d, const char *src, size_t len) {
+    if (len == 0) return 0;
+    size_t need = d->css_text_len + len + 2;
+    if (need > d->css_text_cap) {
+        size_t want = d->css_text_cap == 0 ? 1024 : d->css_text_cap;
+        while (want < need) want *= 2;
+        char *p = (char *)realloc(d->css_text, want);
+        if (p == NULL) return -1;
+        d->css_text = p;
+        d->css_text_cap = want;
+    }
+    if (d->css_text_len > 0) {
+        d->css_text[d->css_text_len++] = '\n';
+    }
+    memcpy(d->css_text + d->css_text_len, src, len);
+    d->css_text_len += len;
+    d->css_text[d->css_text_len] = '\0';
+    return 0;
+}
+
+/* Push a new element onto the doc and onto the parse-time stack. Returns
+ * the new element index, or -1 on failure. */
+static int doc_push_element(br_parser_t *p, const char *tag,
+                            const char *id, const char *cls,
+                            const char *inline_style) {
+    br_doc_t *d = p->doc;
+    if (d->element_count == d->element_cap && doc_grow_elements(d) != 0)
+        return -1;
+    br_element_t *e = &d->elements[d->element_count];
+    memset(e, 0, sizeof(*e));
+    if (tag != NULL) {
+        size_t tl = strlen(tag);
+        if (tl >= sizeof(e->tag)) tl = sizeof(e->tag) - 1;
+        memcpy(e->tag, tag, tl);
+        e->tag[tl] = '\0';
+    }
+    if (id != NULL && id[0] != '\0') {
+        size_t il = strlen(id);
+        if (il >= sizeof(e->id)) il = sizeof(e->id) - 1;
+        memcpy(e->id, id, il);
+        e->id[il] = '\0';
+    }
+    if (cls != NULL && cls[0] != '\0') {
+        const char *q = cls;
+        while (*q != '\0' && e->class_count < BROWSER_ELEMENT_CLASSES) {
+            while (*q == ' ' || *q == '\t' || *q == '\n' || *q == '\r') q++;
+            if (*q == '\0') break;
+            const char *start = q;
+            while (*q != '\0' && *q != ' ' && *q != '\t' &&
+                   *q != '\n' && *q != '\r') q++;
+            size_t len = (size_t)(q - start);
+            if (len > 0) {
+                if (len >= BROWSER_ELEMENT_CLASS_MAX)
+                    len = BROWSER_ELEMENT_CLASS_MAX - 1;
+                memcpy(e->classes[e->class_count], start, len);
+                e->classes[e->class_count][len] = '\0';
+                e->class_count++;
+            }
+        }
+    }
+    if (inline_style != NULL && inline_style[0] != '\0') {
+        e->inline_style = strdup(inline_style);
+    }
+    e->parent = cur_element_index(p);
+    int idx = (int)d->element_count++;
+    if (p->elem_depth < BR_MAX_ELEM_STACK) {
+        p->elem_stack[p->elem_depth] = idx;
+        size_t tl = strlen(e->tag);
+        if (tl >= sizeof(p->elem_tag_stack[0]))
+            tl = sizeof(p->elem_tag_stack[0]) - 1;
+        memcpy(p->elem_tag_stack[p->elem_depth], e->tag, tl);
+        p->elem_tag_stack[p->elem_depth][tl] = '\0';
+        p->elem_depth++;
+    }
+    return idx;
+}
+
+static void doc_pop_element(br_parser_t *p, const char *tag) {
+    /* Pop until we find a matching tag, or do nothing if none on stack. */
+    for (int i = p->elem_depth - 1; i >= 0; i--) {
+        if (strcmp(p->elem_tag_stack[i], tag) == 0) {
+            p->elem_depth = i;
+            return;
+        }
+    }
+}
+
+static int doc_record_ext_sheet(br_doc_t *d, const char *href, size_t len) {
+    if (d->ext_sheet_count >= BROWSER_EXT_SHEETS_MAX) return 0;
+    char *copy = (char *)malloc(len + 1);
+    if (copy == NULL) return -1;
+    memcpy(copy, href, len);
+    copy[len] = '\0';
+    d->ext_sheets[d->ext_sheet_count++] = copy;
     return 0;
 }
 
@@ -216,7 +356,8 @@ static int buf_putc(br_parser_t *p, char c) {
 static int flush_text(br_parser_t *p) {
     if (p->buf_len == 0) return 0;
     p->buf[p->buf_len] = '\0';
-    int rc = doc_emit_text(p->doc, p->buf, cur_style(p), cur_link(p));
+    int rc = doc_emit_text(p->doc, p->buf, cur_style(p), cur_link(p),
+                           cur_element_index(p));
     p->buf_len = 0;
     return rc;
 }
@@ -225,9 +366,9 @@ static void apply_pending_break(br_parser_t *p) {
     if (p->pending_break == 0) return;
     flush_text(p);
     if (p->pending_break >= 2)
-        doc_emit_marker(p->doc, BR_RUN_PARAGRAPH);
+        doc_emit_marker(p->doc, BR_RUN_PARAGRAPH, cur_element_index(p));
     else
-        doc_emit_marker(p->doc, BR_RUN_BREAK);
+        doc_emit_marker(p->doc, BR_RUN_BREAK, cur_element_index(p));
     p->pending_break = 0;
 }
 
@@ -395,6 +536,21 @@ typedef struct {
     /* Attribute "src" value (last-resort fallback for <img>). */
     char  src[2048];
     int   has_src;
+    /* Attribute "id". */
+    char  id[BROWSER_ELEMENT_ID_MAX];
+    int   has_id;
+    /* Attribute "class". */
+    char  cls[256];
+    int   has_class;
+    /* Attribute "style". */
+    char  style[1024];
+    int   has_style;
+    /* Attribute "rel" — used to recognise <link rel=stylesheet>. */
+    char  rel[64];
+    int   has_rel;
+    /* Attribute "type" — used to skip non-CSS stylesheets. */
+    char  type[64];
+    int   has_type;
 } br_tag_t;
 
 static void lower_inplace(char *s) {
@@ -457,6 +613,11 @@ static int parse_tag(br_parser_t *p, br_tag_t *out) {
         int is_alt = (alen == 3) && (strncasecmp(an, "alt", 3) == 0);
         int is_title = (alen == 5) && (strncasecmp(an, "title", 5) == 0);
         int is_src = (alen == 3) && (strncasecmp(an, "src", 3) == 0);
+        int is_id = (alen == 2) && (strncasecmp(an, "id", 2) == 0);
+        int is_class = (alen == 5) && (strncasecmp(an, "class", 5) == 0);
+        int is_style = (alen == 5) && (strncasecmp(an, "style", 5) == 0);
+        int is_rel = (alen == 3) && (strncasecmp(an, "rel", 3) == 0);
+        int is_type = (alen == 4) && (strncasecmp(an, "type", 4) == 0);
         /* attr value */
         if (q < p->end && *q == '=') {
             q++;
@@ -469,31 +630,41 @@ static int parse_tag(br_parser_t *p, br_tag_t *out) {
                 while (q < p->end && !isspace((unsigned char)*q) && *q != '>') q++;
             }
             size_t vlen = (size_t)(q - vs);
+            #define TAKE_INTO(field) do { \
+                size_t take = vlen; \
+                if (take >= sizeof(out->field)) take = sizeof(out->field) - 1; \
+                memcpy(out->field, vs, take); \
+                out->field[take] = '\0'; \
+            } while (0)
             if (is_href && !out->has_href) {
-                size_t take = vlen;
-                if (take >= sizeof(out->href)) take = sizeof(out->href) - 1;
-                memcpy(out->href, vs, take);
-                out->href[take] = '\0';
+                TAKE_INTO(href);
                 out->has_href = 1;
             } else if (is_alt && !out->has_alt) {
-                size_t take = vlen;
-                if (take >= sizeof(out->alt)) take = sizeof(out->alt) - 1;
-                memcpy(out->alt, vs, take);
-                out->alt[take] = '\0';
+                TAKE_INTO(alt);
                 out->has_alt = 1;
             } else if (is_title && !out->has_title) {
-                size_t take = vlen;
-                if (take >= sizeof(out->title)) take = sizeof(out->title) - 1;
-                memcpy(out->title, vs, take);
-                out->title[take] = '\0';
+                TAKE_INTO(title);
                 out->has_title = 1;
             } else if (is_src && !out->has_src) {
-                size_t take = vlen;
-                if (take >= sizeof(out->src)) take = sizeof(out->src) - 1;
-                memcpy(out->src, vs, take);
-                out->src[take] = '\0';
+                TAKE_INTO(src);
                 out->has_src = 1;
+            } else if (is_id && !out->has_id) {
+                TAKE_INTO(id);
+                out->has_id = 1;
+            } else if (is_class && !out->has_class) {
+                TAKE_INTO(cls);
+                out->has_class = 1;
+            } else if (is_style && !out->has_style) {
+                TAKE_INTO(style);
+                out->has_style = 1;
+            } else if (is_rel && !out->has_rel) {
+                TAKE_INTO(rel);
+                out->has_rel = 1;
+            } else if (is_type && !out->has_type) {
+                TAKE_INTO(type);
+                out->has_type = 1;
             }
+            #undef TAKE_INTO
             if (quote != 0 && q < p->end) q++;
         }
     }
@@ -520,17 +691,6 @@ static int is_block_tag(const char *name) {
     return 0;
 }
 
-static int is_void_tag(const char *name) {
-    static const char *voids[] = {
-        "area", "base", "br", "col", "embed", "hr", "img", "input", "link",
-        "meta", "param", "source", "track", "wbr", NULL
-    };
-    for (int i = 0; voids[i] != NULL; i++) {
-        if (strcmp(voids[i], name) == 0) return 1;
-    }
-    return 0;
-}
-
 static int push_style(br_parser_t *p, br_style_t s) {
     if (p->style_depth >= BR_MAX_STYLE_STACK) return 0;
     p->style_stack[p->style_depth++] = s;
@@ -539,6 +699,21 @@ static int push_style(br_parser_t *p, br_style_t s) {
 
 static void pop_style(br_parser_t *p) {
     if (p->style_depth > 0) p->style_depth--;
+}
+
+/* Tags that carry no useful element-level styling (br, hr, head/body/html,
+ * meta etc.). We don't push them onto the element stack to keep the tree
+ * shallow. */
+static int is_skipped_element(const char *n) {
+    static const char *list[] = {
+        "br", "wbr", "hr", "meta", "html", "head", "base", "param",
+        "source", "track", "area", "col", "embed",
+        NULL
+    };
+    for (int i = 0; list[i] != NULL; i++) {
+        if (strcmp(list[i], n) == 0) return 1;
+    }
+    return 0;
 }
 
 static void handle_open_tag(br_parser_t *p, const br_tag_t *t) {
@@ -562,12 +737,58 @@ static void handle_open_tag(br_parser_t *p, const br_tag_t *t) {
     }
     if (p->skip_tag[0] != '\0') return;
 
+    /* Track the element tree for CSS. Push for any tag that isn't trivially
+     * "no element" (br/hr) and isn't an attribute-only container. */
+    int pushed_element = 0;
+    if (!is_skipped_element(n) && strcmp(n, "title") != 0 &&
+        strcmp(n, "script") != 0 && strcmp(n, "noscript") != 0 &&
+        strcmp(n, "style") != 0 && strcmp(n, "link") != 0) {
+        doc_push_element(p, n,
+                         t->has_id ? t->id : NULL,
+                         t->has_class ? t->cls : NULL,
+                         t->has_style ? t->style : NULL);
+        pushed_element = 1;
+    }
+    (void)pushed_element;
+
     /* In <head>, drop everything except <title>. */
     if (strcmp(n, "head") == 0) { p->in_head = 1; return; }
     if (strcmp(n, "body") == 0) { p->in_head = 0; return; }
     if (p->in_head && strcmp(n, "title") != 0) {
         if (strcmp(n, "script") == 0) { p->in_script = 1; return; }
         if (strcmp(n, "style") == 0) { p->in_style = 1; return; }
+        if (strcmp(n, "link") == 0) {
+            /* <link rel="stylesheet" href="..."> */
+            if (t->has_href && t->has_rel) {
+                /* case-insensitive substring "stylesheet" check */
+                char rel_lower[64];
+                size_t rl = strlen(t->rel);
+                if (rl >= sizeof(rel_lower)) rl = sizeof(rel_lower) - 1;
+                memcpy(rel_lower, t->rel, rl);
+                rel_lower[rl] = '\0';
+                lower_inplace(rel_lower);
+                if (strstr(rel_lower, "stylesheet") != NULL) {
+                    doc_record_ext_sheet(p->doc, t->href, strlen(t->href));
+                }
+            }
+            return;
+        }
+        return;
+    }
+
+    /* <link> outside head (some sites place it in body). */
+    if (strcmp(n, "link") == 0) {
+        if (t->has_href && t->has_rel) {
+            char rel_lower[64];
+            size_t rl = strlen(t->rel);
+            if (rl >= sizeof(rel_lower)) rl = sizeof(rel_lower) - 1;
+            memcpy(rel_lower, t->rel, rl);
+            rel_lower[rl] = '\0';
+            lower_inplace(rel_lower);
+            if (strstr(rel_lower, "stylesheet") != NULL) {
+                doc_record_ext_sheet(p->doc, t->href, strlen(t->href));
+            }
+        }
         return;
     }
 
@@ -577,7 +798,7 @@ static void handle_open_tag(br_parser_t *p, const br_tag_t *t) {
     }
     if (strcmp(n, "hr") == 0) {
         flush_text(p);
-        doc_emit_marker(p->doc, BR_RUN_RULE);
+        doc_emit_marker(p->doc, BR_RUN_RULE, cur_element_index(p));
         request_break(p, 0);
         return;
     }
@@ -638,16 +859,19 @@ static void handle_open_tag(br_parser_t *p, const br_tag_t *t) {
         apply_pending_break(p);
         /* Indent by list depth. */
         for (int i = 1; i < p->list_depth; i++) {
-            doc_emit_text(p->doc, "  ", BR_STYLE_NORMAL, -1);
+            doc_emit_text(p->doc, "  ", BR_STYLE_NORMAL, -1,
+                          cur_element_index(p));
         }
         if (p->list_depth > 0 && p->ol_counter[p->list_depth - 1] >= 0) {
             char buf[16];
             int n_num = snprintf(buf, sizeof(buf), "%d. ",
                                  p->ol_counter[p->list_depth - 1]++);
             (void)n_num;
-            doc_emit_text(p->doc, buf, BR_STYLE_LIST_BULLET, -1);
+            doc_emit_text(p->doc, buf, BR_STYLE_LIST_BULLET, -1,
+                          cur_element_index(p));
         } else {
-            doc_emit_text(p->doc, "• ", BR_STYLE_LIST_BULLET, -1);
+            doc_emit_text(p->doc, "• ", BR_STYLE_LIST_BULLET, -1,
+                          cur_element_index(p));
         }
         return;
     }
@@ -660,13 +884,15 @@ static void handle_open_tag(br_parser_t *p, const br_tag_t *t) {
     if (strcmp(n, "dd") == 0) {
         request_break(p, 0);
         flush_text(p);
-        doc_emit_text(p->doc, "    ", BR_STYLE_NORMAL, -1);
+        doc_emit_text(p->doc, "    ", BR_STYLE_NORMAL, -1,
+                      cur_element_index(p));
         return;
     }
     if (strcmp(n, "blockquote") == 0) {
         request_break(p, 1);
         flush_text(p);
-        doc_emit_text(p->doc, "    │ ", BR_STYLE_NORMAL, -1);
+        doc_emit_text(p->doc, "    │ ", BR_STYLE_NORMAL, -1,
+                      cur_element_index(p));
         push_style(p, BR_STYLE_ITALIC);
         return;
     }
@@ -683,7 +909,8 @@ static void handle_open_tag(br_parser_t *p, const br_tag_t *t) {
         if (p->buf_len == 0 && p->doc->run_count > 0) {
             const br_run_t *last = &p->doc->runs[p->doc->run_count - 1];
             if (last->kind == BR_RUN_TEXT) {
-                doc_emit_text(p->doc, " │ ", BR_STYLE_NORMAL, -1);
+                doc_emit_text(p->doc, " │ ", BR_STYLE_NORMAL, -1,
+                              cur_element_index(p));
             }
         }
         if (strcmp(n, "th") == 0) push_style(p, BR_STYLE_BOLD);
@@ -699,7 +926,8 @@ static void handle_open_tag(br_parser_t *p, const br_tag_t *t) {
                 const char *alt = NULL;
                 if (t->has_alt && t->alt[0] != '\0') alt = t->alt;
                 else if (t->has_title && t->title[0] != '\0') alt = t->title;
-                doc_emit_image(p->doc, img_idx, alt, cur_link(p));
+                doc_emit_image(p->doc, img_idx, alt, cur_link(p),
+                               cur_element_index(p));
                 request_break(p, 0);
                 return;
             }
@@ -719,7 +947,8 @@ static void handle_open_tag(br_parser_t *p, const br_tag_t *t) {
         } else {
             snprintf(buf, sizeof(buf), "[img]");
         }
-        doc_emit_text(p->doc, buf, BR_STYLE_ITALIC, cur_link(p));
+        doc_emit_text(p->doc, buf, BR_STYLE_ITALIC, cur_link(p),
+                      cur_element_index(p));
         return;
     }
     if (strcmp(n, "a") == 0) {
@@ -750,7 +979,7 @@ static void handle_close_tag(br_parser_t *p, const br_tag_t *t) {
         }
         return;
     }
-    if (strcmp(n, "head") == 0) { p->in_head = 0; return; }
+    if (strcmp(n, "head") == 0) { p->in_head = 0; goto pop_elem; }
     if (strcmp(n, "title") == 0) {
         /* Snapshot title from accumulator text. */
         if (p->buf_len > 0) {
@@ -789,18 +1018,18 @@ static void handle_close_tag(br_parser_t *p, const br_tag_t *t) {
         flush_text(p);
         pop_style(p);
         p->in_textarea = 0;
-        return;
+        goto pop_elem;
     }
     if (strcmp(n, "pre") == 0) {
         flush_text(p);
         p->in_pre = 0;
         request_break(p, 1);
-        return;
+        goto pop_elem;
     }
     if (strcmp(n, "h1") == 0 || strcmp(n, "h2") == 0 ||
         strcmp(n, "h3") == 0 || strcmp(n, "h4") == 0 ||
         strcmp(n, "h5") == 0 || strcmp(n, "h6") == 0) {
-        flush_text(p); pop_style(p); request_break(p, 1); return;
+        flush_text(p); pop_style(p); request_break(p, 1); goto pop_elem;
     }
     if (strcmp(n, "b") == 0 || strcmp(n, "strong") == 0 ||
         strcmp(n, "i") == 0 || strcmp(n, "em") == 0 ||
@@ -808,30 +1037,33 @@ static void handle_close_tag(br_parser_t *p, const br_tag_t *t) {
         strcmp(n, "dfn") == 0 ||
         strcmp(n, "code") == 0 || strcmp(n, "tt") == 0 ||
         strcmp(n, "kbd") == 0 || strcmp(n, "samp") == 0) {
-        flush_text(p); pop_style(p); return;
+        flush_text(p); pop_style(p); goto pop_elem;
     }
     if (strcmp(n, "ul") == 0 || strcmp(n, "ol") == 0) {
         if (p->list_depth > 0) p->list_depth--;
         request_break(p, 1);
-        return;
+        goto pop_elem;
     }
     if (strcmp(n, "dt") == 0) {
-        flush_text(p); pop_style(p); return;
+        flush_text(p); pop_style(p); goto pop_elem;
     }
     if (strcmp(n, "blockquote") == 0) {
-        flush_text(p); pop_style(p); request_break(p, 1); return;
+        flush_text(p); pop_style(p); request_break(p, 1); goto pop_elem;
     }
     if (strcmp(n, "th") == 0) {
-        flush_text(p); pop_style(p); return;
+        flush_text(p); pop_style(p); goto pop_elem;
     }
     if (strcmp(n, "a") == 0) {
         flush_text(p);
         if (p->link_depth > 0) p->link_depth--;
-        return;
+        goto pop_elem;
     }
     if (is_block_tag(n)) {
         request_break(p, 1);
     }
+pop_elem:
+    if (!is_skipped_element(n))
+        doc_pop_element(p, n);
 }
 
 /* ----- main parse loop ----- */
@@ -847,13 +1079,17 @@ int br_doc_parse_html(br_doc_t *doc, const char *html, size_t len) {
 
     while (p.p < p.end) {
         if (p.in_script || p.in_style) {
-            /* Skip until matching </script> or </style>. */
+            /* Skip until matching </script> or </style>. Inside <style> we
+             * keep the bytes so the CSS engine can parse them later. */
             const char *needle = p.in_script ? "</script" : "</style";
             size_t nlen = strlen(needle);
             const char *q = p.p;
             while (q + nlen <= p.end) {
                 if (strncasecmp(q, needle, nlen) == 0) break;
                 q++;
+            }
+            if (p.in_style && q > p.p) {
+                doc_append_css(doc, p.p, (size_t)(q - p.p));
             }
             p.p = (q + nlen <= p.end) ? q : p.end;
             if (p.p < p.end) {
@@ -906,7 +1142,7 @@ int br_doc_parse_html(br_doc_t *doc, const char *html, size_t len) {
             apply_pending_break(&p);
             if (*p.p == '\n') {
                 flush_text(&p);
-                doc_emit_marker(p.doc, BR_RUN_BREAK);
+                doc_emit_marker(p.doc, BR_RUN_BREAK, cur_element_index(&p));
                 p.p++;
                 continue;
             }

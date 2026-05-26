@@ -10,6 +10,7 @@
  * borrowed run text (so the layout becomes invalid if the doc is freed).
  */
 #include "layout.h"
+#include "../parse/css/css.h"
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -55,6 +56,46 @@ static int style_bold(br_style_t s) {
 
 static int style_underline(br_style_t s) {
     return s == BR_STYLE_LINK;
+}
+
+/* Resolve effective per-box attributes from the run + its element's
+ * computed style. CSS values override the defaults derived from the enum
+ * style, but the enum is the fallback when CSS didn't set the property. */
+static void apply_computed(br_box_t *b, const br_run_t *r,
+                           const br_computed_style_t *cs) {
+    b->style = r->style;
+    b->scale = style_scale(r->style);
+    b->bold = style_bold(r->style);
+    b->underline = style_underline(r->style);
+    b->strike = 0;
+    b->have_color = 0;
+    b->have_bg = 0;
+    if (cs != NULL) {
+        if (cs->have_scale) b->scale = cs->font_scale;
+        if (cs->bold) b->bold = 1;
+        /* italic is rendered as a stylistic alias of BR_STYLE_ITALIC in
+         * paint.c; we don't have a separate italic glyph, so we leave
+         * box drawing alone and only let the cascade set bold/underline. */
+        if (cs->underline) b->underline = 1;
+        if (cs->strike) b->strike = 1;
+        if (cs->have_color) {
+            b->color = cs->color;
+            b->have_color = 1;
+        }
+        if (cs->have_bg && (cs->bg_color & 0xFF000000u) != 0) {
+            b->bg_color = cs->bg_color;
+            b->have_bg = 1;
+        }
+    }
+}
+
+/* Walk up the element chain looking for display:none / visibility:hidden.
+ * Cascade already propagates hidden onto children, but element_index can
+ * be -1 for some runs (whitespace markers) — in that case nothing hides. */
+static int run_is_hidden(const br_doc_t *doc, const br_run_t *r) {
+    if (r->element_index < 0) return 0;
+    if ((size_t)r->element_index >= doc->element_count) return 0;
+    return doc->elements[r->element_index].computed.hidden ? 1 : 0;
 }
 
 /* Count UTF-8 codepoints in a span, for advance computation. */
@@ -109,6 +150,10 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
     for (size_t i = 0; i < doc->run_count; i++) {
         const br_run_t *r = &doc->runs[i];
 
+        if (run_is_hidden(doc, r)) continue;
+
+        const br_computed_style_t *cs = br_css_run_style(doc, r);
+
         if (r->kind == BR_RUN_BREAK) {
             y = line_top + line_h;
             x = 0;
@@ -128,6 +173,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
             /* horizontal rule occupies its own row */
             y = line_top + line_h;
             br_box_t b = {0};
+            apply_computed(&b, r, cs);
             b.x = 0; b.y = y + LINE_H / 2 - 1;
             b.w = content_width; b.h = 2;
             b.scale = 1;
@@ -168,6 +214,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
                 if (ih <= 0) ih = 1;
 
                 br_box_t b = {0};
+                apply_computed(&b, r, cs);
                 b.x = 0; b.y = line_top;
                 b.w = iw; b.h = ih;
                 b.scale = 1;
@@ -188,6 +235,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
                 int tlen = (int)strlen(r->text);
                 int w = word_advance_px(r->text, 0, tlen, 1);
                 br_box_t b = {0};
+                apply_computed(&b, r, cs);
                 b.x = x; b.y = line_top;
                 b.w = w; b.h = GLYPH_H;
                 b.scale = 1;
@@ -208,6 +256,11 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
         int scale = style_scale(r->style);
         int bold = style_bold(r->style);
         int under = style_underline(r->style);
+        if (cs != NULL) {
+            if (cs->have_scale) scale = cs->font_scale;
+            if (cs->bold) bold = 1;
+            if (cs->underline) under = 1;
+        }
         int run_line_h = GLYPH_H * scale + 4;
         if (run_line_h > line_h) line_h = run_line_h;
 
@@ -225,6 +278,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
                 if (seg_end > seg_start) {
                     int w = word_advance_px(t, seg_start, seg_end, scale);
                     br_box_t b = {0};
+                    apply_computed(&b, r, cs);
                     b.x = x; b.y = line_top;
                     b.w = w; b.h = GLYPH_H * scale;
                     b.scale = scale;
@@ -288,6 +342,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
                     int dw = ADVANCE * scale;
                     if (cur_w + dw > content_width && cur_start < k) {
                         br_box_t b = {0};
+                        apply_computed(&b, r, cs);
                         b.x = x; b.y = line_top;
                         b.w = cur_w; b.h = GLYPH_H * scale;
                         b.scale = scale;
@@ -310,6 +365,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
                 }
                 if (cur_start < seg_end) {
                     br_box_t b = {0};
+                    apply_computed(&b, r, cs);
                     b.x = x; b.y = line_top;
                     b.w = cur_w; b.h = GLYPH_H * scale;
                     b.scale = scale;
@@ -326,6 +382,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
             }
 
             br_box_t b = {0};
+            apply_computed(&b, r, cs);
             b.x = x; b.y = line_top;
             b.w = w; b.h = GLYPH_H * scale;
             b.scale = scale;

@@ -131,6 +131,18 @@ static uint32_t style_color(br_style_t s, int focused_link, int is_focused) {
     }
 }
 
+/* Honour CSS override if present, otherwise fall back to the enum-based
+ * palette. Focused-link highlight always wins for the foreground colour so
+ * keyboard navigation stays visible. */
+static uint32_t resolve_color(const br_box_t *b, int focused_link,
+                              int is_focused) {
+    if (b->style == BR_STYLE_LINK && focused_link && is_focused) {
+        return COL_LINK_FOCUS;
+    }
+    if (b->have_color) return b->color;
+    return style_color(b->style, focused_link, is_focused);
+}
+
 static int hits_grow(br_link_hits_t *h) {
     size_t want = h->cap == 0 ? 32 : h->cap * 2;
     br_link_rect_t *p = (br_link_rect_t *)realloc(h->rects, want * sizeof(*p));
@@ -194,7 +206,10 @@ void br_paint_page(void *surface_v,
             continue;
         }
 
-        if (b->style == BR_STYLE_CODE || b->style == BR_STYLE_PRE) {
+        if (b->have_bg) {
+            surf_fill(px, pitch_px, sw, sh, b->x - 1, y0 - 1,
+                      b->w + 2, b->h + 2, b->bg_color);
+        } else if (b->style == BR_STYLE_CODE || b->style == BR_STYLE_PRE) {
             surf_fill(px, pitch_px, sw, sh, b->x - 1, y0 - 1,
                       b->w + 2, b->h + 2, COL_CODE_BG);
         }
@@ -203,7 +218,7 @@ void br_paint_page(void *surface_v,
                       b->w + 2, b->h + 2, COL_LINK_BG);
         }
 
-        uint32_t color = style_color(b->style, focused_link >= 0, is_focused);
+        uint32_t color = resolve_color(b, focused_link >= 0, is_focused);
 
         const char *t = b->text;
         int tlen = b->text_len;
@@ -227,6 +242,10 @@ void br_paint_page(void *surface_v,
         if (b->underline) {
             int uy = y0 + b->h;
             surf_fill(px, pitch_px, sw, sh, b->x, uy, b->w, 1, color);
+        }
+        if (b->strike) {
+            int sy_ = y0 + b->h / 2;
+            surf_fill(px, pitch_px, sw, sh, b->x, sy_, b->w, 1, color);
         }
 
         if (hits != NULL && b->link_index >= 0) {

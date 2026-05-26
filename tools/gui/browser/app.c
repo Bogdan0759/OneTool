@@ -15,6 +15,8 @@
 #include "net/fetch.h"
 #include "net/fetch_async.h"
 #include "parse/html.h"
+#include "parse/css/css.h"
+#include "parse/css/internal.h"
 #include "render/layout.h"
 #include "render/paint.h"
 #include "render/image.h"
@@ -33,11 +35,42 @@ static int         g_layout_width = -1;
 static void       *g_chrome_surface = NULL;
 static void       *g_status_surface = NULL;
 
-/* Built-in welcome doc, shown when no URL is given. */
+/* Built-in welcome doc, shown when no URL is given. Includes an
+ * intentional CSS demo block so you can see the cascade working without
+ * having to load a remote page. */
 static const char *kHomeHtml =
-    "<html><head><title>OneTool Browser</title></head><body>"
+    "<html><head><title>OneTool Browser</title>"
+    "<style>"
+    "  body { color: #1a1a2e; background-color: #fbf8f1; }"
+    "  h1 { color: #c81e5a; background-color: #ffe6f0; }"
+    "  h2 { color: #2255aa; }"
+    "  .green { color: #2a7a2a; font-weight: bold; }"
+    "  .strike { text-decoration: line-through; color: #888; }"
+    "  #boxed { background-color: #d8efff; color: #003366; }"
+    "  .hidden-thing { display: none; }"
+    "  code { background-color: #fff3b0; color: #5a2a00; }"
+    "  a { color: #007a3d; }"
+    "  blockquote { color: #553388; background-color: #f0e8ff; }"
+    "</style>"
+    "</head><body>"
     "<h1>OneTool Browser</h1>"
     "<p>A tiny text-mode browser built on <b>ranal</b> + <b>srapi</b>.</p>"
+
+    "<h2>CSS demo</h2>"
+    "<p>The colours and backgrounds you see here come from the "
+    "<code>&lt;style&gt;</code> block in this page — proof that the CSS "
+    "engine is alive.</p>"
+    "<p>This text contains a <span class=\"green\">green bold span</span>, "
+    "a <span class=\"strike\">struck-out fragment</span>, and an "
+    "<span style=\"color:#cc4400;background-color:#ffe9d6\">inline-styled "
+    "highlight</span>.</p>"
+    "<p id=\"boxed\">This whole paragraph has an id-based background "
+    "and text colour — selector <code>#boxed</code>.</p>"
+    "<p class=\"hidden-thing\">If you can read this, display:none isn't "
+    "working.</p>"
+    "<blockquote>Block-quoted text inherits its purple colour from "
+    "<code>blockquote { color: ... }</code>.</blockquote>"
+
     "<h2>Controls</h2>"
     "<ul>"
     "<li><b>Ctrl+L</b> or <b>/</b> — focus the URL bar</li>"
@@ -56,7 +89,147 @@ static const char *kHomeHtml =
     "instead of taking over DRM.</i></p>"
     "</body></html>";
 
+static void build_and_apply_css(browser_app_t *app);
+
+static int url_has_scheme(const char *s) {
+    if (s == NULL || s[0] == '\0') return 0;
+    if (!((s[0] >= 'a' && s[0] <= 'z') || (s[0] >= 'A' && s[0] <= 'Z'))) {
+        return 0;
+    }
+    for (const char *p = s + 1; *p != '\0'; p++) {
+        if (*p == ':') return 1;
+        if (*p == '/' || *p == '?' || *p == '#') return 0;
+        if (!( (*p >= 'a' && *p <= 'z') ||
+               (*p >= 'A' && *p <= 'Z') ||
+               (*p >= '0' && *p <= '9') ||
+               *p == '+' || *p == '-' || *p == '.')) {
+            return 0;
+        }
+    }
+    return 0;
+}
+
+static int app_is_loading(const browser_app_t *app) {
+    if (app == NULL || app->net == NULL) return 0;
+    return br_net_poll((br_net_t *)app->net, 0, NULL, NULL, NULL, NULL, 0) ==
+           BR_NET_LOADING;
+}
+
+static void copy_cstr(char *dst, size_t cap, const char *src) {
+    if (cap == 0) return;
+    if (src == NULL) src = "";
+    strncpy(dst, src, cap - 1);
+    dst[cap - 1] = '\0';
+}
+
+static void base_without_query_fragment(const char *src, char *out, size_t cap) {
+    size_t n = 0;
+    if (cap == 0) return;
+    while (src[n] != '\0' && src[n] != '?' && src[n] != '#' && n + 1 < cap) {
+        out[n] = src[n];
+        n++;
+    }
+    out[n] = '\0';
+}
+
+static void normalize_url_path(char *path) {
+    char *src = path;
+    char *dst = path;
+
+    while (*src != '\0') {
+        if (src[0] == '/' && src[1] == '/') {
+            src++;
+            continue;
+        }
+        if (src[0] == '/' && src[1] == '.' &&
+            (src[2] == '/' || src[2] == '\0')) {
+            src += (src[2] == '/') ? 2 : 1;
+            continue;
+        }
+        if (src[0] == '/' && src[1] == '.' && src[2] == '.' &&
+            (src[3] == '/' || src[3] == '\0')) {
+            src += (src[3] == '/') ? 3 : 2;
+            if (dst > path) {
+                dst--;
+                while (dst > path && dst[-1] != '/') dst--;
+            }
+            *dst = '\0';
+            continue;
+        }
+        *dst++ = *src++;
+    }
+    *dst = '\0';
+    if (path[0] == '\0') strcpy(path, "/");
+}
+
+static void join_url(const char *base, const char *ref, char *out, size_t cap) {
+    out[0] = '\0';
+    if (cap == 0 || ref == NULL || ref[0] == '\0') return;
+
+    if (url_has_scheme(ref)) {
+        copy_cstr(out, cap, ref);
+        return;
+    }
+    if (strncmp(ref, "//", 2) == 0) {
+        const char *scheme_end = strstr(base, ":");
+        if (scheme_end == NULL) return;
+        snprintf(out, cap, "%.*s:%s", (int)(scheme_end - base), base, ref);
+        return;
+    }
+
+    char clean_base[BROWSER_URL_MAX];
+    base_without_query_fragment(base != NULL ? base : "", clean_base,
+                                sizeof(clean_base));
+
+    const char *scheme_end = strstr(clean_base, "://");
+    if (scheme_end == NULL) {
+        if (ref[0] == '#') copy_cstr(out, cap, clean_base);
+        else copy_cstr(out, cap, ref);
+        return;
+    }
+
+    const char *host = scheme_end + 3;
+    const char *path = strchr(host, '/');
+    size_t origin_len = path != NULL ? (size_t)(path - clean_base)
+                                     : strlen(clean_base);
+    char origin[BROWSER_URL_MAX];
+    snprintf(origin, sizeof(origin), "%.*s", (int)origin_len, clean_base);
+
+    if (ref[0] == '#') {
+        snprintf(out, cap, "%s%s", clean_base, ref);
+        return;
+    }
+    if (ref[0] == '?') {
+        snprintf(out, cap, "%s%s", clean_base, ref);
+        return;
+    }
+
+    char path_buf[BROWSER_URL_MAX];
+    if (ref[0] == '/') {
+        copy_cstr(path_buf, sizeof(path_buf), ref);
+    } else {
+        const char *dir = path != NULL ? strrchr(path, '/') : NULL;
+        if (dir == NULL) {
+            snprintf(path_buf, sizeof(path_buf), "/%s", ref);
+        } else {
+            size_t dir_len = (size_t)(dir - clean_base) + 1;
+            if (dir_len >= sizeof(path_buf)) dir_len = sizeof(path_buf) - 1;
+            snprintf(path_buf, sizeof(path_buf), "%.*s%s", (int)dir_len,
+                     clean_base, ref);
+            memmove(path_buf, path_buf + origin_len,
+                    strlen(path_buf + origin_len) + 1);
+        }
+    }
+
+    normalize_url_path(path_buf);
+    snprintf(out, cap, "%s%s", origin, path_buf);
+}
+
 static void load_home(browser_app_t *app) {
+    if (app->doc != NULL && app->doc->stylesheet != NULL) {
+        br_css_stylesheet_destroy((br_stylesheet_t *)app->doc->stylesheet);
+        app->doc->stylesheet = NULL;
+    }
     br_doc_clear(app->doc);
     if (br_doc_parse_html(app->doc, kHomeHtml, strlen(kHomeHtml)) != 0) {
         snprintf(app->status, sizeof(app->status), "parse failed");
@@ -65,9 +238,12 @@ static void load_home(browser_app_t *app) {
                  "welcome — press Ctrl+L to enter a URL");
     }
     snprintf(app->url, sizeof(app->url), "about:home");
+    build_and_apply_css(app);
     app->scroll_y = 0;
     app->focused_link = -1;
     app->hover_link = -1;
+    app->has_queued_nav = 0;
+    app->queued_url[0] = '\0';
     g_layout_width = -1;
     app->page_dirty = 1;
     app->chrome_dirty = 1;
@@ -85,7 +261,11 @@ int br_app_init(browser_app_t *app, const char *initial_url) {
     br_layout_init(&g_layout);
 
     br_net_t *net = (br_net_t *)calloc(1, sizeof(*net));
-    if (net == NULL) return -1;
+    if (net == NULL) {
+        br_doc_destroy(app->doc);
+        app->doc = NULL;
+        return -1;
+    }
     br_net_init(net);
     app->net = net;
 
@@ -103,6 +283,10 @@ void br_app_shutdown(browser_app_t *app) {
         br_net_destroy((br_net_t *)app->net);
         free(app->net);
         app->net = NULL;
+    }
+    if (app->doc != NULL && app->doc->stylesheet != NULL) {
+        br_css_stylesheet_destroy((br_stylesheet_t *)app->doc->stylesheet);
+        app->doc->stylesheet = NULL;
     }
     br_doc_destroy(app->doc);
     app->doc = NULL;
@@ -129,7 +313,7 @@ void br_app_shutdown(browser_app_t *app) {
 static void normalize_url(char *url, size_t cap) {
     if (url[0] == '\0') return;
     /* If no scheme and not a file path, prepend http://. */
-    if (strstr(url, "://") != NULL) return;
+    if (url_has_scheme(url)) return;
     if (url[0] == '/') return; /* leave file paths to the user */
     char tmp[BROWSER_URL_MAX];
     snprintf(tmp, sizeof(tmp), "http://%s", url);
@@ -160,14 +344,21 @@ int br_app_navigate(browser_app_t *app, const char *url) {
     char target[BROWSER_URL_MAX];
     strncpy(target, url, sizeof(target) - 1);
     target[sizeof(target) - 1] = '\0';
+    normalize_url(target, sizeof(target));
+
+    if (app_is_loading(app)) {
+        copy_cstr(app->queued_url, sizeof(app->queued_url), target);
+        app->has_queued_nav = 1;
+        snprintf(app->status, sizeof(app->status), "queued %s", target);
+        app->chrome_dirty = 1;
+        return 0;
+    }
 
     if (strcmp(target, "about:home") == 0) {
         load_home(app);
         push_history(app, app->url);
         return 0;
     }
-
-    normalize_url(target, sizeof(target));
 
     snprintf(app->status, sizeof(app->status), "loading %s…", target);
     app->chrome_dirty = 1;
@@ -183,6 +374,58 @@ int br_app_navigate(browser_app_t *app, const char *url) {
 }
 
 static void load_page_images(browser_app_t *app);
+static void resolve_url_against_base(const char *base_url, const char *url_str,
+                                     const char *src, char *out, size_t cap);
+
+/* Build doc->stylesheet from:
+ *   1. the built-in user-agent rules,
+ *   2. external <link rel=stylesheet> sheets (fetched synchronously),
+ *   3. accumulated <style> blocks.
+ * Then run the cascade across doc->elements. */
+static void build_and_apply_css(browser_app_t *app) {
+    if (app->doc == NULL) return;
+    br_doc_t *doc = app->doc;
+
+    if (doc->stylesheet != NULL) {
+        br_css_stylesheet_destroy((br_stylesheet_t *)doc->stylesheet);
+        doc->stylesheet = NULL;
+    }
+    br_stylesheet_t *ss = br_css_stylesheet_create();
+    if (ss == NULL) return;
+
+    /* (1) user agent first so author rules can override. */
+    br_css_apply_user_agent(ss);
+
+    /* (2) external <link> sheets. Synchronous — keeps the cascade well
+     * defined before layout. We cap how many we'll fetch per page so a
+     * pathological case can't hang the UI. */
+    int fetched = 0;
+    for (int i = 0; i < doc->ext_sheet_count && fetched < 8; i++) {
+        char resolved[BROWSER_URL_MAX];
+        resolve_url_against_base(doc->base_url, app->url,
+                                 doc->ext_sheets[i], resolved, sizeof(resolved));
+        if (resolved[0] == '\0') continue;
+        snprintf(app->status, sizeof(app->status), "css %d/%d…",
+                 fetched + 1, doc->ext_sheet_count);
+        app->chrome_dirty = 1;
+        char *body = NULL;
+        size_t len = 0;
+        const char *err = NULL;
+        if (browser_fetch_url(resolved, &body, &len, NULL, &err) == 0) {
+            br_css_parse_into(ss, body, len);
+            free(body);
+        }
+        fetched++;
+    }
+
+    /* (3) inline <style> contents. */
+    if (doc->css_text != NULL && doc->css_text_len > 0) {
+        br_css_parse_into(ss, doc->css_text, doc->css_text_len);
+    }
+
+    br_css_apply_to_doc(doc, ss);
+    doc->stylesheet = ss;
+}
 
 static void apply_fetch_result(browser_app_t *app,
                                char *body, size_t len, char *final_url,
@@ -208,6 +451,10 @@ static void apply_fetch_result(browser_app_t *app,
 
     push_history(app, app->url);
 
+    /* Resolve CSS *before* images so layout can pick up any
+     * display:none / visibility:hidden choices the author made. */
+    build_and_apply_css(app);
+
     /* Fetch and decode images referenced in the page. */
     if (app->doc->image_count > 0) {
         load_page_images(app);
@@ -229,70 +476,16 @@ static void resolve_link_target(browser_app_t *app, int link_index,
     if (link_index < 0 || (size_t)link_index >= app->doc->link_count) return;
     const char *href = app->doc->links[link_index].href;
     if (href == NULL || href[0] == '\0') return;
-    if (strstr(href, "://") != NULL) {
-        strncpy(out, href, cap - 1);
-        out[cap - 1] = '\0';
-        return;
-    }
-    if (strncmp(href, "//", 2) == 0) {
-        const char *base = app->doc->base_url[0] != '\0' ? app->doc->base_url : app->url;
-        const char *scheme_end = strstr(base, "://");
-        size_t scheme_len = scheme_end != NULL ? (size_t)(scheme_end - base) : 4;
-        snprintf(out, cap, "%.*s:%s", (int)scheme_len, base, href);
-        return;
-    }
     const char *base = app->doc->base_url[0] != '\0' ? app->doc->base_url : app->url;
-    if (href[0] == '/') {
-        const char *scheme_end = strstr(base, "://");
-        if (scheme_end != NULL) {
-            const char *host_end = scheme_end + 3;
-            while (*host_end != '\0' && *host_end != '/') host_end++;
-            size_t prefix = (size_t)(host_end - base);
-            snprintf(out, cap, "%.*s%s", (int)prefix, base, href);
-            return;
-        }
-    }
-    const char *last_slash = base;
-    for (const char *q = base; *q != '\0'; q++) {
-        if (*q == '/') last_slash = q;
-    }
-    size_t prefix = (size_t)(last_slash - base) + 1;
-    snprintf(out, cap, "%.*s%s", (int)prefix, base, href);
+    join_url(base, href, out, cap);
 }
 
 static void resolve_url_against_base(const char *base_url, const char *url_str,
                                      const char *src, char *out, size_t cap) {
     out[0] = '\0';
     if (src == NULL || src[0] == '\0') return;
-    if (strstr(src, "://") != NULL) {
-        strncpy(out, src, cap - 1);
-        out[cap - 1] = '\0';
-        return;
-    }
-    if (strncmp(src, "//", 2) == 0) {
-        const char *base = base_url[0] != '\0' ? base_url : url_str;
-        const char *scheme_end = strstr(base, "://");
-        size_t scheme_len = scheme_end != NULL ? (size_t)(scheme_end - base) : 4;
-        snprintf(out, cap, "%.*s:%s", (int)scheme_len, base, src);
-        return;
-    }
     const char *base = base_url[0] != '\0' ? base_url : url_str;
-    if (src[0] == '/') {
-        const char *scheme_end = strstr(base, "://");
-        if (scheme_end != NULL) {
-            const char *host_end = scheme_end + 3;
-            while (*host_end != '\0' && *host_end != '/') host_end++;
-            size_t prefix = (size_t)(host_end - base);
-            snprintf(out, cap, "%.*s%s", (int)prefix, base, src);
-            return;
-        }
-    }
-    const char *last_slash = base;
-    for (const char *q = base; *q != '\0'; q++) {
-        if (*q == '/') last_slash = q;
-    }
-    size_t prefix = (size_t)(last_slash - base) + 1;
-    snprintf(out, cap, "%.*s%s", (int)prefix, base, src);
+    join_url(base, src, out, cap);
 }
 
 #define BROWSER_MAX_IMAGES_PER_PAGE 32
@@ -458,10 +651,24 @@ int br_app_frame(browser_app_t *app) {
         char err[128] = {0};
         int s = br_net_poll((br_net_t *)app->net, 1,
                             &body, &len, &final_url, err, sizeof(err));
-        apply_fetch_result(app, body, len, final_url, err,
-                           s == BR_NET_DONE_OK);
+        if (app->has_queued_nav) {
+            char queued[BROWSER_URL_MAX];
+            copy_cstr(queued, sizeof(queued), app->queued_url);
+            app->has_queued_nav = 0;
+            app->queued_url[0] = '\0';
+            free(body);
+            free(final_url);
+            br_app_navigate(app, queued);
+            body = NULL;
+            final_url = NULL;
+        } else {
+            apply_fetch_result(app, body, len, final_url, err,
+                               s == BR_NET_DONE_OK);
+        }
         free(body);
         free(final_url);
+        net_state = br_net_poll((br_net_t *)app->net, 0, NULL, NULL, NULL,
+                                NULL, 0);
     }
 
     if (app->pending_navigate) {

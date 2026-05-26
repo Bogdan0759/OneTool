@@ -10,7 +10,14 @@ typedef struct {
     int      scale;       /* 1 or 2 */
     int      bold;
     int      underline;
+    int      strike;
     br_style_t style;
+    /* If have_style is set, color/bg_color come from the CSS cascade and
+     * override the colour derived from `style`. */
+    int      have_color;
+    int      have_bg;
+    uint32_t color;
+    uint32_t bg_color;
     const char *text;     /* borrowed pointer into a run's text buffer */
     int      text_len;    /* byte count */
     int      link_index;  /* -1 if not a link */

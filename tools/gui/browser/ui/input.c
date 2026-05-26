@@ -104,23 +104,21 @@ static int key_hook(uint32_t scancode, uint32_t modifiers,
     }
     if (alt && scancode == SRAPI_SCANCODE_LEFT) {
         app->pending_navigate = 0;
-        if (app->history_count > 0) {
+        if (app->history_count > 1) {
             free(app->history[app->history_count - 1]);  /* current */
             app->history_count--;
-            if (app->history_count > 0) {
-                strncpy(app->url, app->history[app->history_count - 1],
-                        sizeof(app->url) - 1);
-                app->url[sizeof(app->url) - 1] = '\0';
-                strncpy(app->url_edit, app->url, sizeof(app->url_edit) - 1);
-                app->url_edit[sizeof(app->url_edit) - 1] = '\0';
-                app->url_edit_len = strlen(app->url_edit);
-                app->url_cursor = app->url_edit_len;
-                /* Pop so reload below sees the right URL and will push it
-                   again as the new "current" entry. */
-                free(app->history[app->history_count - 1]);
-                app->history_count--;
-                app->pending_navigate = 1;
-            }
+            strncpy(app->url, app->history[app->history_count - 1],
+                    sizeof(app->url) - 1);
+            app->url[sizeof(app->url) - 1] = '\0';
+            strncpy(app->url_edit, app->url, sizeof(app->url_edit) - 1);
+            app->url_edit[sizeof(app->url_edit) - 1] = '\0';
+            app->url_edit_len = strlen(app->url_edit);
+            app->url_cursor = app->url_edit_len;
+            /* Pop so reload below sees the right URL and will push it
+               again as the new "current" entry. */
+            free(app->history[app->history_count - 1]);
+            app->history_count--;
+            app->pending_navigate = 1;
         }
         app->chrome_dirty = 1;
         return 1;
