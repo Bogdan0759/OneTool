@@ -31,6 +31,7 @@ typedef enum {
     BR_RUN_BREAK,        /* forced line break (<br>) */
     BR_RUN_PARAGRAPH,    /* paragraph end / block break */
     BR_RUN_RULE,         /* <hr> */
+    BR_RUN_IMAGE,        /* inline/block image */
 } br_run_kind_t;
 
 typedef enum {
@@ -51,6 +52,7 @@ typedef struct {
     br_style_t    style;
     char         *text;          /* utf-8, owned; NULL for non-TEXT runs */
     int           link_index;    /* index into doc->links[], -1 if none */
+    int           image_index;   /* index into doc->images[], -1 if none */
 } br_run_t;
 
 typedef struct {
@@ -59,12 +61,23 @@ typedef struct {
 } br_link_t;
 
 typedef struct {
+    uint32_t *pixels;            /* ARGB32, malloc'd; NULL until decoded */
+    int       width;
+    int       height;
+    char     *src;               /* raw src URL from HTML, owned */
+    int       loaded;            /* 0=pending, 1=ok, -1=failed */
+} br_image_t;
+
+typedef struct {
     br_run_t   *runs;
     size_t      run_count;
     size_t      run_cap;
     br_link_t  *links;
     size_t      link_count;
     size_t      link_cap;
+    br_image_t *images;
+    size_t      image_count;
+    size_t      image_cap;
     char        title[BROWSER_TITLE_MAX];
     char        base_url[BROWSER_URL_MAX];
 } br_doc_t;

@@ -17,6 +17,7 @@
 #include "parse/html.h"
 #include "render/layout.h"
 #include "render/paint.h"
+#include "render/image.h"
 #include "ui/chrome.h"
 #include "ui/input.h"
 
@@ -181,6 +182,8 @@ int br_app_navigate(browser_app_t *app, const char *url) {
     return 0;
 }
 
+static void load_page_images(browser_app_t *app);
+
 static void apply_fetch_result(browser_app_t *app,
                                char *body, size_t len, char *final_url,
                                const char *err, int ok) {
@@ -204,6 +207,11 @@ static void apply_fetch_result(browser_app_t *app,
     app->doc->base_url[sizeof(app->doc->base_url) - 1] = '\0';
 
     push_history(app, app->url);
+
+    /* Fetch and decode images referenced in the page. */
+    if (app->doc->image_count > 0) {
+        load_page_images(app);
+    }
 
     snprintf(app->status, sizeof(app->status), "%zu B • %s",
              len, app->doc->title[0] != '\0' ? app->doc->title : "(no title)");
@@ -250,6 +258,87 @@ static void resolve_link_target(browser_app_t *app, int link_index,
     }
     size_t prefix = (size_t)(last_slash - base) + 1;
     snprintf(out, cap, "%.*s%s", (int)prefix, base, href);
+}
+
+static void resolve_url_against_base(const char *base_url, const char *url_str,
+                                     const char *src, char *out, size_t cap) {
+    out[0] = '\0';
+    if (src == NULL || src[0] == '\0') return;
+    if (strstr(src, "://") != NULL) {
+        strncpy(out, src, cap - 1);
+        out[cap - 1] = '\0';
+        return;
+    }
+    if (strncmp(src, "//", 2) == 0) {
+        const char *base = base_url[0] != '\0' ? base_url : url_str;
+        const char *scheme_end = strstr(base, "://");
+        size_t scheme_len = scheme_end != NULL ? (size_t)(scheme_end - base) : 4;
+        snprintf(out, cap, "%.*s:%s", (int)scheme_len, base, src);
+        return;
+    }
+    const char *base = base_url[0] != '\0' ? base_url : url_str;
+    if (src[0] == '/') {
+        const char *scheme_end = strstr(base, "://");
+        if (scheme_end != NULL) {
+            const char *host_end = scheme_end + 3;
+            while (*host_end != '\0' && *host_end != '/') host_end++;
+            size_t prefix = (size_t)(host_end - base);
+            snprintf(out, cap, "%.*s%s", (int)prefix, base, src);
+            return;
+        }
+    }
+    const char *last_slash = base;
+    for (const char *q = base; *q != '\0'; q++) {
+        if (*q == '/') last_slash = q;
+    }
+    size_t prefix = (size_t)(last_slash - base) + 1;
+    snprintf(out, cap, "%.*s%s", (int)prefix, base, src);
+}
+
+#define BROWSER_MAX_IMAGES_PER_PAGE 32
+
+static void load_page_images(browser_app_t *app) {
+    if (app->doc == NULL) return;
+    br_doc_t *doc = app->doc;
+    int loaded = 0;
+
+    for (size_t i = 0; i < doc->image_count && loaded < BROWSER_MAX_IMAGES_PER_PAGE; i++) {
+        br_image_t *img = &doc->images[i];
+        if (img->loaded != 0) continue;
+
+        char resolved[BROWSER_URL_MAX];
+        resolve_url_against_base(doc->base_url, app->url,
+                                 img->src, resolved, sizeof(resolved));
+
+        if (resolved[0] == '\0') {
+            img->loaded = -1;
+            continue;
+        }
+
+        snprintf(app->status, sizeof(app->status), "image %d/%d…",
+                 loaded + 1, (int)doc->image_count);
+        app->chrome_dirty = 1;
+
+        char *body = NULL;
+        size_t len = 0;
+        const char *err = NULL;
+        if (browser_fetch_url(resolved, &body, &len, NULL, &err) == 0) {
+            uint32_t *pixels = NULL;
+            int w = 0, h = 0;
+            if (br_image_decode(body, len, &pixels, &w, &h) == 0) {
+                img->pixels = pixels;
+                img->width = w;
+                img->height = h;
+                img->loaded = 1;
+            } else {
+                img->loaded = -1;
+            }
+            free(body);
+        } else {
+            img->loaded = -1;
+        }
+        loaded++;
+    }
 }
 
 void br_app_follow_link(browser_app_t *app, int link_index) {

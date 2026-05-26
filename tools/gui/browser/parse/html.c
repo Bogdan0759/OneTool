@@ -78,6 +78,14 @@ void br_doc_clear(br_doc_t *doc) {
     doc->links = NULL;
     doc->link_count = 0;
     doc->link_cap = 0;
+    for (size_t i = 0; i < doc->image_count; i++) {
+        free(doc->images[i].src);
+        free(doc->images[i].pixels);
+    }
+    free(doc->images);
+    doc->images = NULL;
+    doc->image_count = 0;
+    doc->image_cap = 0;
     doc->title[0] = '\0';
 }
 
@@ -114,6 +122,7 @@ static int doc_emit_text(br_doc_t *d, const char *text, br_style_t style,
     r->style = style;
     r->text = strdup(text);
     r->link_index = link_index;
+    r->image_index = -1;
     return r->text == NULL ? -1 : 0;
 }
 
@@ -124,6 +133,7 @@ static int doc_emit_marker(br_doc_t *d, br_run_kind_t kind) {
     r->style = BR_STYLE_NORMAL;
     r->text = NULL;
     r->link_index = -1;
+    r->image_index = -1;
     return 0;
 }
 
@@ -136,6 +146,41 @@ static int doc_add_link(br_doc_t *d, const char *href, size_t href_len) {
     l->href[href_len] = '\0';
     l->first_run = (int)d->run_count;
     return (int)d->link_count++;
+}
+
+static int doc_grow_images(br_doc_t *d) {
+    size_t want = d->image_cap == 0 ? 16 : d->image_cap * 2;
+    br_image_t *p = (br_image_t *)realloc(d->images, want * sizeof(br_image_t));
+    if (p == NULL) return -1;
+    d->images = p;
+    d->image_cap = want;
+    return 0;
+}
+
+static int doc_add_image(br_doc_t *d, const char *src, size_t src_len) {
+    if (d->image_count == d->image_cap && doc_grow_images(d) != 0) return -1;
+    br_image_t *img = &d->images[d->image_count];
+    img->src = (char *)malloc(src_len + 1);
+    if (img->src == NULL) return -1;
+    memcpy(img->src, src, src_len);
+    img->src[src_len] = '\0';
+    img->pixels = NULL;
+    img->width = 0;
+    img->height = 0;
+    img->loaded = 0;
+    return (int)d->image_count++;
+}
+
+static int doc_emit_image(br_doc_t *d, int image_index, const char *alt,
+                          int link_index) {
+    if (d->run_count == d->run_cap && doc_grow_runs(d) != 0) return -1;
+    br_run_t *r = &d->runs[d->run_count++];
+    r->kind = BR_RUN_IMAGE;
+    r->style = BR_STYLE_NORMAL;
+    r->text = (alt != NULL && alt[0] != '\0') ? strdup(alt) : NULL;
+    r->link_index = link_index;
+    r->image_index = image_index;
+    return 0;
 }
 
 /* ----- parser helpers ----- */
@@ -645,7 +690,21 @@ static void handle_open_tag(br_parser_t *p, const br_tag_t *t) {
         return;
     }
     if (strcmp(n, "img") == 0) {
-        /* Render alt/title/src as inline placeholder. */
+        flush_text(p);
+        request_break(p, 0);
+        apply_pending_break(p);
+        if (t->has_src && t->src[0] != '\0') {
+            int img_idx = doc_add_image(p->doc, t->src, strlen(t->src));
+            if (img_idx >= 0) {
+                const char *alt = NULL;
+                if (t->has_alt && t->alt[0] != '\0') alt = t->alt;
+                else if (t->has_title && t->title[0] != '\0') alt = t->title;
+                doc_emit_image(p->doc, img_idx, alt, cur_link(p));
+                request_break(p, 0);
+                return;
+            }
+        }
+        /* Fallback: no src or alloc fail — show text placeholder */
         const char *label = NULL;
         if (t->has_alt && t->alt[0] != '\0') label = t->alt;
         else if (t->has_title && t->title[0] != '\0') label = t->title;
@@ -660,7 +719,6 @@ static void handle_open_tag(br_parser_t *p, const br_tag_t *t) {
         } else {
             snprintf(buf, sizeof(buf), "[img]");
         }
-        flush_text(p);
         doc_emit_text(p->doc, buf, BR_STYLE_ITALIC, cur_link(p));
         return;
     }

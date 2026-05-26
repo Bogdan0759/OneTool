@@ -1,7 +1,7 @@
 string CC = "clang";
 string CFLAGS = "-O3 -flto";
 string LDFLAGS = "-static";
-string LDLIBS = "-lssl -lcrypto -lz -lzstd -ldl -pthread -lncursesw -ltinfo -lm";
+string LDLIBS = "-lssl -lcrypto -lz -lzstd -ldl -pthread -lncursesw -ltinfo -lm -ljpeg -lpng16";
 
 string TARGET = "onetool";
 string MAIN_SRC = "main.c";
@@ -276,13 +276,16 @@ string BROWSER_LAYOUT_OBJ = "tools/gui/browser/render/layout.o";
 string BROWSER_PAINT_HDR = "tools/gui/browser/render/paint.h";
 string BROWSER_PAINT_SRC = "tools/gui/browser/render/paint.c";
 string BROWSER_PAINT_OBJ = "tools/gui/browser/render/paint.o";
+string BROWSER_IMAGE_HDR = "tools/gui/browser/render/image.h";
+string BROWSER_IMAGE_SRC = "tools/gui/browser/render/image.c";
+string BROWSER_IMAGE_OBJ = "tools/gui/browser/render/image.o";
 string BROWSER_CHROME_HDR = "tools/gui/browser/ui/chrome.h";
 string BROWSER_CHROME_SRC = "tools/gui/browser/ui/chrome.c";
 string BROWSER_CHROME_OBJ = "tools/gui/browser/ui/chrome.o";
 string BROWSER_INPUT_HDR = "tools/gui/browser/ui/input.h";
 string BROWSER_INPUT_SRC = "tools/gui/browser/ui/input.c";
 string BROWSER_INPUT_OBJ = "tools/gui/browser/ui/input.o";
-string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/filesystem/fsize.o tools/filesystem/ls.o tools/filesystem/cat.o tools/filesystem/free.o tools/filesystem/size.o tools/filesystem/nm.o tools/dev/gapi_supported.o tools/dev/srapi_demo.o tools/dev/converter/srvid2mp4.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o tools/network/nsetup.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o libs/elf/elf.o libs/memory/memory.o libs/srapi/src/core/context.o libs/srapi/src/core/debug.o libs/srapi/src/core/framebuffer.o libs/srapi/src/core/export.o libs/srapi/src/core/command.o libs/srapi/src/core/buffer.o libs/srapi/src/core/image.o libs/srapi/src/core/image_view.o libs/srapi/src/core/queue.o libs/srapi/src/core/tile_cache.o libs/srapi/src/core/time.o libs/srapi/src/backend/cpu/renderer.o libs/srapi/src/backend/gpu/gpu.o libs/srapi/src/backend/gpu/i915.o libs/srapi/src/backend/gpu/i915/render3d.o libs/srapi/src/backend/gpu/i915/vm.o libs/srapi/src/backend/fbdev/fbdev.o libs/srapi/src/backend/drm/buffer.o libs/srapi/src/backend/drm/drm.o libs/srapi/src/backend/drm/record.o libs/srapi/src/display/drm_probe.o libs/srapi/src/vm/shader.o libs/srapi/src/vm/exec.o libs/srapi/src/vm/exec_simd.o libs/srapi/src/vm/threadpool.o libs/srapi/src/io/ppm.o libs/srapi/src/input/input.o libs/srapi/src/input/evdev.o libs/srapi/src/input/scancode.o libs/gui/ranal/src/app.o libs/gui/ranal/src/widget.o libs/gui/ranal/src/font.o libs/gui/ranal/src/context.o libs/gui/ranal/src/swm_client.o libs/gui/sprot/src/msg.o libs/gui/sprot/src/client.o libs/gui/sprot/src/srapi_bridge.o libs/gui/sprot/src/vk_interop.o libs/gui/swm/src/main.o libs/gui/swm/src/backend/srapi_drm.o libs/gui/swm/src/buffer/buffer.o libs/gui/swm/src/de/de.o libs/gui/swm/src/probe/render_node.o tools/dev/sprot_hello.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/dev/mlink/cli.o tools/dev/mlink/object.o tools/dev/mlink/elf-reader.o tools/dev/mlink/symtab.o tools/dev/mlink/layout.o tools/dev/mlink/reloc.o tools/dev/mlink/emit.o tools/dev/mlink/bytes.o tools/dev/mlink/log.o tools/dev/mlink/macro.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o tools/system/configure/size.o tools/system/video/cvm.o tools/system/userc/users.o tools/system/userc/tui.o tools/games/click.o tools/games/ranal_demo.o tools/gui/term.o tools/gui/browser/main.o tools/gui/browser/app.o tools/gui/browser/net/fetch.o tools/gui/browser/net/fetch_async.o tools/gui/browser/parse/html.o tools/gui/browser/render/layout.o tools/gui/browser/render/paint.o tools/gui/browser/ui/chrome.o tools/gui/browser/ui/input.o";
+string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/filesystem/fsize.o tools/filesystem/ls.o tools/filesystem/cat.o tools/filesystem/free.o tools/filesystem/size.o tools/filesystem/nm.o tools/dev/gapi_supported.o tools/dev/srapi_demo.o tools/dev/converter/srvid2mp4.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o tools/network/nsetup.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o libs/elf/elf.o libs/memory/memory.o libs/srapi/src/core/context.o libs/srapi/src/core/debug.o libs/srapi/src/core/framebuffer.o libs/srapi/src/core/export.o libs/srapi/src/core/command.o libs/srapi/src/core/buffer.o libs/srapi/src/core/image.o libs/srapi/src/core/image_view.o libs/srapi/src/core/queue.o libs/srapi/src/core/tile_cache.o libs/srapi/src/core/time.o libs/srapi/src/backend/cpu/renderer.o libs/srapi/src/backend/gpu/gpu.o libs/srapi/src/backend/gpu/i915.o libs/srapi/src/backend/gpu/i915/render3d.o libs/srapi/src/backend/gpu/i915/vm.o libs/srapi/src/backend/fbdev/fbdev.o libs/srapi/src/backend/drm/buffer.o libs/srapi/src/backend/drm/drm.o libs/srapi/src/backend/drm/record.o libs/srapi/src/display/drm_probe.o libs/srapi/src/vm/shader.o libs/srapi/src/vm/exec.o libs/srapi/src/vm/exec_simd.o libs/srapi/src/vm/threadpool.o libs/srapi/src/io/ppm.o libs/srapi/src/input/input.o libs/srapi/src/input/evdev.o libs/srapi/src/input/scancode.o libs/gui/ranal/src/app.o libs/gui/ranal/src/widget.o libs/gui/ranal/src/font.o libs/gui/ranal/src/context.o libs/gui/ranal/src/swm_client.o libs/gui/sprot/src/msg.o libs/gui/sprot/src/client.o libs/gui/sprot/src/srapi_bridge.o libs/gui/sprot/src/vk_interop.o libs/gui/swm/src/main.o libs/gui/swm/src/backend/srapi_drm.o libs/gui/swm/src/buffer/buffer.o libs/gui/swm/src/de/de.o libs/gui/swm/src/probe/render_node.o tools/dev/sprot_hello.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/dev/mlink/cli.o tools/dev/mlink/object.o tools/dev/mlink/elf-reader.o tools/dev/mlink/symtab.o tools/dev/mlink/layout.o tools/dev/mlink/reloc.o tools/dev/mlink/emit.o tools/dev/mlink/bytes.o tools/dev/mlink/log.o tools/dev/mlink/macro.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o tools/system/configure/size.o tools/system/video/cvm.o tools/system/userc/users.o tools/system/userc/tui.o tools/games/click.o tools/games/ranal_demo.o tools/gui/term.o tools/gui/browser/main.o tools/gui/browser/app.o tools/gui/browser/net/fetch.o tools/gui/browser/net/fetch_async.o tools/gui/browser/parse/html.o tools/gui/browser/render/layout.o tools/gui/browser/render/paint.o tools/gui/browser/render/image.o tools/gui/browser/ui/chrome.o tools/gui/browser/ui/input.o";
 
 task all() {
     build();
@@ -503,6 +506,10 @@ task build() {
         @echo("[CC] %s", BROWSER_PAINT_SRC);
         @run("%s %s %s -c %s -o %s", CC, CFLAGS, BROWSER_CFLAGS, BROWSER_PAINT_SRC, BROWSER_PAINT_OBJ);
     }
+    if (@is_outdated(BROWSER_IMAGE_OBJ, BROWSER_IMAGE_SRC, BROWSER_IMAGE_HDR)) {
+        @echo("[CC] %s", BROWSER_IMAGE_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, BROWSER_CFLAGS, BROWSER_IMAGE_SRC, BROWSER_IMAGE_OBJ);
+    }
     if (@is_outdated(BROWSER_CHROME_OBJ, BROWSER_CHROME_SRC, BROWSER_CHROME_HDR, BROWSER_HDR, RANAL_HDR)) {
         @echo("[CC] %s", BROWSER_CHROME_SRC);
         @run("%s %s %s -c %s -o %s", CC, CFLAGS, BROWSER_CFLAGS, BROWSER_CHROME_SRC, BROWSER_CHROME_OBJ);
@@ -511,7 +518,7 @@ task build() {
         @echo("[CC] %s", BROWSER_INPUT_SRC);
         @run("%s %s %s -c %s -o %s", CC, CFLAGS, BROWSER_CFLAGS, BROWSER_INPUT_SRC, BROWSER_INPUT_OBJ);
     }
-    if (@is_outdated(BROWSER_APP_OBJ, BROWSER_APP_SRC, BROWSER_APP_HDR, BROWSER_HDR, BROWSER_FETCH_HDR, BROWSER_HTML_HDR, BROWSER_LAYOUT_HDR, BROWSER_PAINT_HDR, BROWSER_CHROME_HDR, BROWSER_INPUT_HDR, RANAL_HDR)) {
+    if (@is_outdated(BROWSER_APP_OBJ, BROWSER_APP_SRC, BROWSER_APP_HDR, BROWSER_HDR, BROWSER_FETCH_HDR, BROWSER_HTML_HDR, BROWSER_LAYOUT_HDR, BROWSER_PAINT_HDR, BROWSER_IMAGE_HDR, BROWSER_CHROME_HDR, BROWSER_INPUT_HDR, RANAL_HDR)) {
         @echo("[CC] %s", BROWSER_APP_SRC);
         @run("%s %s %s -c %s -o %s", CC, CFLAGS, BROWSER_CFLAGS, BROWSER_APP_SRC, BROWSER_APP_OBJ);
     }
@@ -848,6 +855,7 @@ task build() {
         BROWSER_HTML_OBJ,
         BROWSER_LAYOUT_OBJ,
         BROWSER_PAINT_OBJ,
+        BROWSER_IMAGE_OBJ,
         BROWSER_CHROME_OBJ,
         BROWSER_INPUT_OBJ,
         EXTRA_TOOLS_BUNDLE_OBJ
@@ -974,6 +982,7 @@ task clean() {
     @run("rm -f %s", BROWSER_HTML_OBJ);
     @run("rm -f %s", BROWSER_LAYOUT_OBJ);
     @run("rm -f %s", BROWSER_PAINT_OBJ);
+    @run("rm -f %s", BROWSER_IMAGE_OBJ);
     @run("rm -f %s", BROWSER_CHROME_OBJ);
     @run("rm -f %s", BROWSER_INPUT_OBJ);
     @run("rm -f %s", EXTRA_TOOLS_BUNDLE_OBJ);

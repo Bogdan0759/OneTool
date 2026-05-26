@@ -134,11 +134,73 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
             b.style = BR_STYLE_NORMAL;
             b.text = NULL; b.text_len = 0;
             b.link_index = -1;
+            b.image_pixels = NULL;
             emit_box(l, b);
             y += LINE_H;
             x = 0;
             line_top = y;
             line_h = LINE_H;
+            continue;
+        }
+
+        if (r->kind == BR_RUN_IMAGE) {
+            /* Start a new line for the image. */
+            if (x > 0) {
+                y = line_top + line_h;
+                x = 0;
+                line_top = y;
+                line_h = LINE_H;
+            }
+
+            int img_idx = r->image_index;
+            const br_image_t *img = NULL;
+            if (img_idx >= 0 && (size_t)img_idx < doc->image_count)
+                img = &doc->images[img_idx];
+
+            if (img != NULL && img->loaded == 1 && img->pixels != NULL) {
+                int iw = img->width;
+                int ih = img->height;
+                /* Scale to fit content width, preserving aspect ratio. */
+                if (iw > content_width) {
+                    ih = ih * content_width / iw;
+                    iw = content_width;
+                }
+                if (ih <= 0) ih = 1;
+
+                br_box_t b = {0};
+                b.x = 0; b.y = line_top;
+                b.w = iw; b.h = ih;
+                b.scale = 1;
+                b.style = BR_STYLE_NORMAL;
+                b.text = NULL; b.text_len = 0;
+                b.link_index = r->link_index;
+                b.image_pixels = img->pixels;
+                b.img_src_w = img->width;
+                b.img_src_h = img->height;
+                if (emit_box(l, b) != 0) return -1;
+
+                y = line_top + ih;
+                x = 0;
+                line_top = y;
+                line_h = LINE_H;
+            } else if (r->text != NULL) {
+                /* Image failed to load — show alt text as italic placeholder. */
+                int tlen = (int)strlen(r->text);
+                int w = word_advance_px(r->text, 0, tlen, 1);
+                br_box_t b = {0};
+                b.x = x; b.y = line_top;
+                b.w = w; b.h = GLYPH_H;
+                b.scale = 1;
+                b.bold = 0;
+                b.underline = 0;
+                b.style = BR_STYLE_ITALIC;
+                b.text = r->text;
+                b.text_len = tlen;
+                b.link_index = r->link_index;
+                b.image_pixels = NULL;
+                if (emit_box(l, b) != 0) return -1;
+                x += w;
+            }
             continue;
         }
 

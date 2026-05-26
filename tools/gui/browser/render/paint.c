@@ -38,6 +38,41 @@ static void surf_fill(uint32_t *px, int pitch_px, int sw, int sh,
     }
 }
 
+static void surf_blit_scaled(uint32_t *px, int pitch_px, int sw, int sh,
+                             int dx, int dy, int dw, int dh,
+                             const uint32_t *src, int src_w, int src_h) {
+    if (src == NULL || src_w <= 0 || src_h <= 0) return;
+    if (dw <= 0 || dh <= 0) return;
+    for (int row = 0; row < dh; row++) {
+        int py = dy + row;
+        if (py < 0) continue;
+        if (py >= sh) break;
+        int sy = row * src_h / dh;
+        if (sy >= src_h) sy = src_h - 1;
+        const uint32_t *srow = src + (size_t)sy * src_w;
+        uint32_t *drow = px + (size_t)py * pitch_px;
+        for (int col = 0; col < dw; col++) {
+            int xx = dx + col;
+            if (xx < 0) continue;
+            if (xx >= sw) break;
+            int sx = col * src_w / dw;
+            if (sx >= src_w) sx = src_w - 1;
+            uint32_t spx = srow[sx];
+            uint32_t a = (spx >> 24) & 0xFF;
+            if (a == 0xFF) {
+                drow[xx] = spx;
+            } else if (a > 0) {
+                uint32_t dpx = drow[xx];
+                uint32_t inv = 255 - a;
+                uint32_t r = (((spx >> 16) & 0xFF) * a + ((dpx >> 16) & 0xFF) * inv) / 255;
+                uint32_t g = (((spx >>  8) & 0xFF) * a + ((dpx >>  8) & 0xFF) * inv) / 255;
+                uint32_t b = (((spx      ) & 0xFF) * a + ((dpx      ) & 0xFF) * inv) / 255;
+                drow[xx] = (0xFFu << 24) | (r << 16) | (g << 8) | b;
+            }
+        }
+    }
+}
+
 static void draw_glyph_scaled(uint32_t *px, int pitch_px, int sw, int sh,
                               int x, int y, uint32_t cp,
                               uint32_t color, int scale) {
@@ -141,6 +176,17 @@ void br_paint_page(void *surface_v,
         if (y0 + b->h < 0 || y0 >= vh) continue;
 
         int is_focused = (focused_link >= 0 && b->link_index == focused_link);
+
+        /* Image box — blit scaled pixels. */
+        if (b->image_pixels != NULL) {
+            surf_blit_scaled(px, pitch_px, sw, sh,
+                             b->x, y0, b->w, b->h,
+                             b->image_pixels, b->img_src_w, b->img_src_h);
+            if (hits != NULL && b->link_index >= 0) {
+                hits_push(hits, b->link_index, b->x, y0, b->w, b->h);
+            }
+            continue;
+        }
 
         if (b->style == BR_STYLE_NORMAL && b->text == NULL && b->w > 0 && b->h > 0) {
             /* horizontal rule */

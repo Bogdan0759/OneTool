@@ -3,7 +3,7 @@
 
 #include "../browser.h"
 
-/* A single drawn glyph cluster (a word). */
+/* A single drawn glyph cluster (a word) or an image. */
 typedef struct {
     int      x, y;        /* top-left, in document-local pixels */
     int      w, h;        /* size in pixels (after scale) */
@@ -14,6 +14,9 @@ typedef struct {
     const char *text;     /* borrowed pointer into a run's text buffer */
     int      text_len;    /* byte count */
     int      link_index;  /* -1 if not a link */
+    const uint32_t *image_pixels;  /* NULL if not an image; borrowed */
+    int      img_src_w;   /* original image width */
+    int      img_src_h;   /* original image height */
 } br_box_t;
 
 typedef struct {
