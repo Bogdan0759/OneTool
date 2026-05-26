@@ -109,6 +109,7 @@ void br_doc_clear(br_doc_t *doc) {
         doc->ext_sheets[i] = NULL;
     }
     doc->ext_sheet_count = 0;
+    doc->base_href[0] = '\0';
     /* doc->stylesheet is freed by the CSS module; we just clear the pointer
      * here — the caller (app) is responsible for destroying it before
      * br_doc_clear() if needed. */
@@ -323,6 +324,14 @@ static int doc_record_ext_sheet(br_doc_t *d, const char *href, size_t len) {
     return 0;
 }
 
+static void doc_set_base_href(br_doc_t *d, const char *href, size_t len) {
+    if (d == NULL || href == NULL || len == 0) return;
+    if (d->base_href[0] != '\0') return;
+    if (len >= sizeof(d->base_href)) len = sizeof(d->base_href) - 1;
+    memcpy(d->base_href, href, len);
+    d->base_href[len] = '\0';
+}
+
 /* ----- parser helpers ----- */
 
 static br_style_t cur_style(const br_parser_t *p) {
@@ -527,6 +536,9 @@ typedef struct {
     /* Attribute "href" value, if present. */
     char  href[2048];
     int   has_href;
+    /* Attribute "name". Used for legacy anchor targets. */
+    char  name_attr[BROWSER_ELEMENT_ID_MAX];
+    int   has_name_attr;
     /* Attribute "alt" value (used for <img>). */
     char  alt[512];
     int   has_alt;
@@ -610,6 +622,7 @@ static int parse_tag(br_parser_t *p, br_tag_t *out) {
                !isspace((unsigned char)*q) && *q != '/') q++;
         size_t alen = (size_t)(q - an);
         int is_href = (alen == 4) && (strncasecmp(an, "href", 4) == 0);
+        int is_name = (alen == 4) && (strncasecmp(an, "name", 4) == 0);
         int is_alt = (alen == 3) && (strncasecmp(an, "alt", 3) == 0);
         int is_title = (alen == 5) && (strncasecmp(an, "title", 5) == 0);
         int is_src = (alen == 3) && (strncasecmp(an, "src", 3) == 0);
@@ -639,6 +652,9 @@ static int parse_tag(br_parser_t *p, br_tag_t *out) {
             if (is_href && !out->has_href) {
                 TAKE_INTO(href);
                 out->has_href = 1;
+            } else if (is_name && !out->has_name_attr) {
+                TAKE_INTO(name_attr);
+                out->has_name_attr = 1;
             } else if (is_alt && !out->has_alt) {
                 TAKE_INTO(alt);
                 out->has_alt = 1;
@@ -744,7 +760,7 @@ static void handle_open_tag(br_parser_t *p, const br_tag_t *t) {
         strcmp(n, "script") != 0 && strcmp(n, "noscript") != 0 &&
         strcmp(n, "style") != 0 && strcmp(n, "link") != 0) {
         doc_push_element(p, n,
-                         t->has_id ? t->id : NULL,
+                         t->has_id ? t->id : (t->has_name_attr ? t->name_attr : NULL),
                          t->has_class ? t->cls : NULL,
                          t->has_style ? t->style : NULL);
         pushed_element = 1;
@@ -754,6 +770,12 @@ static void handle_open_tag(br_parser_t *p, const br_tag_t *t) {
     /* In <head>, drop everything except <title>. */
     if (strcmp(n, "head") == 0) { p->in_head = 1; return; }
     if (strcmp(n, "body") == 0) { p->in_head = 0; return; }
+    if (strcmp(n, "base") == 0) {
+        if (t->has_href && t->href[0] != '\0') {
+            doc_set_base_href(p->doc, t->href, strlen(t->href));
+        }
+        return;
+    }
     if (p->in_head && strcmp(n, "title") != 0) {
         if (strcmp(n, "script") == 0) { p->in_script = 1; return; }
         if (strcmp(n, "style") == 0) { p->in_style = 1; return; }
@@ -954,7 +976,7 @@ static void handle_open_tag(br_parser_t *p, const br_tag_t *t) {
     if (strcmp(n, "a") == 0) {
         flush_text(p);
         int link_idx = -1;
-        if (t->has_href && t->href[0] != '\0' && t->href[0] != '#') {
+        if (t->has_href && t->href[0] != '\0') {
             link_idx = doc_add_link(p->doc, t->href, strlen(t->href));
         }
         if (p->link_depth < BR_MAX_STYLE_STACK) {

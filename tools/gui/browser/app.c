@@ -90,6 +90,42 @@ static const char *kHomeHtml =
     "</body></html>";
 
 static void build_and_apply_css(browser_app_t *app);
+static void load_page_images(browser_app_t *app);
+static void resolve_url_against_base(const char *base_url, const char *url_str,
+                                     const char *src, char *out, size_t cap);
+
+static int element_is_descendant(const br_doc_t *doc, int child, int ancestor) {
+    while (child >= 0 && (size_t)child < doc->element_count) {
+        if (child == ancestor) return 1;
+        child = doc->elements[child].parent;
+    }
+    return 0;
+}
+
+static int scroll_to_fragment(browser_app_t *app, const char *fragment) {
+    if (app == NULL || app->doc == NULL || fragment == NULL || fragment[0] == '\0') {
+        return -1;
+    }
+    int target = -1;
+    for (size_t i = 0; i < app->doc->element_count; i++) {
+        if (strcmp(app->doc->elements[i].id, fragment) == 0) {
+            target = (int)i;
+            break;
+        }
+    }
+    if (target < 0) return -1;
+    for (size_t i = 0; i < g_layout.box_count; i++) {
+        const br_box_t *b = &g_layout.boxes[i];
+        if (b->element_index >= 0 &&
+            element_is_descendant(app->doc, b->element_index, target)) {
+            app->scroll_y = b->y > 8 ? b->y - 8 : 0;
+            app->page_dirty = 1;
+            app->chrome_dirty = 1;
+            return 0;
+        }
+    }
+    return -1;
+}
 
 static int url_has_scheme(const char *s) {
     if (s == NULL || s[0] == '\0') return 0;
@@ -122,6 +158,33 @@ static void copy_cstr(char *dst, size_t cap, const char *src) {
     dst[cap - 1] = '\0';
 }
 
+static void split_fragment(const char *url, char *base, size_t base_cap,
+                           char *frag, size_t frag_cap) {
+    const char *hash = url != NULL ? strchr(url, '#') : NULL;
+    if (frag_cap > 0) frag[0] = '\0';
+    if (hash == NULL) {
+        copy_cstr(base, base_cap, url);
+        return;
+    }
+    if (base_cap > 0) {
+        size_t n = (size_t)(hash - url);
+        if (n >= base_cap) n = base_cap - 1;
+        memcpy(base, url, n);
+        base[n] = '\0';
+    }
+    if (frag_cap > 0) copy_cstr(frag, frag_cap, hash + 1);
+}
+
+static void base_without_fragment(const char *src, char *out, size_t cap) {
+    size_t n = 0;
+    if (cap == 0) return;
+    while (src[n] != '\0' && src[n] != '#' && n + 1 < cap) {
+        out[n] = src[n];
+        n++;
+    }
+    out[n] = '\0';
+}
+
 static void base_without_query_fragment(const char *src, char *out, size_t cap) {
     size_t n = 0;
     if (cap == 0) return;
@@ -130,6 +193,14 @@ static void base_without_query_fragment(const char *src, char *out, size_t cap) 
         n++;
     }
     out[n] = '\0';
+}
+
+static int same_url_ignoring_fragment(const char *a, const char *b) {
+    char aa[BROWSER_URL_MAX];
+    char bb[BROWSER_URL_MAX];
+    base_without_fragment(a != NULL ? a : "", aa, sizeof(aa));
+    base_without_fragment(b != NULL ? b : "", bb, sizeof(bb));
+    return strcmp(aa, bb) == 0;
 }
 
 static void normalize_url_path(char *path) {
@@ -225,6 +296,23 @@ static void join_url(const char *base, const char *ref, char *out, size_t cap) {
     snprintf(out, cap, "%s%s", origin, path_buf);
 }
 
+static void effective_base_url(const browser_app_t *app, char *out, size_t cap) {
+    if (cap == 0) return;
+    out[0] = '\0';
+    if (app == NULL || app->doc == NULL) return;
+    if (app->doc->base_href[0] != '\0') {
+        const char *fallback = app->doc->base_url[0] != '\0'
+                               ? app->doc->base_url : app->url;
+        join_url(fallback, app->doc->base_href, out, cap);
+        if (out[0] != '\0') return;
+    }
+    if (app->doc->base_url[0] != '\0') {
+        copy_cstr(out, cap, app->doc->base_url);
+        return;
+    }
+    copy_cstr(out, cap, app->url);
+}
+
 static void load_home(browser_app_t *app) {
     if (app->doc != NULL && app->doc->stylesheet != NULL) {
         br_css_stylesheet_destroy((br_stylesheet_t *)app->doc->stylesheet);
@@ -244,6 +332,7 @@ static void load_home(browser_app_t *app) {
     app->hover_link = -1;
     app->has_queued_nav = 0;
     app->queued_url[0] = '\0';
+    app->pending_fragment[0] = '\0';
     g_layout_width = -1;
     app->page_dirty = 1;
     app->chrome_dirty = 1;
@@ -342,9 +431,14 @@ static void push_history(browser_app_t *app, const char *url) {
 int br_app_navigate(browser_app_t *app, const char *url) {
     if (url == NULL || url[0] == '\0') return -1;
     char target[BROWSER_URL_MAX];
+    char fetch_target[BROWSER_URL_MAX];
+    char fragment[BROWSER_ELEMENT_ID_MAX];
     strncpy(target, url, sizeof(target) - 1);
     target[sizeof(target) - 1] = '\0';
     normalize_url(target, sizeof(target));
+    split_fragment(target, fetch_target, sizeof(fetch_target),
+                   fragment, sizeof(fragment));
+    copy_cstr(app->pending_fragment, sizeof(app->pending_fragment), fragment);
 
     if (app_is_loading(app)) {
         copy_cstr(app->queued_url, sizeof(app->queued_url), target);
@@ -354,8 +448,26 @@ int br_app_navigate(browser_app_t *app, const char *url) {
         return 0;
     }
 
-    if (strcmp(target, "about:home") == 0) {
+    if (fragment[0] != '\0' && same_url_ignoring_fragment(fetch_target, app->url)) {
+        copy_cstr(app->url, sizeof(app->url), target);
+        if (scroll_to_fragment(app, fragment) == 0) {
+            snprintf(app->status, sizeof(app->status), "#%s", fragment);
+        } else {
+            snprintf(app->status, sizeof(app->status), "anchor not found: #%s",
+                     fragment);
+        }
+        app->pending_fragment[0] = '\0';
+        app->chrome_dirty = 1;
+        return 0;
+    }
+
+    if (strcmp(fetch_target, "about:home") == 0) {
         load_home(app);
+        if (fragment[0] != '\0') {
+            scroll_to_fragment(app, fragment);
+            app->pending_fragment[0] = '\0';
+        }
+        copy_cstr(app->url, sizeof(app->url), target);
         push_history(app, app->url);
         return 0;
     }
@@ -363,7 +475,7 @@ int br_app_navigate(browser_app_t *app, const char *url) {
     snprintf(app->status, sizeof(app->status), "loading %s…", target);
     app->chrome_dirty = 1;
 
-    if (br_net_start((br_net_t *)app->net, target) != 0) {
+    if (br_net_start((br_net_t *)app->net, fetch_target) != 0) {
         snprintf(app->status, sizeof(app->status), "error: fetch start failed");
         return -1;
     }
@@ -372,10 +484,6 @@ int br_app_navigate(browser_app_t *app, const char *url) {
     app->url[sizeof(app->url) - 1] = '\0';
     return 0;
 }
-
-static void load_page_images(browser_app_t *app);
-static void resolve_url_against_base(const char *base_url, const char *url_str,
-                                     const char *src, char *out, size_t cap);
 
 /* Build doc->stylesheet from:
  *   1. the built-in user-agent rules,
@@ -402,8 +510,10 @@ static void build_and_apply_css(browser_app_t *app) {
     int fetched = 0;
     for (int i = 0; i < doc->ext_sheet_count && fetched < 8; i++) {
         char resolved[BROWSER_URL_MAX];
-        resolve_url_against_base(doc->base_url, app->url,
-                                 doc->ext_sheets[i], resolved, sizeof(resolved));
+        char base[BROWSER_URL_MAX];
+        effective_base_url(app, base, sizeof(base));
+        resolve_url_against_base(base, app->url, doc->ext_sheets[i],
+                                 resolved, sizeof(resolved));
         if (resolved[0] == '\0') continue;
         snprintf(app->status, sizeof(app->status), "css %d/%d…",
                  fetched + 1, doc->ext_sheet_count);
@@ -444,9 +554,16 @@ static void apply_fetch_result(browser_app_t *app,
 
     const char *show_url = (final_url != NULL && final_url[0] != '\0')
                            ? final_url : app->url;
-    strncpy(app->url, show_url, sizeof(app->url) - 1);
-    app->url[sizeof(app->url) - 1] = '\0';
-    strncpy(app->doc->base_url, app->url, sizeof(app->doc->base_url) - 1);
+    char final_base[BROWSER_URL_MAX];
+    split_fragment(show_url, final_base, sizeof(final_base), NULL, 0);
+    if (app->pending_fragment[0] != '\0') {
+        snprintf(app->url, sizeof(app->url), "%s#%s",
+                 final_base, app->pending_fragment);
+    } else {
+        strncpy(app->url, show_url, sizeof(app->url) - 1);
+        app->url[sizeof(app->url) - 1] = '\0';
+    }
+    strncpy(app->doc->base_url, final_base, sizeof(app->doc->base_url) - 1);
     app->doc->base_url[sizeof(app->doc->base_url) - 1] = '\0';
 
     push_history(app, app->url);
@@ -476,7 +593,8 @@ static void resolve_link_target(browser_app_t *app, int link_index,
     if (link_index < 0 || (size_t)link_index >= app->doc->link_count) return;
     const char *href = app->doc->links[link_index].href;
     if (href == NULL || href[0] == '\0') return;
-    const char *base = app->doc->base_url[0] != '\0' ? app->doc->base_url : app->url;
+    char base[BROWSER_URL_MAX];
+    effective_base_url(app, base, sizeof(base));
     join_url(base, href, out, cap);
 }
 
@@ -500,8 +618,10 @@ static void load_page_images(browser_app_t *app) {
         if (img->loaded != 0) continue;
 
         char resolved[BROWSER_URL_MAX];
-        resolve_url_against_base(doc->base_url, app->url,
-                                 img->src, resolved, sizeof(resolved));
+        char base[BROWSER_URL_MAX];
+        effective_base_url(app, base, sizeof(base));
+        resolve_url_against_base(base, app->url, img->src, resolved,
+                                 sizeof(resolved));
 
         if (resolved[0] == '\0') {
             img->loaded = -1;
@@ -686,6 +806,10 @@ int br_app_frame(browser_app_t *app) {
         br_layout_build(&g_layout, app->doc, app->page_w - 16);
         g_layout_width = app->page_w;
         app->content_h = g_layout.content_h;
+        if (app->pending_fragment[0] != '\0') {
+            scroll_to_fragment(app, app->pending_fragment);
+            app->pending_fragment[0] = '\0';
+        }
         app->page_dirty = 1;
     }
 

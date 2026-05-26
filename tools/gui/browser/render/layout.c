@@ -64,6 +64,7 @@ static int style_underline(br_style_t s) {
 static void apply_computed(br_box_t *b, const br_run_t *r,
                            const br_computed_style_t *cs) {
     b->style = r->style;
+    b->element_index = r->element_index;
     b->scale = style_scale(r->style);
     b->bold = style_bold(r->style);
     b->underline = style_underline(r->style);
@@ -180,6 +181,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
             b.style = BR_STYLE_NORMAL;
             b.text = NULL; b.text_len = 0;
             b.link_index = -1;
+            b.element_index = r->element_index;
             b.image_pixels = NULL;
             emit_box(l, b);
             y += LINE_H;
@@ -221,6 +223,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
                 b.style = BR_STYLE_NORMAL;
                 b.text = NULL; b.text_len = 0;
                 b.link_index = r->link_index;
+                b.element_index = r->element_index;
                 b.image_pixels = img->pixels;
                 b.img_src_w = img->width;
                 b.img_src_h = img->height;
@@ -245,6 +248,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
                 b.text = r->text;
                 b.text_len = tlen;
                 b.link_index = r->link_index;
+                b.element_index = r->element_index;
                 b.image_pixels = NULL;
                 if (emit_box(l, b) != 0) return -1;
                 x += w;
@@ -288,6 +292,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
                     b.text = t + seg_start;
                     b.text_len = seg_end - seg_start;
                     b.link_index = r->link_index;
+                    b.element_index = r->element_index;
                     if (emit_box(l, b) != 0) return -1;
                     x += w;
                 }
@@ -352,6 +357,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
                         b.text = t + cur_start;
                         b.text_len = k - cur_start;
                         b.link_index = r->link_index;
+                        b.element_index = r->element_index;
                         if (emit_box(l, b) != 0) return -1;
                         y = line_top + line_h;
                         x = 0;
@@ -375,6 +381,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
                     b.text = t + cur_start;
                     b.text_len = seg_end - cur_start;
                     b.link_index = r->link_index;
+                    b.element_index = r->element_index;
                     if (emit_box(l, b) != 0) return -1;
                     x += cur_w;
                 }
@@ -392,6 +399,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
             b.text = t + seg_start;
             b.text_len = seg_end - seg_start;
             b.link_index = r->link_index;
+            b.element_index = r->element_index;
             if (emit_box(l, b) != 0) return -1;
             x += w;
         }

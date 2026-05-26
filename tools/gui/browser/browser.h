@@ -133,6 +133,7 @@ typedef struct {
     /* Hrefs collected from <link rel=stylesheet>, owned. */
     char          *ext_sheets[BROWSER_EXT_SHEETS_MAX];
     int            ext_sheet_count;
+    char           base_href[BROWSER_URL_MAX];
     /* Parsed stylesheet, owned. Created by app after HTML+ext-fetch finish. */
     void          *stylesheet;     /* br_stylesheet_t * */
     char           title[BROWSER_TITLE_MAX];
@@ -168,6 +169,7 @@ typedef struct browser_app {
     char   url[BROWSER_URL_MAX];
     char   status[BROWSER_STATUS_MAX];
     char   queued_url[BROWSER_URL_MAX];
+    char   pending_fragment[BROWSER_ELEMENT_ID_MAX];
     char   url_edit[BROWSER_URL_MAX];
     size_t url_edit_len;
     int    url_focused;

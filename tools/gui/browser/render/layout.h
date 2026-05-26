@@ -21,6 +21,7 @@ typedef struct {
     const char *text;     /* borrowed pointer into a run's text buffer */
     int      text_len;    /* byte count */
     int      link_index;  /* -1 if not a link */
+    int      element_index;
     const uint32_t *image_pixels;  /* NULL if not an image; borrowed */
     int      img_src_w;   /* original image width */
     int      img_src_h;   /* original image height */
