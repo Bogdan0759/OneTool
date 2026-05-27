@@ -39,6 +39,9 @@
 #define BROWSER_ELEMENT_ID_MAX  64
 #define BROWSER_ELEMENT_CLASS_MAX 32
 #define BROWSER_ELEMENT_CLASSES 6
+#define BROWSER_ELEMENT_ATTRS   8
+#define BROWSER_ATTR_NAME_MAX   32
+#define BROWSER_ATTR_VALUE_MAX  96
 #define BROWSER_EXT_SHEETS_MAX  16
 
 typedef enum {
@@ -82,10 +85,18 @@ typedef struct {
 } br_computed_style_t;
 
 typedef struct {
+    char name[BROWSER_ATTR_NAME_MAX];
+    char value[BROWSER_ATTR_VALUE_MAX];
+    int  has_value;
+} br_attr_t;
+
+typedef struct {
     char tag[BROWSER_ELEMENT_TAG_MAX];
     char id[BROWSER_ELEMENT_ID_MAX];
     char classes[BROWSER_ELEMENT_CLASSES][BROWSER_ELEMENT_CLASS_MAX];
     int  class_count;
+    br_attr_t attrs[BROWSER_ELEMENT_ATTRS];
+    int  attr_count;
     char *inline_style;            /* raw style="..." text, owned, may be NULL */
     int  parent;                   /* index into doc->elements, -1 for root */
     br_computed_style_t computed;
@@ -133,6 +144,10 @@ typedef struct {
     /* Hrefs collected from <link rel=stylesheet>, owned. */
     char          *ext_sheets[BROWSER_EXT_SHEETS_MAX];
     int            ext_sheet_count;
+    int            script_count;
+    int            module_script_count;
+    int            js_app_hints;
+    int            noscript_count;
     char           base_href[BROWSER_URL_MAX];
     /* Parsed stylesheet, owned. Created by app after HTML+ext-fetch finish. */
     void          *stylesheet;     /* br_stylesheet_t * */

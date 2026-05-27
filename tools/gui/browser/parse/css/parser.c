@@ -198,6 +198,14 @@ static void skip_block_or_semicolon(br_css_lex_t *l) {
     }
 }
 
+static int at_rule_is_container(const br_css_tok_t *tok) {
+    if (tok == NULL || tok->kind != BR_CSST_AT || tok->text == NULL) return 0;
+    if (tok->len == 6 && strncasecmp(tok->text, "@media", 6) == 0) return 1;
+    if (tok->len == 9 && strncasecmp(tok->text, "@supports", 9) == 0) return 1;
+    if (tok->len == 6 && strncasecmp(tok->text, "@layer", 6) == 0) return 1;
+    return 0;
+}
+
 /* Parse a single rule starting from the lexer's current position. Returns
  * 1 if a rule was produced (and appended to ss), 0 on EOF, -1 on error. */
 static int parse_rule(br_css_lex_t *l, br_stylesheet_t *ss) {
@@ -208,6 +216,34 @@ static int parse_rule(br_css_lex_t *l, br_stylesheet_t *ss) {
     br_css_tok_t peek;
     br_css_lex_peek_skipws(l, &peek);
     if (peek.kind == BR_CSST_AT) {
+        if (at_rule_is_container(&peek)) {
+            br_css_lex_next(l, &peek);
+            int paren = 0;
+            while (l->p < l->end) {
+                char c = *l->p;
+                if (c == '(' || c == '[') paren++;
+                else if ((c == ')' || c == ']') && paren > 0) paren--;
+                else if (c == '{' && paren == 0) {
+                    l->p++;
+                    break;
+                } else if (c == ';' && paren == 0) {
+                    return 1;
+                }
+                l->p++;
+            }
+            while (l->p < l->end) {
+                br_css_lex_skip_ws(l);
+                if (l->p >= l->end) break;
+                if (*l->p == '}') {
+                    l->p++;
+                    break;
+                }
+                int r = parse_rule(l, ss);
+                if (r < 0) return -1;
+                if (r == 0) break;
+            }
+            return 1;
+        }
         skip_block_or_semicolon(l);
         return 1;
     }

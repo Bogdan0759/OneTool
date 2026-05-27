@@ -80,6 +80,9 @@ typedef struct {
     char id[BROWSER_ELEMENT_ID_MAX];                    /* empty = no id */
     char classes[BROWSER_ELEMENT_CLASSES][BROWSER_ELEMENT_CLASS_MAX];
     int  class_count;
+    char attr_name[BROWSER_ATTR_NAME_MAX];
+    char attr_value[BROWSER_ATTR_VALUE_MAX];
+    int  attr_has_value;
     /* Pseudo flags. Only :hover is supported but parsed so :pseudo doesn't
      * break matching. */
     int  pseudo_link;     /* :link / :visited match a tag, no extra constraint */

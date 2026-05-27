@@ -109,6 +109,10 @@ void br_doc_clear(br_doc_t *doc) {
         doc->ext_sheets[i] = NULL;
     }
     doc->ext_sheet_count = 0;
+    doc->script_count = 0;
+    doc->module_script_count = 0;
+    doc->js_app_hints = 0;
+    doc->noscript_count = 0;
     doc->base_href[0] = '\0';
     /* doc->stylesheet is freed by the CSS module; we just clear the pointer
      * here — the caller (app) is responsible for destroying it before
@@ -251,6 +255,7 @@ static int doc_append_css(br_doc_t *d, const char *src, size_t len) {
  * the new element index, or -1 on failure. */
 static int doc_push_element(br_parser_t *p, const char *tag,
                             const char *id, const char *cls,
+                            const br_attr_t *attrs, int attr_count,
                             const char *inline_style) {
     br_doc_t *d = p->doc;
     if (d->element_count == d->element_cap && doc_grow_elements(d) != 0)
@@ -286,6 +291,11 @@ static int doc_push_element(br_parser_t *p, const char *tag,
                 e->class_count++;
             }
         }
+    }
+    if (attrs != NULL && attr_count > 0) {
+        if (attr_count > BROWSER_ELEMENT_ATTRS) attr_count = BROWSER_ELEMENT_ATTRS;
+        for (int i = 0; i < attr_count; i++) e->attrs[i] = attrs[i];
+        e->attr_count = attr_count;
     }
     if (inline_style != NULL && inline_style[0] != '\0') {
         e->inline_style = strdup(inline_style);
@@ -563,10 +573,33 @@ typedef struct {
     /* Attribute "type" — used to skip non-CSS stylesheets. */
     char  type[64];
     int   has_type;
+    /* Attribute "src" on <script> is a decent JS-app signal too. */
+    br_attr_t attrs[BROWSER_ELEMENT_ATTRS];
+    int   attr_count;
 } br_tag_t;
 
 static void lower_inplace(char *s) {
     for (; *s != '\0'; s++) *s = (char)tolower((unsigned char)*s);
+}
+
+static void tag_record_attr(br_tag_t *t, const char *name, size_t name_len,
+                            const char *value, size_t value_len, int has_value) {
+    if (t->attr_count >= BROWSER_ELEMENT_ATTRS || name_len == 0) return;
+    br_attr_t *a = &t->attrs[t->attr_count++];
+    size_t take_name = name_len;
+    if (take_name >= sizeof(a->name)) take_name = sizeof(a->name) - 1;
+    memcpy(a->name, name, take_name);
+    a->name[take_name] = '\0';
+    lower_inplace(a->name);
+    a->has_value = 0;
+    a->value[0] = '\0';
+    if (has_value && value != NULL) {
+        size_t take_val = value_len;
+        if (take_val >= sizeof(a->value)) take_val = sizeof(a->value) - 1;
+        memcpy(a->value, value, take_val);
+        a->value[take_val] = '\0';
+        a->has_value = 1;
+    }
 }
 
 /* Parse a tag starting at p->p (which points at '<'). On success p->p is
@@ -680,8 +713,11 @@ static int parse_tag(br_parser_t *p, br_tag_t *out) {
                 TAKE_INTO(type);
                 out->has_type = 1;
             }
+            tag_record_attr(out, an, alen, vs, vlen, 1);
             #undef TAKE_INTO
             if (quote != 0 && q < p->end) q++;
+        } else {
+            tag_record_attr(out, an, alen, NULL, 0, 0);
         }
     }
     if (q < p->end && *q == '>') q++;
@@ -762,6 +798,7 @@ static void handle_open_tag(br_parser_t *p, const br_tag_t *t) {
         doc_push_element(p, n,
                          t->has_id ? t->id : (t->has_name_attr ? t->name_attr : NULL),
                          t->has_class ? t->cls : NULL,
+                         t->attrs, t->attr_count,
                          t->has_style ? t->style : NULL);
         pushed_element = 1;
     }
@@ -777,7 +814,18 @@ static void handle_open_tag(br_parser_t *p, const br_tag_t *t) {
         return;
     }
     if (p->in_head && strcmp(n, "title") != 0) {
-        if (strcmp(n, "script") == 0) { p->in_script = 1; return; }
+        if (strcmp(n, "script") == 0) {
+            p->doc->script_count++;
+            if (t->has_type &&
+                (strcasestr(t->type, "module") != NULL ||
+                 strcasestr(t->type, "javascript") != NULL ||
+                 strcasestr(t->type, "ecmascript") != NULL)) {
+                p->doc->module_script_count++;
+            }
+            if (t->has_src) p->doc->js_app_hints++;
+            p->in_script = 1;
+            return;
+        }
         if (strcmp(n, "style") == 0) { p->in_style = 1; return; }
         if (strcmp(n, "link") == 0) {
             /* <link rel="stylesheet" href="..."> */
@@ -834,8 +882,20 @@ static void handle_open_tag(br_parser_t *p, const br_tag_t *t) {
         p->title_off = (int)p->doc->run_count;
         return;
     }
-    if (strcmp(n, "script") == 0 || strcmp(n, "noscript") == 0) {
-        /* drop noscript content too — usually contains "enable JS" notices */
+    if (strcmp(n, "script") == 0) {
+        p->doc->script_count++;
+        if (t->has_type &&
+            (strcasestr(t->type, "module") != NULL ||
+             strcasestr(t->type, "javascript") != NULL ||
+             strcasestr(t->type, "ecmascript") != NULL)) {
+            p->doc->module_script_count++;
+        }
+        if (t->has_src) p->doc->js_app_hints++;
+        p->in_script = 1;
+        return;
+    }
+    if (strcmp(n, "noscript") == 0) {
+        p->doc->noscript_count++;
         p->in_script = 1;
         return;
     }

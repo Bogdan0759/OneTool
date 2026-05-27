@@ -93,6 +93,7 @@ static void build_and_apply_css(browser_app_t *app);
 static void load_page_images(browser_app_t *app);
 static void resolve_url_against_base(const char *base_url, const char *url_str,
                                      const char *src, char *out, size_t cap);
+static int doc_looks_js_heavy(const br_doc_t *doc);
 
 static int element_is_descendant(const br_doc_t *doc, int child, int ancestor) {
     while (child >= 0 && (size_t)child < doc->element_count) {
@@ -577,14 +578,29 @@ static void apply_fetch_result(browser_app_t *app,
         load_page_images(app);
     }
 
-    snprintf(app->status, sizeof(app->status), "%zu B • %s",
-             len, app->doc->title[0] != '\0' ? app->doc->title : "(no title)");
+    if (doc_looks_js_heavy(app->doc)) {
+        snprintf(app->status, sizeof(app->status),
+                 "%zu B • %s • JS-heavy page",
+                 len, app->doc->title[0] != '\0' ? app->doc->title : "(no title)");
+    } else {
+        snprintf(app->status, sizeof(app->status), "%zu B • %s",
+                 len, app->doc->title[0] != '\0' ? app->doc->title : "(no title)");
+    }
     app->scroll_y = 0;
     app->focused_link = -1;
     app->hover_link = -1;
     g_layout_width = -1;       /* force re-layout next frame */
     app->page_dirty = 1;
     app->chrome_dirty = 1;
+}
+
+static int doc_looks_js_heavy(const br_doc_t *doc) {
+    if (doc == NULL) return 0;
+    if (doc->module_script_count > 0) return 1;
+    if (doc->script_count >= 6) return 1;
+    if (doc->js_app_hints >= 2) return 1;
+    if (doc->noscript_count > 0 && doc->script_count > 0) return 1;
+    return 0;
 }
 
 static void resolve_link_target(browser_app_t *app, int link_index,

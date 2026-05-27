@@ -26,6 +26,11 @@ static void lower_copy(const char *src, size_t len, char *dst, size_t cap) {
     dst[len] = '\0';
 }
 
+static void trim_span(const char **start, const char **end) {
+    while (*start < *end && isspace((unsigned char)**start)) (*start)++;
+    while (*end > *start && isspace((unsigned char)*((*end) - 1))) (*end)--;
+}
+
 /* Parse a compound selector (no whitespace inside) starting at `*pp`.
  * Advances `*pp` past the compound. Returns 0 on success. */
 static int parse_compound(const char **pp, const char *end,
@@ -102,11 +107,44 @@ static int parse_compound(const char **pp, const char *end,
             continue;
         }
         if (c == '[') {
-            /* Attribute selector — parse-and-ignore for now. */
             p++;
+            while (p < end && isspace((unsigned char)*p)) p++;
+            const char *name_start = p;
+            while (p < end && (isalnum((unsigned char)*p) || *p == '-' ||
+                               *p == '_' || *p == ':')) p++;
+            const char *name_end = p;
+            trim_span(&name_start, &name_end);
+            if (name_end > name_start) {
+                lower_copy(name_start, (size_t)(name_end - name_start),
+                           out->attr_name, sizeof(out->attr_name));
+            }
+            while (p < end && isspace((unsigned char)*p)) p++;
+            if (p < end && *p == '=') {
+                p++;
+                while (p < end && isspace((unsigned char)*p)) p++;
+                const char *val_start = p;
+                const char *val_end = p;
+                if (p < end && (*p == '"' || *p == '\'')) {
+                    char quote = *p++;
+                    val_start = p;
+                    while (p < end && *p != quote) p++;
+                    val_end = p;
+                    if (p < end) p++;
+                } else {
+                    while (p < end && *p != ']' && !isspace((unsigned char)*p)) p++;
+                    val_end = p;
+                }
+                trim_span(&val_start, &val_end);
+                if (val_end > val_start) {
+                    size_t take = (size_t)(val_end - val_start);
+                    if (take >= sizeof(out->attr_value)) take = sizeof(out->attr_value) - 1;
+                    memcpy(out->attr_value, val_start, take);
+                    out->attr_value[take] = '\0';
+                    out->attr_has_value = 1;
+                }
+            }
             while (p < end && *p != ']') p++;
-            if (p < end) p++;
-            out->pseudo_unsupported = 1;
+            if (p < end && *p == ']') p++;
             got_any = 1;
             continue;
         }
@@ -168,6 +206,22 @@ static int compound_matches(const br_css_compound_t *c,
         int found = 0;
         for (int j = 0; j < e->class_count; j++) {
             if (strcmp(c->classes[i], e->classes[j]) == 0) { found = 1; break; }
+        }
+        if (!found) return 0;
+    }
+    if (c->attr_name[0] != '\0') {
+        int found = 0;
+        for (int i = 0; i < e->attr_count; i++) {
+            const br_attr_t *a = &e->attrs[i];
+            if (strcmp(c->attr_name, a->name) != 0) continue;
+            if (!c->attr_has_value) {
+                found = 1;
+                break;
+            }
+            if (a->has_value && strcmp(c->attr_value, a->value) == 0) {
+                found = 1;
+                break;
+            }
         }
         if (!found) return 0;
     }

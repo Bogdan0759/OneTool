@@ -37,7 +37,7 @@ static const char kUserAgentCss[] =
     "code, tt, kbd, samp, pre { font-family: monospace; color: #1e1450; "
     "  background-color: #e6e6dc; }"
     /* Hidden by default. */
-    "head, script, style, title, meta, link { display: none; }";
+    "head, script, style, title, meta, link, [hidden] { display: none; }";
 
 void br_css_apply_user_agent(br_stylesheet_t *ss) {
     if (ss == NULL) return;
