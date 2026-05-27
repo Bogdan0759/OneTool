@@ -22,6 +22,7 @@
 #include "render/image.h"
 #include "ui/chrome.h"
 #include "ui/input.h"
+#include "jsengine/include/jsengine.h"
 
 #include <ranal/ranal.h>
 
@@ -91,9 +92,42 @@ static const char *kHomeHtml =
 
 static void build_and_apply_css(browser_app_t *app);
 static void load_page_images(browser_app_t *app);
+static void run_page_scripts(browser_app_t *app, size_t body_len);
+static void copy_cstr(char *dst, size_t cap, const char *src);
 static void resolve_url_against_base(const char *base_url, const char *url_str,
                                      const char *src, char *out, size_t cap);
 static int doc_looks_js_heavy(const br_doc_t *doc);
+static int doc_set_text_by_id(br_doc_t *doc, const char *id, const char *text);
+
+static js_eval_result_t host_console_log(void *user_data, int argc,
+                                         const js_eval_result_t *argv,
+                                         char *err_buf, size_t err_cap);
+static js_eval_result_t host_document_set_title(void *user_data, int argc,
+                                                const js_eval_result_t *argv,
+                                                char *err_buf, size_t err_cap);
+static js_eval_result_t host_document_get_title(void *user_data, int argc,
+                                                const js_eval_result_t *argv,
+                                                char *err_buf, size_t err_cap);
+static js_eval_result_t host_document_set_text(void *user_data, int argc,
+                                               const js_eval_result_t *argv,
+                                               char *err_buf, size_t err_cap);
+static js_eval_result_t host_location_href(void *user_data, int argc,
+                                           const js_eval_result_t *argv,
+                                           char *err_buf, size_t err_cap);
+
+static const js_host_api_t kBrowserHostApi[] = {
+    { "console_log", -1, host_console_log },
+    { "console.log", -1, host_console_log },
+    { "document_set_title", 1, host_document_set_title },
+    { "document.setTitle", 1, host_document_set_title },
+    { "document_get_title", 0, host_document_get_title },
+    { "document.getTitle", 0, host_document_get_title },
+    { "document_set_text", 2, host_document_set_text },
+    { "document.setText", 2, host_document_set_text },
+    { "location_href", 0, host_location_href },
+    { "location.href", 0, host_location_href },
+    { NULL, 0, NULL }
+};
 
 static int element_is_descendant(const br_doc_t *doc, int child, int ancestor) {
     while (child >= 0 && (size_t)child < doc->element_count) {
@@ -101,6 +135,110 @@ static int element_is_descendant(const br_doc_t *doc, int child, int ancestor) {
         child = doc->elements[child].parent;
     }
     return 0;
+}
+
+static void host_set_error(char *err_buf, size_t err_cap, const char *msg) {
+    if (err_buf == NULL || err_cap == 0) return;
+    snprintf(err_buf, err_cap, "%s", msg != NULL ? msg : "host error");
+}
+
+static js_eval_result_t js_out_undefined(void) {
+    js_eval_result_t out;
+    memset(&out, 0, sizeof(out));
+    out.kind = JS_VALUE_UNDEFINED;
+    return out;
+}
+
+static js_eval_result_t js_out_bool(int value) {
+    js_eval_result_t out = js_out_undefined();
+    out.kind = JS_VALUE_BOOL;
+    out.boolean = value ? 1 : 0;
+    return out;
+}
+
+static js_eval_result_t js_out_string(const char *value) {
+    js_eval_result_t out = js_out_undefined();
+    out.kind = JS_VALUE_STRING;
+    out.string = value != NULL ? value : "";
+    return out;
+}
+
+static js_eval_result_t host_console_log(void *user_data, int argc,
+                                         const js_eval_result_t *argv,
+                                         char *err_buf, size_t err_cap) {
+    (void)user_data;
+    (void)err_buf;
+    (void)err_cap;
+    for (int i = 0; i < argc; i++) {
+        if (i > 0) printf(" ");
+        switch (argv[i].kind) {
+            case JS_VALUE_BOOL: printf("%s", argv[i].boolean ? "true" : "false"); break;
+            case JS_VALUE_NUMBER: printf("%g", argv[i].number); break;
+            case JS_VALUE_STRING: printf("%s", argv[i].string != NULL ? argv[i].string : ""); break;
+            case JS_VALUE_NULL: printf("null"); break;
+            default: printf("undefined"); break;
+        }
+    }
+    printf("\n");
+    return js_out_undefined();
+}
+
+static js_eval_result_t host_document_set_title(void *user_data, int argc,
+                                                const js_eval_result_t *argv,
+                                                char *err_buf, size_t err_cap) {
+    browser_app_t *app = (browser_app_t *)user_data;
+    if (app == NULL || app->doc == NULL) return js_out_undefined();
+    if (argc != 1 || argv[0].kind != JS_VALUE_STRING) {
+        host_set_error(err_buf, err_cap, "document_set_title expects string");
+        return js_out_undefined();
+    }
+    copy_cstr(app->doc->title, sizeof(app->doc->title), argv[0].string);
+    app->chrome_dirty = 1;
+    return js_out_undefined();
+}
+
+static js_eval_result_t host_document_get_title(void *user_data, int argc,
+                                                const js_eval_result_t *argv,
+                                                char *err_buf, size_t err_cap) {
+    browser_app_t *app = (browser_app_t *)user_data;
+    (void)argv;
+    if (argc != 0) {
+        host_set_error(err_buf, err_cap, "document_get_title expects no args");
+        return js_out_undefined();
+    }
+    if (app == NULL || app->doc == NULL) return js_out_string("");
+    return js_out_string(app->doc->title);
+}
+
+static js_eval_result_t host_document_set_text(void *user_data, int argc,
+                                               const js_eval_result_t *argv,
+                                               char *err_buf, size_t err_cap) {
+    browser_app_t *app = (browser_app_t *)user_data;
+    if (app == NULL || app->doc == NULL) return js_out_bool(0);
+    if (argc != 2 || argv[0].kind != JS_VALUE_STRING || argv[1].kind != JS_VALUE_STRING) {
+        host_set_error(err_buf, err_cap, "document_set_text expects (id, text)");
+        return js_out_bool(0);
+    }
+    int changed = doc_set_text_by_id(app->doc, argv[0].string, argv[1].string);
+    if (changed > 0) {
+        g_layout_width = -1;
+        app->page_dirty = 1;
+        app->chrome_dirty = 1;
+    }
+    return js_out_bool(changed > 0);
+}
+
+static js_eval_result_t host_location_href(void *user_data, int argc,
+                                           const js_eval_result_t *argv,
+                                           char *err_buf, size_t err_cap) {
+    browser_app_t *app = (browser_app_t *)user_data;
+    (void)argv;
+    if (argc != 0) {
+        host_set_error(err_buf, err_cap, "location_href expects no args");
+        return js_out_undefined();
+    }
+    if (app == NULL) return js_out_string("");
+    return js_out_string(app->url);
 }
 
 static int scroll_to_fragment(browser_app_t *app, const char *fragment) {
@@ -126,6 +264,36 @@ static int scroll_to_fragment(browser_app_t *app, const char *fragment) {
         }
     }
     return -1;
+}
+
+static int doc_set_text_by_id(br_doc_t *doc, const char *id, const char *text) {
+    if (doc == NULL || id == NULL || id[0] == '\0' || text == NULL) return 0;
+    int target = -1;
+    for (size_t i = 0; i < doc->element_count; i++) {
+        if (strcmp(doc->elements[i].id, id) == 0) {
+            target = (int)i;
+            break;
+        }
+    }
+    if (target < 0) return 0;
+
+    int changed = 0;
+    int wrote = 0;
+    for (size_t i = 0; i < doc->run_count; i++) {
+        br_run_t *run = &doc->runs[i];
+        if (run->kind != BR_RUN_TEXT || run->element_index < 0) continue;
+        if (!element_is_descendant(doc, run->element_index, target)) continue;
+        free(run->text);
+        if (!wrote) {
+            run->text = strdup(text);
+            wrote = 1;
+        } else {
+            run->text = strdup("");
+        }
+        if (run->text == NULL) return changed;
+        changed = 1;
+    }
+    return changed;
 }
 
 static int url_has_scheme(const char *s) {
@@ -578,7 +746,11 @@ static void apply_fetch_result(browser_app_t *app,
         load_page_images(app);
     }
 
-    if (doc_looks_js_heavy(app->doc)) {
+    run_page_scripts(app, len);
+
+    if (app->doc->script_entry_count > 0 && strstr(app->status, "JS ") != NULL) {
+        /* leave JS result in status */
+    } else if (doc_looks_js_heavy(app->doc)) {
         snprintf(app->status, sizeof(app->status),
                  "%zu B • %s • JS-heavy page",
                  len, app->doc->title[0] != '\0' ? app->doc->title : "(no title)");
@@ -667,6 +839,90 @@ static void load_page_images(browser_app_t *app) {
             img->loaded = -1;
         }
         loaded++;
+    }
+}
+
+static int run_script_source(browser_app_t *app, js_engine_t *engine,
+                             const char *label, const char *code,
+                             size_t *ok_count, size_t *fail_count,
+                             char *last_err, size_t last_err_cap) {
+    (void)app;
+    if (engine == NULL || code == NULL || code[0] == '\0') return 0;
+    js_eval_result_t result;
+    char err[256];
+    js_eval_status_t status = js_engine_eval(engine, code, &result,
+                                             err, sizeof(err));
+    if (status == JS_EVAL_OK) {
+        (*ok_count)++;
+        return 0;
+    }
+    (*fail_count)++;
+    snprintf(last_err, last_err_cap, "%s: %s",
+             label != NULL ? label : "script", err);
+    return -1;
+}
+
+static void run_page_scripts(browser_app_t *app, size_t body_len) {
+    if (app == NULL || app->doc == NULL || app->doc->script_entry_count == 0) return;
+
+    js_engine_t *engine = js_engine_create();
+    if (engine == NULL) {
+        snprintf(app->status, sizeof(app->status), "%zu B • JS init failed", body_len);
+        return;
+    }
+    if (js_engine_set_host_api(engine, kBrowserHostApi, app) != 0) {
+        js_engine_destroy(engine);
+        snprintf(app->status, sizeof(app->status), "%zu B • JS host init failed", body_len);
+        return;
+    }
+
+    size_t ok_count = 0;
+    size_t fail_count = 0;
+    char last_err[256] = "";
+
+    for (size_t i = 0; i < app->doc->script_entry_count; i++) {
+        br_script_t *script = &app->doc->scripts[i];
+        if (script->src != NULL && script->src[0] != '\0') {
+            char resolved[BROWSER_URL_MAX];
+            char base[BROWSER_URL_MAX];
+            effective_base_url(app, base, sizeof(base));
+            resolve_url_against_base(base, app->url, script->src,
+                                     resolved, sizeof(resolved));
+            if (resolved[0] == '\0') {
+                fail_count++;
+                snprintf(last_err, sizeof(last_err), "%s: bad src", script->src);
+                continue;
+            }
+            char *body = NULL;
+            size_t len = 0;
+            const char *err = NULL;
+            if (browser_fetch_url(resolved, &body, &len, NULL, &err) != 0) {
+                fail_count++;
+                snprintf(last_err, sizeof(last_err), "%s: %s",
+                         script->src, err != NULL ? err : "fetch failed");
+                continue;
+            }
+            run_script_source(app, engine, script->src, body,
+                              &ok_count, &fail_count, last_err, sizeof(last_err));
+            free(body);
+        } else {
+            run_script_source(app, engine, "inline script", script->code,
+                              &ok_count, &fail_count, last_err, sizeof(last_err));
+        }
+    }
+
+    js_engine_destroy(engine);
+
+    if (fail_count > 0) {
+        snprintf(app->status, sizeof(app->status),
+                 "%zu B • JS %zu ok, %zu failed • %s",
+                 body_len, ok_count, fail_count,
+                 last_err[0] != '\0' ? last_err : "runtime error");
+    } else if (ok_count > 0) {
+        snprintf(app->status, sizeof(app->status),
+                 "%zu B • JS %zu ok • %s",
+                 body_len, ok_count,
+                 app->doc->title[0] != '\0' ? app->doc->title : "(no title)");
     }
 }
 

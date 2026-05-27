@@ -41,6 +41,7 @@ typedef struct {
     int        in_pre;
     int        in_script;
     int        in_style;
+    int        active_script;
     int        in_title;
     int        title_off;
     int        in_head;
@@ -93,6 +94,14 @@ void br_doc_clear(br_doc_t *doc) {
     doc->images = NULL;
     doc->image_count = 0;
     doc->image_cap = 0;
+    for (size_t i = 0; i < doc->script_entry_count; i++) {
+        free(doc->scripts[i].src);
+        free(doc->scripts[i].code);
+    }
+    free(doc->scripts);
+    doc->scripts = NULL;
+    doc->script_entry_count = 0;
+    doc->script_entry_cap = 0;
     for (size_t i = 0; i < doc->element_count; i++) {
         free(doc->elements[i].inline_style);
     }
@@ -216,6 +225,44 @@ static int doc_add_image(br_doc_t *d, const char *src, size_t src_len) {
     img->height = 0;
     img->loaded = 0;
     return (int)d->image_count++;
+}
+
+static int doc_grow_scripts(br_doc_t *d) {
+    size_t want = d->script_entry_cap == 0 ? 8 : d->script_entry_cap * 2;
+    br_script_t *p = (br_script_t *)realloc(d->scripts, want * sizeof(*p));
+    if (p == NULL) return -1;
+    d->scripts = p;
+    d->script_entry_cap = want;
+    return 0;
+}
+
+static int doc_add_script(br_doc_t *d, const char *src, int is_module) {
+    if (d->script_entry_count == d->script_entry_cap && doc_grow_scripts(d) != 0) {
+        return -1;
+    }
+    br_script_t *script = &d->scripts[d->script_entry_count];
+    memset(script, 0, sizeof(*script));
+    if (src != NULL && src[0] != '\0') {
+        script->src = strdup(src);
+        if (script->src == NULL) return -1;
+    }
+    script->is_module = is_module;
+    return (int)d->script_entry_count++;
+}
+
+static int doc_append_script_code(br_doc_t *d, int script_index,
+                                  const char *src, size_t len) {
+    if (script_index < 0 || (size_t)script_index >= d->script_entry_count || len == 0) {
+        return 0;
+    }
+    br_script_t *script = &d->scripts[script_index];
+    size_t old_len = script->code != NULL ? strlen(script->code) : 0;
+    char *p = (char *)realloc(script->code, old_len + len + 1);
+    if (p == NULL) return -1;
+    script->code = p;
+    memcpy(script->code + old_len, src, len);
+    script->code[old_len + len] = '\0';
+    return 0;
 }
 
 static int doc_emit_image(br_doc_t *d, int image_index, const char *alt,
@@ -816,13 +863,17 @@ static void handle_open_tag(br_parser_t *p, const br_tag_t *t) {
     if (p->in_head && strcmp(n, "title") != 0) {
         if (strcmp(n, "script") == 0) {
             p->doc->script_count++;
-            if (t->has_type &&
-                (strcasestr(t->type, "module") != NULL ||
-                 strcasestr(t->type, "javascript") != NULL ||
-                 strcasestr(t->type, "ecmascript") != NULL)) {
+            int is_module = t->has_type && strcasestr(t->type, "module") != NULL;
+            if (is_module ||
+                (t->has_type &&
+                 (strcasestr(t->type, "javascript") != NULL ||
+                  strcasestr(t->type, "ecmascript") != NULL))) {
                 p->doc->module_script_count++;
             }
             if (t->has_src) p->doc->js_app_hints++;
+            p->active_script = doc_add_script(p->doc,
+                                              t->has_src ? t->src : NULL,
+                                              is_module);
             p->in_script = 1;
             return;
         }
@@ -884,13 +935,17 @@ static void handle_open_tag(br_parser_t *p, const br_tag_t *t) {
     }
     if (strcmp(n, "script") == 0) {
         p->doc->script_count++;
-        if (t->has_type &&
-            (strcasestr(t->type, "module") != NULL ||
-             strcasestr(t->type, "javascript") != NULL ||
-             strcasestr(t->type, "ecmascript") != NULL)) {
+        int is_module = t->has_type && strcasestr(t->type, "module") != NULL;
+        if (is_module ||
+            (t->has_type &&
+             (strcasestr(t->type, "javascript") != NULL ||
+              strcasestr(t->type, "ecmascript") != NULL))) {
             p->doc->module_script_count++;
         }
         if (t->has_src) p->doc->js_app_hints++;
+        p->active_script = doc_add_script(p->doc,
+                                          t->has_src ? t->src : NULL,
+                                          is_module);
         p->in_script = 1;
         return;
     }
@@ -1094,7 +1149,11 @@ static void handle_close_tag(br_parser_t *p, const br_tag_t *t) {
         p->in_title = 0;
         return;
     }
-    if (strcmp(n, "script") == 0 || strcmp(n, "noscript") == 0) { p->in_script = 0; return; }
+    if (strcmp(n, "script") == 0 || strcmp(n, "noscript") == 0) {
+        p->in_script = 0;
+        p->active_script = -1;
+        return;
+    }
     if (strcmp(n, "style") == 0) { p->in_style = 0; return; }
     if (strcmp(n, "textarea") == 0) {
         flush_text(p);
@@ -1158,6 +1217,7 @@ int br_doc_parse_html(br_doc_t *doc, const char *html, size_t len) {
     p.p = html;
     p.end = html + len;
     p.doc = doc;
+    p.active_script = -1;
 
     while (p.p < p.end) {
         if (p.in_script || p.in_style) {
@@ -1169,6 +1229,12 @@ int br_doc_parse_html(br_doc_t *doc, const char *html, size_t len) {
             while (q + nlen <= p.end) {
                 if (strncasecmp(q, needle, nlen) == 0) break;
                 q++;
+            }
+            if (p.in_script && q > p.p) {
+                if (doc_append_script_code(doc, p.active_script, p.p,
+                                           (size_t)(q - p.p)) != 0) {
+                    goto oom;
+                }
             }
             if (p.in_style && q > p.p) {
                 doc_append_css(doc, p.p, (size_t)(q - p.p));

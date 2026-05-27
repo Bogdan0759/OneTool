@@ -125,6 +125,12 @@ typedef struct {
 } br_image_t;
 
 typedef struct {
+    char *src;                   /* owned, NULL for inline script */
+    char *code;                  /* owned, NULL for external script */
+    int   is_module;
+} br_script_t;
+
+typedef struct {
     br_run_t      *runs;
     size_t         run_count;
     size_t         run_cap;
@@ -134,6 +140,9 @@ typedef struct {
     br_image_t    *images;
     size_t         image_count;
     size_t         image_cap;
+    br_script_t   *scripts;
+    size_t         script_entry_count;
+    size_t         script_entry_cap;
     br_element_t  *elements;
     size_t         element_count;
     size_t         element_cap;
