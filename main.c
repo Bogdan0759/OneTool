@@ -36,7 +36,6 @@ int rd(int argc, char *argv[]);
 int sw(int argc, char *argv[]);
 int sh(int argc, char *argv[]);
 int tr(int argc, char *argv[]);
-int br(int argc, char *argv[]);
 int tui_main(const char *onetool_argv0);
 const char onetool_version[] = "2.5.1";
 
@@ -85,8 +84,6 @@ const struct onetool_tool onetool_builtin_tools[] = {
     {"sprot_hello", sh, "minimal sprot test client (draws a rectangle)",
      ONETOOL_ARGV0_TOOL_NAME},
     {"term", tr, "GUI terminal (ranal; use --swm to run as swm client)",
-     ONETOOL_ARGV0_TOOL_NAME},
-    {"browser", br, "GUI web browser (ranal; use --swm to run as swm client)",
      ONETOOL_ARGV0_TOOL_NAME},
 };
 

@@ -39,7 +39,6 @@ implemented tools:
 - `swm` - simple window manager / compositor (sprot v0.1) (swm = simple window manager)
 - `sprot_hello` - minimal sprot client (draws a colored rectangle)
 - `term` - GUI terminal built on ranal (standalone or as a swm client via `--swm`)
-- `browser` - GUI web browser built on ranal/srapi: tiny HTTP/HTTPS fetcher + tag-stripping HTML renderer (standalone or as a swm client via `--swm`)
 framework parts:
 
 - `libs/net` - network library for URL parsing, HTTP and transport

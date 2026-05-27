@@ -504,12 +504,6 @@ static void load_embedded_tool_form(onetool_form_t *form, const struct onetool_t
         add_text_field(form, "h", "Height", "-h", "200", "200", "Surface height.");
         add_text_field(form, "seconds", "Seconds", "--seconds", "10", "10", "Run time before disconnect.");
         add_text_field(form, "color", "Color", "--color", "4070C8", "RRGGBB", "Hex color for the rectangle.");
-    } else if (strcmp(tool->name, "browser") == 0) {
-        copy_string(form->title, sizeof(form->title), "browser — GUI web browser");
-        copy_string(form->summary, sizeof(form->summary), "Tiny HTML browser built on ranal/srapi. Standalone owns DRM; with --swm runs as a sprot client window.");
-        add_text_field(form, "url", "Initial URL", "", "", "example.com", "Optional initial URL to fetch on launch.");
-        add_toggle_field(form, "swm", "Run inside swm", "--swm", 0, "Connect to swm and render as a window instead of owning DRM directly.");
-        add_text_field(form, "title", "Window title", "--title", "", "browser", "Title shown in the swm titlebar (with --swm).");
     } else {
         form->has_config = 0;
     }
