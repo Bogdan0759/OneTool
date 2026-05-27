@@ -88,6 +88,14 @@ void js_ast_free(js_ast_t *node) {
             js_ast_free(node->as.member.object);
             free(node->as.member.property);
             break;
+        case JS_AST_OBJECT_LITERAL:
+            for (int i = 0; i < node->as.object.count; i++) {
+                free(node->as.object.keys[i]);
+                js_ast_free(node->as.object.values[i]);
+            }
+            free(node->as.object.keys);
+            free(node->as.object.values);
+            break;
         case JS_AST_IDENT:
             free(node->as.ident.name);
             break;

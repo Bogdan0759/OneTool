@@ -19,6 +19,7 @@
 static const char kUserAgentCss[] =
     /* Document defaults. */
     "html, body { color: #18181c; background-color: #f5f5f5; }"
+    "body { max-width: 980px; }"
     "body, p, div, section, article, header, footer, main, aside, nav,"
     "li, ul, ol, dl, dt, dd, table, tr, td, th, form, blockquote, "
     "figure, figcaption, address, fieldset, details, summary { "
@@ -36,6 +37,13 @@ static const char kUserAgentCss[] =
     /* Code. */
     "code, tt, kbd, samp, pre { font-family: monospace; color: #1e1450; "
     "  background-color: #e6e6dc; }"
+    /* Reading-mode cleanup for wiki-like pages. */
+    ".navbox, .vertical-navbox, .toc, .toclimit-1, .metadata, .mw-editsection,"
+    ".reference, .reflist, .portal, .sidebar, .sistersitebox, .thumbcaption:empty,"
+    ".noprint, .mw-jump-link, .hatnote.navigation-not-searchable { display: none; }"
+    ".mw-parser-output .shortdescription, .authority-control, .plainlinks,"
+    ".ambox, .ombox, .tmbox, .cmbox, .fmbox, .navbox-styles { display: none; }"
+    "table.infobox, table.sidebar { background-color: #eef3f8; }"
     /* Hidden by default. */
     "head, script, style, title, meta, link, [hidden] { display: none; }";
 

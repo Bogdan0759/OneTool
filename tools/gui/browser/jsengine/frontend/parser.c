@@ -1,5 +1,6 @@
 #include "../src/internal.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -62,6 +63,54 @@ static js_ast_t *parse_block(js_parser_t *p) {
     return node;
 }
 
+static js_ast_t *parse_object_literal(js_parser_t *p) {
+    if (!parser_expect(p, JS_TOK_LBRACE, "expected '{'")) return NULL;
+    js_ast_t *node = js_ast_new(JS_AST_OBJECT_LITERAL);
+    if (node == NULL) return NULL;
+    while (p->cur.kind != JS_TOK_RBRACE && p->cur.kind != JS_TOK_EOF) {
+        if (p->cur.kind != JS_TOK_IDENT && p->cur.kind != JS_TOK_STRING) {
+            free(p->error);
+            p->error = js_strdup("expected object key");
+            js_ast_free(node);
+            return NULL;
+        }
+        char *key = tokdup(&p->cur);
+        parser_bump(p);
+        if (!parser_expect(p, JS_TOK_COLON, "expected ':' after object key")) {
+            free(key);
+            js_ast_free(node);
+            return NULL;
+        }
+        js_ast_t *value = parse_expr(p);
+        if (value == NULL) {
+            free(key);
+            js_ast_free(node);
+            return NULL;
+        }
+        int want = node->as.object.count + 1;
+        char **keys = (char **)realloc(node->as.object.keys, (size_t)want * sizeof(*keys));
+        js_ast_t **values = (js_ast_t **)realloc(node->as.object.values, (size_t)want * sizeof(*values));
+        if (keys == NULL || values == NULL) {
+            free(keys);
+            free(values);
+            free(key);
+            js_ast_free(value);
+            js_ast_free(node);
+            return NULL;
+        }
+        node->as.object.keys = keys;
+        node->as.object.values = values;
+        node->as.object.keys[node->as.object.count] = key;
+        node->as.object.values[node->as.object.count++] = value;
+        if (!parser_accept(p, JS_TOK_COMMA)) break;
+    }
+    if (!parser_expect(p, JS_TOK_RBRACE, "expected '}' after object literal")) {
+        js_ast_free(node);
+        return NULL;
+    }
+    return node;
+}
+
 static js_ast_t *parse_primary(js_parser_t *p) {
     js_ast_t *node = NULL;
     if (p->cur.kind == JS_TOK_NUMBER) {
@@ -104,6 +153,9 @@ static js_ast_t *parse_primary(js_parser_t *p) {
             return NULL;
         }
         return node;
+    }
+    if (p->cur.kind == JS_TOK_LBRACE) {
+        return parse_object_literal(p);
     }
     free(p->error);
     p->error = js_strdup("expected expression");
@@ -235,7 +287,7 @@ static js_ast_t *parse_assign(js_parser_t *p) {
     js_ast_t *left = parse_logic_or(p);
     if (left == NULL) return NULL;
     if (p->cur.kind != JS_TOK_EQ) return left;
-    if (left->kind != JS_AST_IDENT) {
+    if (left->kind != JS_AST_IDENT && left->kind != JS_AST_MEMBER_EXPR) {
         js_ast_free(left);
         free(p->error);
         p->error = js_strdup("invalid assignment target");
@@ -243,7 +295,30 @@ static js_ast_t *parse_assign(js_parser_t *p) {
     }
     js_ast_t *node = js_ast_new(JS_AST_ASSIGN_EXPR);
     if (node == NULL) { js_ast_free(left); return NULL; }
-    node->as.assign.name = js_strdup(left->as.ident.name);
+    if (left->kind == JS_AST_IDENT) {
+        node->as.assign.name = js_strdup(left->as.ident.name);
+    } else {
+        size_t need = strlen(left->as.member.property) + 64;
+        node->as.assign.name = (char *)malloc(need);
+        if (node->as.assign.name == NULL) {
+            js_ast_free(left);
+            js_ast_free(node);
+            return NULL;
+        }
+        if (left->as.member.object->kind == JS_AST_IDENT) {
+            snprintf(node->as.assign.name, need, "%s.%s",
+                     left->as.member.object->as.ident.name,
+                     left->as.member.property);
+        } else {
+            free(node->as.assign.name);
+            node->as.assign.name = NULL;
+            js_ast_free(left);
+            js_ast_free(node);
+            free(p->error);
+            p->error = js_strdup("unsupported member assignment target");
+            return NULL;
+        }
+    }
     js_ast_free(left);
     parser_bump(p);
     node->as.assign.value = parse_assign(p);

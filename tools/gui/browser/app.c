@@ -114,18 +114,28 @@ static js_eval_result_t host_document_set_text(void *user_data, int argc,
 static js_eval_result_t host_location_href(void *user_data, int argc,
                                            const js_eval_result_t *argv,
                                            char *err_buf, size_t err_cap);
+static js_eval_result_t host_navigator_user_agent(void *user_data, int argc,
+                                                  const js_eval_result_t *argv,
+                                                  char *err_buf, size_t err_cap);
 
 static const js_host_api_t kBrowserHostApi[] = {
     { "console_log", -1, host_console_log },
     { "console.log", -1, host_console_log },
+    { "window.console.log", -1, host_console_log },
     { "document_set_title", 1, host_document_set_title },
     { "document.setTitle", 1, host_document_set_title },
+    { "window.document.setTitle", 1, host_document_set_title },
     { "document_get_title", 0, host_document_get_title },
     { "document.getTitle", 0, host_document_get_title },
+    { "window.document.getTitle", 0, host_document_get_title },
     { "document_set_text", 2, host_document_set_text },
     { "document.setText", 2, host_document_set_text },
+    { "window.document.setText", 2, host_document_set_text },
     { "location_href", 0, host_location_href },
     { "location.href", 0, host_location_href },
+    { "window.location.href", 0, host_location_href },
+    { "navigator.userAgent", 0, host_navigator_user_agent },
+    { "window.navigator.userAgent", 0, host_navigator_user_agent },
     { NULL, 0, NULL }
 };
 
@@ -239,6 +249,18 @@ static js_eval_result_t host_location_href(void *user_data, int argc,
     }
     if (app == NULL) return js_out_string("");
     return js_out_string(app->url);
+}
+
+static js_eval_result_t host_navigator_user_agent(void *user_data, int argc,
+                                                  const js_eval_result_t *argv,
+                                                  char *err_buf, size_t err_cap) {
+    (void)user_data;
+    (void)argv;
+    if (argc != 0) {
+        host_set_error(err_buf, err_cap, "navigator.userAgent expects no args");
+        return js_out_undefined();
+    }
+    return js_out_string("OneToolBrowser/0.1");
 }
 
 static int scroll_to_fragment(browser_app_t *app, const char *fragment) {

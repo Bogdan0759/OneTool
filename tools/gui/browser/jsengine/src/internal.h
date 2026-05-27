@@ -9,6 +9,7 @@
 typedef struct js_function js_function_t;
 typedef struct js_native_fn js_native_fn_t;
 typedef struct js_engine js_engine_t;
+typedef struct js_object js_object_t;
 
 typedef enum {
     JS_RT_UNDEFINED = 0,
@@ -16,6 +17,7 @@ typedef enum {
     JS_RT_BOOL,
     JS_RT_NUMBER,
     JS_RT_STRING,
+    JS_RT_OBJECT,
     JS_RT_FUNCTION,
     JS_RT_NATIVE
 } js_runtime_kind_t;
@@ -26,10 +28,24 @@ typedef struct {
         int             boolean;
         double          number;
         char           *string;
+        js_object_t    *object;
         js_function_t  *function;
         js_native_fn_t *native;
     } as;
 } js_runtime_value_t;
+
+typedef struct {
+    char              *name;
+    js_runtime_value_t value;
+    int                is_const;
+} js_object_prop_t;
+
+struct js_object {
+    js_object_prop_t *props;
+    int               count;
+    int               cap;
+    int               refs;
+};
 
 typedef struct {
     char             *name;
@@ -64,6 +80,7 @@ typedef enum {
     JS_TOK_LBRACE,
     JS_TOK_RBRACE,
     JS_TOK_DOT,
+    JS_TOK_COLON,
     JS_TOK_COMMA,
     JS_TOK_SEMI,
     JS_TOK_PLUS,
@@ -116,6 +133,7 @@ typedef enum {
     JS_AST_UNARY_EXPR,
     JS_AST_CALL_EXPR,
     JS_AST_MEMBER_EXPR,
+    JS_AST_OBJECT_LITERAL,
     JS_AST_IDENT,
     JS_AST_NUMBER,
     JS_AST_STRING,
@@ -185,6 +203,11 @@ struct js_ast {
             char     *property;
         } member;
         struct {
+            char    **keys;
+            js_ast_t **values;
+            int       count;
+        } object;
+        struct {
             char *name;
         } ident;
         struct {
@@ -227,6 +250,10 @@ typedef enum {
     JS_OP_SET_GLOBAL,
     JS_OP_GET_LOCAL,
     JS_OP_SET_LOCAL,
+    JS_OP_NEW_OBJECT,
+    JS_OP_DUP,
+    JS_OP_GET_PROP,
+    JS_OP_SET_PROP,
     JS_OP_ADD,
     JS_OP_SUB,
     JS_OP_MUL,
@@ -324,9 +351,18 @@ js_runtime_value_t js_runtime_make_null(void);
 js_runtime_value_t js_runtime_make_bool(int v);
 js_runtime_value_t js_runtime_make_number(double v);
 js_runtime_value_t js_runtime_make_string(const char *s);
+js_runtime_value_t js_runtime_make_object(js_object_t *obj);
 js_runtime_value_t js_runtime_make_function(js_function_t *fn);
 js_runtime_value_t js_runtime_make_native(js_native_fn_t *native);
 js_runtime_value_t js_runtime_clone(const js_runtime_value_t *value);
+js_object_t *js_object_create(void);
+void js_object_free(js_object_t *obj);
+int js_object_define(js_object_t *obj, const char *name,
+                     js_runtime_value_t value, int is_const, char **err);
+int js_object_set(js_object_t *obj, const char *name,
+                  js_runtime_value_t value, char **err);
+int js_object_get(js_object_t *obj, const char *name,
+                  js_runtime_value_t *out, char **err);
 
 void js_global_env_init(js_global_env_t *env);
 void js_global_env_free(js_global_env_t *env);

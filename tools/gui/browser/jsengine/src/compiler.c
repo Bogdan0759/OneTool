@@ -123,6 +123,15 @@ static int compile_expr(js_compiler_t *c, js_ast_t *node) {
             if (emit_op(c, JS_OP_GET_GLOBAL) != 0) return -1;
             return emit_u16(c, (uint16_t)idx);
         }
+        case JS_AST_OBJECT_LITERAL:
+            if (emit_op(c, JS_OP_NEW_OBJECT) != 0) return -1;
+            for (int i = 0; i < node->as.object.count; i++) {
+                if (emit_op(c, JS_OP_DUP) != 0) return -1;
+                if (emit_const_string(c, node->as.object.keys[i]) != 0) return -1;
+                if (compile_expr(c, node->as.object.values[i]) != 0) return -1;
+                if (emit_op(c, JS_OP_SET_PROP) != 0) return -1;
+            }
+            return 0;
         case JS_AST_ASSIGN_EXPR: {
             if (compile_expr(c, node->as.assign.value) != 0) return -1;
             js_local_t *local = find_local(c, node->as.assign.name);
@@ -194,7 +203,9 @@ static int compile_expr(js_compiler_t *c, js_ast_t *node) {
             if (emit_op(c, JS_OP_CALL) != 0) return -1;
             return js_chunk_write(&c->fn->chunk, (uint8_t)node->as.call.arg_count);
         case JS_AST_MEMBER_EXPR:
-            return compile_member_name(c, node);
+            if (compile_expr(c, node->as.member.object) != 0) return -1;
+            if (emit_const_string(c, node->as.member.property) != 0) return -1;
+            return emit_op(c, JS_OP_GET_PROP);
         default:
             compiler_error(c, "unsupported expression");
             return -1;

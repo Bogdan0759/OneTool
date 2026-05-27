@@ -59,6 +59,14 @@ static int val_to_number(const js_runtime_value_t *v, double *out) {
     return -1;
 }
 
+static int val_to_cstr(const js_runtime_value_t *v, const char **out) {
+    if (v->kind == JS_RT_STRING && v->as.string != NULL) {
+        *out = v->as.string;
+        return 0;
+    }
+    return -1;
+}
+
 void js_vm_init(js_vm_t *vm, js_global_env_t *globals) {
     memset(vm, 0, sizeof(*vm));
     vm->globals = globals;
@@ -180,6 +188,72 @@ js_vm_result_t js_vm_run(js_vm_t *vm, js_function_t *function) {
                 uint16_t slot = read_u16(frame);
                 js_runtime_value_free(&vm->stack[frame->slot_base + slot]);
                 vm->stack[frame->slot_base + slot] = js_runtime_clone(vm_peek(vm, 0));
+                break;
+            }
+            case JS_OP_NEW_OBJECT: {
+                js_object_t *obj = js_object_create();
+                if (obj == NULL) {
+                    vm_set_error(vm, "out of memory");
+                    goto fail;
+                }
+                if (vm_push(vm, js_runtime_make_object(obj)) != 0) goto fail;
+                break;
+            }
+            case JS_OP_DUP: {
+                if (vm_push(vm, js_runtime_clone(vm_peek(vm, 0))) != 0) goto fail;
+                break;
+            }
+            case JS_OP_GET_PROP: {
+                js_runtime_value_t key = vm_pop(vm);
+                js_runtime_value_t obj = vm_pop(vm);
+                js_runtime_value_t out = js_runtime_make_undefined();
+                const char *name = NULL;
+                if (obj.kind != JS_RT_OBJECT) {
+                    vm_set_error(vm, "property access on non-object");
+                } else if (val_to_cstr(&key, &name) != 0) {
+                    vm_set_error(vm, "property name must be string");
+                } else if (js_object_get(obj.as.object, name, &out, &vm->error) != 0) {
+                    goto prop_fail;
+                }
+                js_runtime_value_free(&key);
+                js_runtime_value_free(&obj);
+                if (vm->error != NULL) goto fail;
+                if (vm_push(vm, out) != 0) goto fail;
+                break;
+prop_fail:
+                js_runtime_value_free(&key);
+                js_runtime_value_free(&obj);
+                goto fail;
+            }
+            case JS_OP_SET_PROP: {
+                js_runtime_value_t value = vm_pop(vm);
+                js_runtime_value_t key = vm_pop(vm);
+                js_runtime_value_t obj = vm_pop(vm);
+                const char *name = NULL;
+                if (obj.kind != JS_RT_OBJECT) {
+                    vm_set_error(vm, "property write on non-object");
+                } else if (val_to_cstr(&key, &name) != 0) {
+                    vm_set_error(vm, "property name must be string");
+                } else {
+                    js_runtime_value_t copy = js_runtime_clone(&value);
+                    if (js_object_set(obj.as.object, name, copy, &vm->error) != 0) {
+                        js_runtime_value_free(&copy);
+                        js_runtime_value_free(&value);
+                        js_runtime_value_free(&key);
+                        js_runtime_value_free(&obj);
+                        goto fail;
+                    }
+                }
+                if (vm->error != NULL) {
+                    js_runtime_value_free(&value);
+                    js_runtime_value_free(&key);
+                    js_runtime_value_free(&obj);
+                    goto fail;
+                }
+                if (vm_push(vm, js_runtime_clone(&obj)) != 0) goto fail;
+                js_runtime_value_free(&value);
+                js_runtime_value_free(&key);
+                js_runtime_value_free(&obj);
                 break;
             }
             case JS_OP_ADD:

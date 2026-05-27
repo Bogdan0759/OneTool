@@ -238,6 +238,14 @@ void br_css_apply_decl(br_computed_style_t *cs, const br_css_decl_t *decl,
             else cs->hidden = 0;
             break;
         case BR_CSS_PROP_TEXT_ALIGN:
+        case BR_CSS_PROP_WHITE_SPACE:
+        case BR_CSS_PROP_WIDTH:
+        case BR_CSS_PROP_MAX_WIDTH:
+        case BR_CSS_PROP_MIN_WIDTH:
+        case BR_CSS_PROP_FLOAT:
+        case BR_CSS_PROP_MARGIN:
+        case BR_CSS_PROP_MARGIN_LEFT:
+        case BR_CSS_PROP_MARGIN_RIGHT:
             /* renderer doesn't model alignment yet — ignore */
             break;
         default:

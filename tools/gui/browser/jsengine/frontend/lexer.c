@@ -140,6 +140,7 @@ void js_lex_next(js_lexer_t *lex, js_token_t *out) {
         ONE('{', JS_TOK_LBRACE);
         ONE('}', JS_TOK_RBRACE);
         ONE('.', JS_TOK_DOT);
+        ONE(':', JS_TOK_COLON);
         ONE(',', JS_TOK_COMMA);
         ONE(';', JS_TOK_SEMI);
         ONE('+', JS_TOK_PLUS);

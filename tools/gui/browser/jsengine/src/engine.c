@@ -56,6 +56,66 @@ static int track_module(js_engine_t *engine, js_function_t *fn) {
     return 0;
 }
 
+static int ensure_host_path(js_engine_t *engine, const char *path,
+                            js_runtime_value_t value) {
+    char buf[256];
+    size_t n = strlen(path);
+    if (n >= sizeof(buf)) return -1;
+    memcpy(buf, path, n + 1);
+
+    char *save = NULL;
+    char *part = strtok_r(buf, ".", &save);
+    js_runtime_value_t current;
+    int have_current = 0;
+
+    while (part != NULL) {
+        char *next = strtok_r(NULL, ".", &save);
+        if (!have_current) {
+            if (next == NULL) {
+                return js_global_define(&engine->globals, part, value, 1, NULL);
+            }
+            if (js_global_get(&engine->globals, part, &current, NULL) != 0 ||
+                current.kind != JS_RT_OBJECT) {
+                js_object_t *obj = js_object_create();
+                if (obj == NULL) return -1;
+                js_runtime_value_t objv = js_runtime_make_object(obj);
+                if (js_global_define(&engine->globals, part, objv, 1, NULL) != 0) {
+                    js_runtime_value_free(&objv);
+                }
+                if (js_global_get(&engine->globals, part, &current, NULL) != 0) return -1;
+            }
+            have_current = 1;
+        } else {
+            if (next == NULL) {
+                int rc = js_object_set(current.as.object, part, value, NULL);
+                js_runtime_value_free(&current);
+                return rc;
+            }
+            js_runtime_value_t child;
+            if (js_object_get(current.as.object, part, &child, NULL) != 0 ||
+                child.kind != JS_RT_OBJECT) {
+                js_object_t *obj = js_object_create();
+                if (obj == NULL) {
+                    js_runtime_value_free(&current);
+                    return -1;
+                }
+                js_runtime_value_t objv = js_runtime_make_object(obj);
+                if (js_object_set(current.as.object, part, objv, NULL) != 0) {
+                    js_runtime_value_free(&objv);
+                    js_runtime_value_free(&current);
+                    return -1;
+                }
+                child = js_runtime_make_object(obj);
+            }
+            js_runtime_value_free(&current);
+            current = child;
+        }
+        part = next;
+    }
+    if (have_current) js_runtime_value_free(&current);
+    return 0;
+}
+
 int js_engine_set_host_api(js_engine_t *engine, const js_host_api_t *api,
                            void *user_data) {
     if (engine == NULL) return -1;
@@ -92,6 +152,10 @@ int js_engine_set_host_api(js_engine_t *engine, const js_host_api_t *api,
         if (js_global_define(&engine->globals, api[i].name,
                              js_runtime_make_native(fn), 1, NULL) != 0) {
             return -1;
+        }
+        if (strchr(api[i].name, '.') != NULL) {
+            js_runtime_value_t alias = js_runtime_make_native(fn);
+            if (ensure_host_path(engine, api[i].name, alias) != 0) return -1;
         }
     }
     return 0;

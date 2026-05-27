@@ -142,8 +142,11 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
     br_layout_clear(l);
     if (doc == NULL) return 0;
     if (content_width < 80) content_width = 80;
+    if (content_width > 980) content_width = 980;
 
-    int x = 0, y = 0;
+    int left_pad = content_width > 720 ? 12 : 0;
+    int right_limit = content_width - left_pad;
+    int x = left_pad, y = 0;
     int line_h = LINE_H;       /* height of current line */
     int line_top = 0;          /* y of current line top */
 
@@ -157,7 +160,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
 
         if (r->kind == BR_RUN_BREAK) {
             y = line_top + line_h;
-            x = 0;
+            x = left_pad;
             line_top = y;
             line_h = LINE_H;
             continue;
@@ -165,7 +168,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
         if (r->kind == BR_RUN_PARAGRAPH) {
             y = line_top + line_h;
             y += LINE_H / 2;
-            x = 0;
+            x = left_pad;
             line_top = y;
             line_h = LINE_H;
             continue;
@@ -175,8 +178,8 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
             y = line_top + line_h;
             br_box_t b = {0};
             apply_computed(&b, r, cs);
-            b.x = 0; b.y = y + LINE_H / 2 - 1;
-            b.w = content_width; b.h = 2;
+            b.x = left_pad; b.y = y + LINE_H / 2 - 1;
+            b.w = right_limit - left_pad; b.h = 2;
             b.scale = 1;
             b.style = BR_STYLE_NORMAL;
             b.text = NULL; b.text_len = 0;
@@ -195,7 +198,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
             /* Start a new line for the image. */
             if (x > 0) {
                 y = line_top + line_h;
-                x = 0;
+                x = left_pad;
                 line_top = y;
                 line_h = LINE_H;
             }
@@ -210,14 +213,14 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
                 int ih = img->height;
                 /* Scale to fit content width, preserving aspect ratio. */
                 if (iw > content_width) {
-                    ih = ih * content_width / iw;
-                    iw = content_width;
+                    ih = ih * (right_limit - left_pad) / iw;
+                    iw = right_limit - left_pad;
                 }
                 if (ih <= 0) ih = 1;
 
                 br_box_t b = {0};
                 apply_computed(&b, r, cs);
-                b.x = 0; b.y = line_top;
+                b.x = left_pad; b.y = line_top;
                 b.w = iw; b.h = ih;
                 b.scale = 1;
                 b.style = BR_STYLE_NORMAL;
@@ -230,7 +233,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
                 if (emit_box(l, b) != 0) return -1;
 
                 y = line_top + ih;
-                x = 0;
+                x = left_pad;
                 line_top = y;
                 line_h = LINE_H;
             } else if (r->text != NULL) {
@@ -312,9 +315,9 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
             while (j < tlen && t[j] == ' ') {
                 if (x > 0) {
                     x += ADVANCE * scale;
-                    if (x > content_width) {
+                    if (x > right_limit) {
                         y = line_top + line_h;
-                        x = 0;
+                        x = left_pad;
                         line_top = y;
                         line_h = run_line_h;
                     }
@@ -330,22 +333,22 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
 
             /* If the word would overflow and we're not at the line start,
                wrap to a new line. */
-            if (x + w > content_width && x > 0) {
+            if (x + w > right_limit && x > left_pad) {
                 y = line_top + line_h;
-                x = 0;
+                x = left_pad;
                 line_top = y;
                 line_h = run_line_h;
             }
 
             /* Long words that still don't fit: split codepoint by codepoint. */
-            if (w > content_width) {
+            if (w > right_limit - left_pad) {
                 int cur_start = seg_start;
                 int cur_w = 0;
                 int k = seg_start;
                 while (k < seg_end) {
                     int adv = utf8_skip(t, k, seg_end);
                     int dw = ADVANCE * scale;
-                    if (cur_w + dw > content_width && cur_start < k) {
+                    if (cur_w + dw > right_limit - left_pad && cur_start < k) {
                         br_box_t b = {0};
                         apply_computed(&b, r, cs);
                         b.x = x; b.y = line_top;
@@ -360,7 +363,7 @@ int br_layout_build(br_layout_t *l, const br_doc_t *doc, int content_width) {
                         b.element_index = r->element_index;
                         if (emit_box(l, b) != 0) return -1;
                         y = line_top + line_h;
-                        x = 0;
+                        x = left_pad;
                         line_top = y;
                         line_h = run_line_h;
                         cur_start = k;
