@@ -1,0 +1,5 @@
+[2026-05-28 10:05:06] wlbridge server starting. display: wayland-5, swm_socket: /tmp/swm.sock
+[2026-05-28 10:05:06] Wayland proxy running.
+[2026-05-28 10:05:06] New Wayland client connected. Initializing Sprot connection...
+[2026-05-28 10:05:06] Client registration complete.
+[2026-05-28 10:05:06] Wayland client disconnected. Cleaning up resources.

@@ -504,9 +504,16 @@ static void load_embedded_tool_form(onetool_form_t *form, const struct onetool_t
         add_text_field(form, "h", "Height", "-h", "200", "200", "Surface height.");
         add_text_field(form, "seconds", "Seconds", "--seconds", "10", "10", "Run time before disconnect.");
         add_text_field(form, "color", "Color", "--color", "4070C8", "RRGGBB", "Hex color for the rectangle.");
+    } else if (strcmp(tool->name, "wayland_bridge") == 0) {
+        copy_string(form->title, sizeof(form->title), "Wayland Bridge");
+        copy_string(form->summary, sizeof(form->summary), "Launch the Wayland compatibility proxy (wlbridge) to run arbitrary Wayland clients inside swm.");
+        add_text_field(form, "display", "Display", "--display", "wayland-0", "wayland-0", "Wayland socket display name.");
+        add_text_field(form, "socket", "SWM Socket", "--socket", "/tmp/swm.sock", "/tmp/swm.sock", "Path to the SWM socket.");
+        add_text_field(form, "run", "Run App", "--run", "", "firefox", "Optional Wayland client command to launch immediately.");
     } else {
         form->has_config = 0;
     }
+
 
     add_extra_args_field(form);
 }

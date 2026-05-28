@@ -36,6 +36,7 @@ int rd(int argc, char *argv[]);
 int sw(int argc, char *argv[]);
 int sh(int argc, char *argv[]);
 int tr(int argc, char *argv[]);
+int wb(int argc, char *argv[]);
 int tui_main(const char *onetool_argv0);
 const char onetool_version[] = "2.5.1";
 
@@ -85,6 +86,8 @@ const struct onetool_tool onetool_builtin_tools[] = {
      ONETOOL_ARGV0_TOOL_NAME},
     {"term", tr, "GUI terminal (ranal; use --swm to run as swm client)",
      ONETOOL_ARGV0_TOOL_NAME},
+    {"wayland_bridge", wb, "Wayland client compatibility bridge for swm",
+     ONETOOL_ARGV0_BINARY_PATH},
 };
 
 const int onetool_builtin_tool_count =

@@ -39,6 +39,7 @@ implemented tools:
 - `swm` - simple window manager / compositor (sprot v0.1) (swm = simple window manager)
 - `sprot_hello` - minimal sprot client (draws a colored rectangle)
 - `term` - GUI terminal built on ranal (standalone or as a swm client via `--swm`)
+- `wayland_bridge` - Wayland client compatibility bridge for swm (wlbridge)
 framework parts:
 
 - `libs/net` - network library for URL parsing, HTTP and transport
