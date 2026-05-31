@@ -141,6 +141,23 @@ static void on_protocol_log(void *ud, enum wl_protocol_logger_type dir,
     struct wl_client *client = msg->resource ? wl_resource_get_client(msg->resource) : NULL;
     pid_t pid = 0;
     if (client) { uid_t u; gid_t g; wl_client_get_credentials(client, &pid, &u, &g); }
+
+    if (strcmp(iface, "wl_registry") == 0 && strcmp(method, "global") == 0 && msg->arguments_count >= 3) {
+        debug_log("[PROTO %s] pid=%d %s@%u.%s name=%u interface=%s version=%u",
+                  dir_str, (int)pid, iface, res_id, method,
+                  msg->arguments[0].u, msg->arguments[1].s, msg->arguments[2].u);
+        return;
+    }
+    if (strcmp(iface, "wl_registry") == 0 && strcmp(method, "bind") == 0 && msg->arguments_count >= 4) {
+        debug_log("[PROTO %s] pid=%d %s@%u.%s name=%u interface=%s version=%u new_id=%u",
+                  dir_str, (int)pid, iface, res_id, method,
+                  msg->arguments[0].u, msg->arguments[1].s, msg->arguments[2].u, msg->arguments[3].n);
+        return;
+    }
+    if (msg->arguments_count > 0) {
+        debug_log("[PROTO %s] pid=%d %s@%u.%s argc=%d", dir_str, (int)pid, iface, res_id, method, msg->arguments_count);
+        return;
+    }
     debug_log("[PROTO %s] pid=%d %s@%u.%s", dir_str, (int)pid, iface, res_id, method);
 }
 
@@ -954,6 +971,164 @@ static const struct xdg_toplevel_interface xdg_toplevel_implementation = {
     .set_minimized = xdg_toplevel_set_minimized,
 };
 
+// Data device (clipboard/DnD) stubs
+static void data_source_offer(struct wl_client *client, struct wl_resource *resource, const char *mime_type) {
+    (void)client; (void)resource;
+    debug_log("data_source_offer: %s", mime_type ? mime_type : "(null)");
+}
+
+static void data_source_destroy(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    wl_resource_destroy(resource);
+}
+
+static void data_source_set_actions(struct wl_client *client, struct wl_resource *resource, uint32_t dnd_actions) {
+    (void)client; (void)resource;
+    debug_log("data_source_set_actions: 0x%x", dnd_actions);
+}
+
+static const struct wl_data_source_interface data_source_implementation = {
+    .offer = data_source_offer,
+    .destroy = data_source_destroy,
+    .set_actions = data_source_set_actions,
+};
+
+static void data_device_start_drag(struct wl_client *client, struct wl_resource *resource,
+                                   struct wl_resource *source, struct wl_resource *origin,
+                                   struct wl_resource *icon, uint32_t serial) {
+    (void)client; (void)resource; (void)source; (void)origin; (void)icon;
+    debug_log("data_device_start_drag: serial=%u (ignored)", serial);
+}
+
+static void data_device_set_selection(struct wl_client *client, struct wl_resource *resource,
+                                      struct wl_resource *source, uint32_t serial) {
+    (void)client; (void)resource; (void)source;
+    debug_log("data_device_set_selection: serial=%u (ignored)", serial);
+}
+
+static void data_device_release(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    wl_resource_destroy(resource);
+}
+
+static const struct wl_data_device_interface data_device_implementation = {
+    .start_drag = data_device_start_drag,
+    .set_selection = data_device_set_selection,
+    .release = data_device_release,
+};
+
+static void data_device_manager_create_data_source(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
+    uint32_t version = wl_resource_get_version(resource);
+    debug_log("data_device_manager_create_data_source: id=%u version=%u", id, version);
+    struct wl_resource *source = wl_resource_create(client, &wl_data_source_interface, version, id);
+    if (!source) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+    wl_resource_set_implementation(source, &data_source_implementation, NULL, NULL);
+}
+
+static void data_device_manager_get_data_device(struct wl_client *client, struct wl_resource *resource,
+                                                uint32_t id, struct wl_resource *seat) {
+    uint32_t version = wl_resource_get_version(resource);
+    debug_log("data_device_manager_get_data_device: id=%u seat=%u version=%u",
+              id, seat ? wl_resource_get_id(seat) : 0, version);
+    struct wl_resource *device = wl_resource_create(client, &wl_data_device_interface, version, id);
+    if (!device) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+    wl_resource_set_implementation(device, &data_device_implementation, NULL, NULL);
+    wl_data_device_send_selection(device, NULL);
+}
+
+static const struct wl_data_device_manager_interface data_device_manager_implementation = {
+    .create_data_source = data_device_manager_create_data_source,
+    .get_data_device = data_device_manager_get_data_device,
+};
+
+static void data_device_manager_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
+    (void)data;
+    debug_log("data_device_manager_bind: version=%u id=%u", version, id);
+    struct wl_resource *resource = wl_resource_create(client, &wl_data_device_manager_interface, version, id);
+    if (!resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+    wl_resource_set_implementation(resource, &data_device_manager_implementation, NULL, NULL);
+}
+
+// Subcompositor stubs
+static void subsurface_destroy(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    wl_resource_destroy(resource);
+}
+
+static void subsurface_set_position(struct wl_client *client, struct wl_resource *resource, int32_t x, int32_t y) {
+    (void)client; (void)resource;
+    debug_log("subsurface_set_position: %d,%d", x, y);
+}
+
+static void subsurface_place_above(struct wl_client *client, struct wl_resource *resource, struct wl_resource *sibling) {
+    (void)client; (void)resource; (void)sibling;
+}
+
+static void subsurface_place_below(struct wl_client *client, struct wl_resource *resource, struct wl_resource *sibling) {
+    (void)client; (void)resource; (void)sibling;
+}
+
+static void subsurface_set_sync(struct wl_client *client, struct wl_resource *resource) {
+    (void)client; (void)resource;
+}
+
+static void subsurface_set_desync(struct wl_client *client, struct wl_resource *resource) {
+    (void)client; (void)resource;
+}
+
+static const struct wl_subsurface_interface subsurface_implementation = {
+    .destroy = subsurface_destroy,
+    .set_position = subsurface_set_position,
+    .place_above = subsurface_place_above,
+    .place_below = subsurface_place_below,
+    .set_sync = subsurface_set_sync,
+    .set_desync = subsurface_set_desync,
+};
+
+static void subcompositor_destroy(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    wl_resource_destroy(resource);
+}
+
+static void subcompositor_get_subsurface(struct wl_client *client, struct wl_resource *resource,
+                                         uint32_t id, struct wl_resource *surface,
+                                         struct wl_resource *parent) {
+    (void)surface; (void)parent;
+    uint32_t version = wl_resource_get_version(resource);
+    debug_log("subcompositor_get_subsurface: id=%u version=%u", id, version);
+    struct wl_resource *subsurface = wl_resource_create(client, &wl_subsurface_interface, version, id);
+    if (!subsurface) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+    wl_resource_set_implementation(subsurface, &subsurface_implementation, NULL, NULL);
+}
+
+static const struct wl_subcompositor_interface subcompositor_implementation = {
+    .destroy = subcompositor_destroy,
+    .get_subsurface = subcompositor_get_subsurface,
+};
+
+static void subcompositor_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
+    (void)data;
+    debug_log("subcompositor_bind: version=%u id=%u", version, id);
+    struct wl_resource *resource = wl_resource_create(client, &wl_subcompositor_interface, version, id);
+    if (!resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+    wl_resource_set_implementation(resource, &subcompositor_implementation, NULL, NULL);
+}
+
 // Seat resources
 static void seat_pointer_destroy(struct wl_resource *resource) {
     struct seat_resource *sr = wl_resource_get_user_data(resource);
@@ -1081,6 +1256,7 @@ static void output_bind(struct wl_client *client, void *data, uint32_t version, 
     wl_output_send_geometry(resource, 0, 0, 1920, 1080, 0, "swm", "wayland_bridge", WL_OUTPUT_TRANSFORM_NORMAL);
     if (version >= 2) {
         wl_output_send_mode(resource, WL_OUTPUT_MODE_CURRENT | WL_OUTPUT_MODE_PREFERRED, 1920, 1080, 60000);
+        wl_output_send_scale(resource, 1);
         wl_output_send_done(resource);
     }
     debug_log("output_bind: done");
@@ -1124,7 +1300,17 @@ int wayland_server_run(const char *display_name, const char *swm_socket, const c
         if (g_debug_file) fclose(g_debug_file);
         return 1;
     }
+    if (!wl_global_create(g_server.display, &wl_subcompositor_interface, 1, NULL, subcompositor_bind)) {
+        wl_display_destroy(g_server.display);
+        if (g_debug_file) fclose(g_debug_file);
+        return 1;
+    }
     if (wl_display_init_shm(g_server.display) != 0) {
+        wl_display_destroy(g_server.display);
+        if (g_debug_file) fclose(g_debug_file);
+        return 1;
+    }
+    if (!wl_global_create(g_server.display, &wl_data_device_manager_interface, 3, NULL, data_device_manager_bind)) {
         wl_display_destroy(g_server.display);
         if (g_debug_file) fclose(g_debug_file);
         return 1;

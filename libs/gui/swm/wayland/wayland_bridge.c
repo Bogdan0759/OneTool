@@ -188,9 +188,39 @@ int wayland_bridge_main(int argc, char *argv[]) {
             if (getenv("XDG_RUNTIME_DIR") == NULL) {
                 setenv("XDG_RUNTIME_DIR", "/tmp", 1);
             }
+            if (getenv("GDK_BACKEND") == NULL) {
+                setenv("GDK_BACKEND", "wayland", 1);
+            }
+            if (getenv("MOZ_ENABLE_WAYLAND") == NULL) {
+                setenv("MOZ_ENABLE_WAYLAND", "1", 1);
+            }
+            if (getenv("QT_QPA_PLATFORM") == NULL) {
+                setenv("QT_QPA_PLATFORM", "wayland", 1);
+            }
+            if (debug_file != NULL) {
+                if (getenv("WAYLAND_DEBUG") == NULL) {
+                    setenv("WAYLAND_DEBUG", "1", 1);
+                }
+                if (getenv("GDK_DEBUG") == NULL) {
+                    setenv("GDK_DEBUG", "misc,events,dnd,selection,clipboard,opengl,vulkan", 1);
+                }
+                if (getenv("MOZ_LOG") == NULL) {
+                    setenv("MOZ_LOG", "Widget:5,WidgetWayland:5,WidgetPopup:5,Gtk:5", 1);
+                }
+                if (getenv("MOZ_LOG_FILE") == NULL) {
+                    char moz_log_file[320];
+                    snprintf(moz_log_file, sizeof(moz_log_file), "%s.moz", debug_file);
+                    setenv("MOZ_LOG_FILE", moz_log_file, 1);
+                }
+            }
 
-            bridge_log(debug_file, "exec app via /bin/sh -c, WAYLAND_DISPLAY=%s XDG_RUNTIME_DIR=%s",
-                       getenv("WAYLAND_DISPLAY"), getenv("XDG_RUNTIME_DIR"));
+            bridge_log(debug_file, "exec app via /bin/sh -c, WAYLAND_DISPLAY=%s XDG_RUNTIME_DIR=%s GDK_BACKEND=%s MOZ_ENABLE_WAYLAND=%s QT_QPA_PLATFORM=%s WAYLAND_DEBUG=%s GDK_DEBUG=%s MOZ_LOG=%s MOZ_LOG_FILE=%s",
+                       getenv("WAYLAND_DISPLAY"), getenv("XDG_RUNTIME_DIR"), getenv("GDK_BACKEND"),
+                       getenv("MOZ_ENABLE_WAYLAND"), getenv("QT_QPA_PLATFORM"),
+                       getenv("WAYLAND_DEBUG") ? getenv("WAYLAND_DEBUG") : "(unset)",
+                       getenv("GDK_DEBUG") ? getenv("GDK_DEBUG") : "(unset)",
+                       getenv("MOZ_LOG") ? getenv("MOZ_LOG") : "(unset)",
+                       getenv("MOZ_LOG_FILE") ? getenv("MOZ_LOG_FILE") : "(unset)");
             char *args[] = { "/bin/sh", "-c", (char *)app_to_run, NULL };
             execv(args[0], args);
             bridge_log(debug_file, "exec app failed: %s", strerror(errno));
