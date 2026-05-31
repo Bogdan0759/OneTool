@@ -3,7 +3,9 @@
 #include "xdg-shell-protocol.h"
 #include "xdg-decoration-protocol.h"
 #include "viewporter-protocol.h"
+#include "linux-dmabuf-protocol.h"
 #include <sprot/client.h>
+#include <sprot/vk_interop.h>
 #include <srapi/srapi.h>
 
 #include <wayland-server.h>
@@ -45,6 +47,7 @@ struct bridge_surface {
     int pending_height;
     int pending_stride;
     size_t pending_size;
+    struct dmabuf_buffer *pending_dmabuf;
     int is_subsurface;
     int is_cursor;
     int32_t subsurface_x;
@@ -87,7 +90,48 @@ struct bridge_server {
     uint32_t next_client_handle;
 };
 
+struct dmabuf_buffer {
+    struct wl_resource *resource;
+    struct wl_listener destroy_listener;
+    int is_dmabuf;
+
+    int fd;
+    uint32_t width;
+    uint32_t height;
+    uint32_t format;
+    uint64_t modifier;
+    uint32_t num_planes;
+    uint32_t offsets[4];
+    uint32_t strides[4];
+    uint32_t flags;
+};
+
+struct dmabuf_params {
+    struct wl_resource *resource;
+    struct bridge_client *client;
+
+    int fds[4];
+    uint32_t offsets[4];
+    uint32_t strides[4];
+    uint64_t modifier;
+    uint32_t num_planes;
+    uint8_t plane_set[4];
+    int used;
+};
+
+struct dmabuf_feedback {
+    struct wl_resource *resource;
+    struct wl_resource *surface_resource;
+};
+
 static struct bridge_server g_server;
+static struct {
+    char render_node_path[256];
+    uint32_t render_major;
+    uint32_t render_minor;
+    int has_drm;
+    int queried;
+} g_render_node_info = {0};
 static FILE *g_debug_file = NULL;
 static int g_keymap_fd = -1;
 static uint32_t g_keymap_size = 0;
@@ -467,22 +511,51 @@ static int client_sprot_fd_handler(int fd, uint32_t mask, void *data) {
                     s->sprot_id = ev.u.surface_created.surface_id;
                     debug_log("Sprot event: Surface created. Sprot ID=%u assigned to handle=%u (sprot_handle=%u)",
                         s->sprot_id, s->client_handle, ev.u.surface_created.client_handle);
-                    // Explicitly set the Sprot surface role to TOPLEVEL so that SWM maps the window
                     int role_res = sprot_set_role(s->sprot_surface, SPROT_SURFACE_ROLE_TOPLEVEL, 0, 0, 0);
                     debug_log("Set Sprot role to SPROT_SURFACE_ROLE_TOPLEVEL for Sprot ID=%u (res=%d)", s->sprot_id, role_res);
 
                     if (s->pending_commit) {
-                        debug_log("Executing deferred surface commit for surface Sprot ID=%u", s->sprot_id);
-                        int dup_fd = dup(s->memfd);
-                        if (dup_fd >= 0) {
-                            int attach_res = sprot_attach_fd(s->sprot_surface, dup_fd, s->pending_width, s->pending_height, s->pending_stride, (uint32_t)s->pending_size, SPROT_BUFFER_SHM, SPROT_PIXEL_FORMAT_BGRA8888);
-                            int commit_res = sprot_commit(s->sprot_surface);
-                            sprot_request_frame(s->sprot_surface);
-                            debug_log("Deferred commit results: attach=%d, commit=%d", attach_res, commit_res);
+                        if (s->pending_dmabuf) {
+                            debug_log("Executing deferred DMA-BUF commit for surface Sprot ID=%u", s->sprot_id);
+                            int dup_fd = dup(s->pending_dmabuf->fd);
+                            if (dup_fd >= 0) {
+                                int attach_res = sprot_surface_attach_dmabuf(
+                                    s->sprot_surface,
+                                    dup_fd,
+                                    s->pending_dmabuf->width,
+                                    s->pending_dmabuf->height,
+                                    s->pending_dmabuf->format,
+                                    s->pending_dmabuf->modifier,
+                                    s->pending_dmabuf->num_planes,
+                                    s->pending_dmabuf->offsets,
+                                    s->pending_dmabuf->strides,
+                                    s->pending_dmabuf->strides[0] * s->pending_dmabuf->height
+                                );
+                                int commit_res = sprot_commit(s->sprot_surface);
+                                sprot_request_frame(s->sprot_surface);
+                                debug_log("Deferred DMA-BUF commit results: attach=%d, commit=%d", attach_res, commit_res);
+                            } else {
+                                debug_log("Error: deferred dup failed for dmabuf: %s", strerror(errno));
+                            }
+                            s->pending_dmabuf = NULL;
                         } else {
-                            debug_log("Error: deferred dup failed: %s", strerror(errno));
+                            debug_log("Executing deferred SHM commit for surface Sprot ID=%u", s->sprot_id);
+                            int dup_fd = dup(s->memfd);
+                            if (dup_fd >= 0) {
+                                int attach_res = sprot_attach_fd(s->sprot_surface, dup_fd, s->pending_width, s->pending_height, s->pending_stride, (uint32_t)s->pending_size, SPROT_BUFFER_SHM, SPROT_PIXEL_FORMAT_BGRA8888);
+                                int commit_res = sprot_commit(s->sprot_surface);
+                                sprot_request_frame(s->sprot_surface);
+                                debug_log("Deferred SHM commit results: attach=%d, commit=%d", attach_res, commit_res);
+                            } else {
+                                debug_log("Error: deferred dup failed: %s", strerror(errno));
+                            }
                         }
                         s->pending_commit = 0;
+
+                        if (s->buffer_resource) {
+                            wl_buffer_send_release(s->buffer_resource);
+                            s->buffer_resource = NULL;
+                        }
                     }
                 }
                 break;
@@ -797,6 +870,62 @@ static void surface_set_input_region(struct wl_client *client, struct wl_resourc
     (void)client; (void)resource; (void)region;
 }
 
+static void handle_dmabuf_buffer(struct bridge_surface *s, struct dmabuf_buffer *dmabuf) {
+    if (!dmabuf || !dmabuf->is_dmabuf) {
+        debug_log("handle_dmabuf_buffer: invalid dmabuf buffer");
+        return;
+    }
+
+    debug_log("handle_dmabuf_buffer: handle=%u dmabuf %dx%d format=0x%x modifier=0x%lx stride=%u",
+              s->client_handle, dmabuf->width, dmabuf->height, dmabuf->format,
+              (unsigned long)dmabuf->modifier, dmabuf->strides[0]);
+
+    if (!s->sprot_surface) {
+        debug_log("Creating new Sprot surface for dmabuf client...");
+        s->sprot_surface = sprot_create_surface(s->client->sprot_conn, dmabuf->width, dmabuf->height);
+        if (!s->sprot_surface) {
+            debug_log("Error: Failed to create Sprot surface for dmabuf.");
+            return;
+        }
+    }
+
+    if (s->sprot_id == 0) {
+        debug_log("Sprot surface ID is not yet ready. Deferring dmabuf attach.");
+        s->pending_dmabuf = dmabuf;
+        s->pending_commit = 1;
+        return;
+    }
+
+    int dup_fd = dup(dmabuf->fd);
+    if (dup_fd < 0) {
+        debug_log("Error: dup failed for dmabuf fd: %s", strerror(errno));
+        return;
+    }
+
+    debug_log("Forwarding dmabuf buffer to SWM (Sprot ID=%u)", s->sprot_id);
+    int attach_res = sprot_surface_attach_dmabuf(
+        s->sprot_surface,
+        dup_fd,
+        dmabuf->width,
+        dmabuf->height,
+        dmabuf->format,
+        dmabuf->modifier,
+        dmabuf->num_planes,
+        dmabuf->offsets,
+        dmabuf->strides,
+        dmabuf->strides[0] * dmabuf->height
+    );
+
+    if (attach_res != 0) {
+        debug_log("Error: sprot_surface_attach_dmabuf failed: %d", attach_res);
+        return;
+    }
+
+    int commit_res = sprot_commit(s->sprot_surface);
+    sprot_request_frame(s->sprot_surface);
+    debug_log("DMA-BUF commit results: attach=%d, commit=%d", attach_res, commit_res);
+}
+
 static void surface_commit(struct wl_client *client, struct wl_resource *resource) {
     struct bridge_surface *s = wl_resource_get_user_data(resource);
     (void)client;
@@ -855,91 +984,96 @@ static void surface_commit(struct wl_client *client, struct wl_resource *resourc
     }
 
     struct wl_shm_buffer *shm_buf = wl_shm_buffer_get(s->buffer_resource);
-    if (!shm_buf) {
-        debug_log("surface_commit: WARNING handle=%u buffer is not SHM (maybe EGL/dmabuf?)", s->client_handle);
-        return;
-    }
+    if (shm_buf) {
+        int32_t width = wl_shm_buffer_get_width(shm_buf);
+        int32_t height = wl_shm_buffer_get_height(shm_buf);
+        int32_t stride = wl_shm_buffer_get_stride(shm_buf);
+        size_t size = (size_t)stride * height;
 
-    int32_t width = wl_shm_buffer_get_width(shm_buf);
-    int32_t height = wl_shm_buffer_get_height(shm_buf);
-    int32_t stride = wl_shm_buffer_get_stride(shm_buf);
-    size_t size = (size_t)stride * height;
+        if (width <= 0 || height <= 0) return;
 
-    if (width <= 0 || height <= 0) return;
+        debug_log("Surface commit for surface handle=%u. Attached SHM buffer size: %dx%d, stride: %d, size: %zu", s->client_handle, width, height, stride, size);
 
-    debug_log("Surface commit for surface handle=%u. Attached buffer size: %dx%d, stride: %d, size: %zu", s->client_handle, width, height, stride, size);
-
-    if (!s->sprot_surface) {
-        debug_log("Creating new Sprot surface for client connection...");
-        s->sprot_surface = sprot_create_surface(s->client->sprot_conn, width, height);
         if (!s->sprot_surface) {
-            debug_log("Error: Failed to create Sprot surface.");
-            return;
-        }
-    }
-
-    // Allocate/resize memfd
-    if (s->memfd < 0 || s->memfd_size < size) {
-        if (s->memfd_map && s->memfd_map != MAP_FAILED) {
-            munmap(s->memfd_map, s->memfd_size);
-        }
-        if (s->memfd >= 0) {
-            close(s->memfd);
+            debug_log("Creating new Sprot surface for client connection...");
+            s->sprot_surface = sprot_create_surface(s->client->sprot_conn, width, height);
+            if (!s->sprot_surface) {
+                debug_log("Error: Failed to create Sprot surface.");
+                return;
+            }
         }
 
-        s->memfd = memfd_create("wlbridge-shm", MFD_CLOEXEC);
-        if (s->memfd < 0) {
-            debug_log("Error: memfd_create failed: %s", strerror(errno));
-            return;
-        }
-        if (ftruncate(s->memfd, size) != 0) {
-            close(s->memfd);
-            s->memfd = -1;
-            debug_log("Error: ftruncate failed: %s", strerror(errno));
-            return;
-        }
-        s->memfd_size = size;
-        s->memfd_map = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, s->memfd, 0);
-        if (s->memfd_map == MAP_FAILED) {
-            close(s->memfd);
-            s->memfd = -1;
-            debug_log("Error: mmap failed: %s", strerror(errno));
-            return;
-        }
-        debug_log("Created new shared memory mapping (memfd) of size %zu for surface handle=%u", size, s->client_handle);
-    }
+        if (s->memfd < 0 || s->memfd_size < size) {
+            if (s->memfd_map && s->memfd_map != MAP_FAILED) {
+                munmap(s->memfd_map, s->memfd_size);
+            }
+            if (s->memfd >= 0) {
+                close(s->memfd);
+            }
 
-    // Copy buffer contents
-    wl_shm_buffer_begin_access(shm_buf);
-    void *src_pixels = wl_shm_buffer_get_data(shm_buf);
-    if (src_pixels && s->memfd_map) {
-        memcpy(s->memfd_map, src_pixels, size);
-    }
-    wl_shm_buffer_end_access(shm_buf);
+            s->memfd = memfd_create("wlbridge-shm", MFD_CLOEXEC);
+            if (s->memfd < 0) {
+                debug_log("Error: memfd_create failed: %s", strerror(errno));
+                return;
+            }
+            if (ftruncate(s->memfd, size) != 0) {
+                close(s->memfd);
+                s->memfd = -1;
+                debug_log("Error: ftruncate failed: %s", strerror(errno));
+                return;
+            }
+            s->memfd_size = size;
+            s->memfd_map = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, s->memfd, 0);
+            if (s->memfd_map == MAP_FAILED) {
+                close(s->memfd);
+                s->memfd = -1;
+                debug_log("Error: mmap failed: %s", strerror(errno));
+                return;
+            }
+            debug_log("Created new shared memory mapping (memfd) of size %zu for surface handle=%u", size, s->client_handle);
+        }
 
-    if (s->sprot_id == 0) {
-        debug_log("Sprot surface ID is not yet ready. Deferring attach and commit.");
-        s->pending_commit = 1;
-        s->pending_width = width;
-        s->pending_height = height;
-        s->pending_stride = stride;
-        s->pending_size = size;
-    } else {
-        // Send attach and commit to SWM immediately
-        int dup_fd = dup(s->memfd);
-        if (dup_fd >= 0) {
-            debug_log("Forwarding buffer attach to SWM (Sprot ID=%u)", s->sprot_id);
-            int attach_res = sprot_attach_fd(s->sprot_surface, dup_fd, width, height, stride, (uint32_t)size, SPROT_BUFFER_SHM, SPROT_PIXEL_FORMAT_BGRA8888);
-            int commit_res = sprot_commit(s->sprot_surface);
-            sprot_request_frame(s->sprot_surface);
-            debug_log("Commit results: attach=%d, commit=%d", attach_res, commit_res);
+        wl_shm_buffer_begin_access(shm_buf);
+        void *src_pixels = wl_shm_buffer_get_data(shm_buf);
+        if (src_pixels && s->memfd_map) {
+            memcpy(s->memfd_map, src_pixels, size);
+        }
+        wl_shm_buffer_end_access(shm_buf);
+
+        if (s->sprot_id == 0) {
+            debug_log("Sprot surface ID is not yet ready. Deferring attach and commit.");
+            s->pending_commit = 1;
+            s->pending_width = width;
+            s->pending_height = height;
+            s->pending_stride = stride;
+            s->pending_size = size;
         } else {
-            debug_log("Error: dup failed: %s", strerror(errno));
+            int dup_fd = dup(s->memfd);
+            if (dup_fd >= 0) {
+                debug_log("Forwarding SHM buffer attach to SWM (Sprot ID=%u)", s->sprot_id);
+                int attach_res = sprot_attach_fd(s->sprot_surface, dup_fd, width, height, stride, (uint32_t)size, SPROT_BUFFER_SHM, SPROT_PIXEL_FORMAT_BGRA8888);
+                int commit_res = sprot_commit(s->sprot_surface);
+                sprot_request_frame(s->sprot_surface);
+                debug_log("SHM commit results: attach=%d, commit=%d", attach_res, commit_res);
+            } else {
+                debug_log("Error: dup failed: %s", strerror(errno));
+            }
+        }
+    } else {
+        struct dmabuf_buffer *dmabuf = wl_resource_get_user_data(s->buffer_resource);
+        if (dmabuf && dmabuf->is_dmabuf) {
+            debug_log("surface_commit: handle=%u using DMA-BUF buffer", s->client_handle);
+            handle_dmabuf_buffer(s, dmabuf);
+        } else {
+            debug_log("surface_commit: WARNING handle=%u buffer is neither SHM nor DMA-BUF", s->client_handle);
+            return;
         }
     }
 
-    wl_buffer_send_release(s->buffer_resource);
-    s->buffer_resource = NULL;
+    if (!s->pending_commit) {
+        wl_buffer_send_release(s->buffer_resource);
+        s->buffer_resource = NULL;
+    }
 }
 
 static void surface_set_buffer_transform(struct wl_client *client, struct wl_resource *resource, int32_t transform) {
@@ -1613,6 +1747,415 @@ static void seat_resource_destroy(struct wl_resource *resource) {
     free(sr);
 }
 
+// DMA-BUF buffer implementation
+static void dmabuf_buffer_destroy(struct wl_resource *resource) {
+    struct dmabuf_buffer *buf = wl_resource_get_user_data(resource);
+    if (!buf) return;
+
+    wl_list_remove(&buf->destroy_listener.link);
+    if (buf->fd >= 0) {
+        close(buf->fd);
+    }
+    free(buf);
+}
+
+static void dmabuf_buffer_handle_destroy(struct wl_listener *listener, void *data) {
+    (void)data;
+    struct dmabuf_buffer *buf = wl_container_of(listener, buf, destroy_listener);
+    if (buf->fd >= 0) {
+        close(buf->fd);
+        buf->fd = -1;
+    }
+}
+
+// DMA-BUF params implementation
+static void params_destroy_handler(struct wl_resource *resource) {
+    struct dmabuf_params *params = wl_resource_get_user_data(resource);
+    if (!params) return;
+
+    for (uint32_t i = 0; i < 4; i++) {
+        if (params->fds[i] >= 0) {
+            close(params->fds[i]);
+        }
+    }
+    free(params);
+}
+
+static void params_destroy(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    wl_resource_destroy(resource);
+}
+
+static void params_add(struct wl_client *client, struct wl_resource *resource,
+                       int32_t fd, uint32_t plane_idx, uint32_t offset,
+                       uint32_t stride, uint32_t modifier_hi, uint32_t modifier_lo) {
+    (void)client;
+    struct dmabuf_params *params = wl_resource_get_user_data(resource);
+
+    if (params->used) {
+        wl_resource_post_error(resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_ALREADY_USED,
+                              "params already used");
+        close(fd);
+        return;
+    }
+
+    if (plane_idx >= 4) {
+        wl_resource_post_error(resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_PLANE_IDX,
+                              "plane index too large");
+        close(fd);
+        return;
+    }
+
+    if (params->plane_set[plane_idx]) {
+        wl_resource_post_error(resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_PLANE_SET,
+                              "plane already set");
+        close(fd);
+        return;
+    }
+
+    uint64_t modifier = ((uint64_t)modifier_hi << 32) | modifier_lo;
+
+    if (params->num_planes > 0 && params->modifier != modifier) {
+        wl_resource_post_error(resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INVALID_FORMAT,
+                              "all planes must have same modifier");
+        close(fd);
+        return;
+    }
+
+    params->fds[plane_idx] = fd;
+    params->offsets[plane_idx] = offset;
+    params->strides[plane_idx] = stride;
+    params->modifier = modifier;
+    params->plane_set[plane_idx] = 1;
+    params->num_planes++;
+
+    debug_log("params_add: plane_idx=%u fd=%d offset=%u stride=%u modifier=0x%lx",
+              plane_idx, fd, offset, stride, (unsigned long)modifier);
+}
+
+static struct wl_resource* params_create_buffer(struct dmabuf_params *params,
+                                                int32_t width, int32_t height,
+                                                uint32_t format, uint32_t flags,
+                                                uint32_t buffer_id) {
+    if (width <= 0 || height <= 0) {
+        wl_resource_post_error(params->resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INVALID_DIMENSIONS,
+                              "invalid dimensions");
+        return NULL;
+    }
+
+    if (params->num_planes == 0) {
+        wl_resource_post_error(params->resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INCOMPLETE,
+                              "no planes added");
+        return NULL;
+    }
+
+    if (params->num_planes != 1) {
+        wl_resource_post_error(params->resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INVALID_FORMAT,
+                              "only single-plane buffers supported");
+        return NULL;
+    }
+
+    if (format != 0x34325241 && format != 0x34325258) {
+        wl_resource_post_error(params->resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INVALID_FORMAT,
+                              "unsupported format (only ARGB8888/XRGB8888)");
+        return NULL;
+    }
+
+    if (params->modifier != 0) {
+        wl_resource_post_error(params->resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INVALID_FORMAT,
+                              "only LINEAR modifier supported");
+        return NULL;
+    }
+
+    if (params->offsets[0] != 0) {
+        wl_resource_post_error(params->resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_OUT_OF_BOUNDS,
+                              "offset must be 0");
+        return NULL;
+    }
+
+    struct dmabuf_buffer *buf = calloc(1, sizeof(*buf));
+    if (!buf) {
+        return NULL;
+    }
+
+    buf->is_dmabuf = 1;
+    buf->fd = params->fds[0];
+    buf->width = width;
+    buf->height = height;
+    buf->format = format;
+    buf->modifier = params->modifier;
+    buf->num_planes = 1;
+    buf->offsets[0] = params->offsets[0];
+    buf->strides[0] = params->strides[0];
+    buf->flags = flags;
+
+    params->fds[0] = -1;
+
+    if (buffer_id == 0) {
+        buf->resource = wl_resource_create(wl_resource_get_client(params->resource),
+                                           &wl_buffer_interface, 1, 0);
+    } else {
+        buf->resource = wl_resource_create(wl_resource_get_client(params->resource),
+                                           &wl_buffer_interface, 1, buffer_id);
+    }
+
+    if (!buf->resource) {
+        close(buf->fd);
+        free(buf);
+        return NULL;
+    }
+
+    wl_resource_set_implementation(buf->resource, NULL, buf, dmabuf_buffer_destroy);
+
+    buf->destroy_listener.notify = dmabuf_buffer_handle_destroy;
+    wl_resource_add_destroy_listener(buf->resource, &buf->destroy_listener);
+
+    debug_log("Created dmabuf buffer: %dx%d format=0x%x modifier=0x%lx stride=%u",
+              width, height, format, (unsigned long)params->modifier, params->strides[0]);
+
+    return buf->resource;
+}
+
+static void params_create(struct wl_client *client, struct wl_resource *resource,
+                         int32_t width, int32_t height, uint32_t format, uint32_t flags) {
+    (void)client;
+    struct dmabuf_params *params = wl_resource_get_user_data(resource);
+
+    if (params->used) {
+        wl_resource_post_error(resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_ALREADY_USED,
+                              "params already used");
+        return;
+    }
+    params->used = 1;
+
+    struct wl_resource *buffer = params_create_buffer(params, width, height, format, flags, 0);
+
+    if (buffer) {
+        zwp_linux_buffer_params_v1_send_created(resource, buffer);
+    } else {
+        zwp_linux_buffer_params_v1_send_failed(resource);
+    }
+}
+
+static void params_create_immed(struct wl_client *client, struct wl_resource *resource,
+                               uint32_t buffer_id, int32_t width, int32_t height,
+                               uint32_t format, uint32_t flags) {
+    (void)client;
+    struct dmabuf_params *params = wl_resource_get_user_data(resource);
+
+    if (params->used) {
+        wl_resource_post_error(resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_ALREADY_USED,
+                              "params already used");
+        return;
+    }
+    params->used = 1;
+
+    struct wl_resource *buffer = params_create_buffer(params, width, height, format, flags, buffer_id);
+
+    if (!buffer) {
+        wl_resource_post_error(resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INVALID_WL_BUFFER,
+                              "failed to create buffer");
+        return;
+    }
+}
+
+static const struct zwp_linux_buffer_params_v1_interface params_implementation = {
+    .destroy = params_destroy,
+    .add = params_add,
+    .create = params_create,
+    .create_immed = params_create_immed,
+};
+
+// DMA-BUF feedback implementation
+static void feedback_destroy(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    wl_resource_destroy(resource);
+}
+
+static void feedback_destroy_handler(struct wl_resource *resource) {
+    struct dmabuf_feedback *feedback = wl_resource_get_user_data(resource);
+    free(feedback);
+}
+
+static const struct zwp_linux_dmabuf_feedback_v1_interface feedback_implementation = {
+    .destroy = feedback_destroy,
+};
+
+static void send_dmabuf_feedback(struct wl_resource *feedback_resource) {
+    if (!g_render_node_info.queried || !g_render_node_info.has_drm) {
+        debug_log("send_dmabuf_feedback: render node not available, skipping");
+        zwp_linux_dmabuf_feedback_v1_send_done(feedback_resource);
+        return;
+    }
+
+    struct {
+        uint32_t format;
+        uint32_t padding;
+        uint64_t modifier;
+    } formats[] = {
+        {0x34325241, 0, 0},
+        {0x34325258, 0, 0},
+    };
+
+    int memfd = memfd_create("dmabuf-feedback", MFD_CLOEXEC);
+    if (memfd < 0) {
+        debug_log("send_dmabuf_feedback: memfd_create failed");
+        zwp_linux_dmabuf_feedback_v1_send_done(feedback_resource);
+        return;
+    }
+
+    size_t table_size = sizeof(formats);
+    if (ftruncate(memfd, table_size) != 0) {
+        close(memfd);
+        debug_log("send_dmabuf_feedback: ftruncate failed");
+        zwp_linux_dmabuf_feedback_v1_send_done(feedback_resource);
+        return;
+    }
+
+    void *map = mmap(NULL, table_size, PROT_READ | PROT_WRITE, MAP_SHARED, memfd, 0);
+    if (map == MAP_FAILED) {
+        close(memfd);
+        debug_log("send_dmabuf_feedback: mmap failed");
+        zwp_linux_dmabuf_feedback_v1_send_done(feedback_resource);
+        return;
+    }
+
+    memcpy(map, formats, table_size);
+    munmap(map, table_size);
+
+    zwp_linux_dmabuf_feedback_v1_send_format_table(feedback_resource, memfd, table_size);
+    close(memfd);
+
+    struct {
+        uint32_t major;
+        uint32_t minor;
+    } dev_id = {
+        .major = g_render_node_info.render_major,
+        .minor = g_render_node_info.render_minor,
+    };
+
+    struct wl_array dev_array;
+    wl_array_init(&dev_array);
+    void *dev_data = wl_array_add(&dev_array, sizeof(dev_id));
+    memcpy(dev_data, &dev_id, sizeof(dev_id));
+    zwp_linux_dmabuf_feedback_v1_send_main_device(feedback_resource, &dev_array);
+
+    struct wl_array indices;
+    wl_array_init(&indices);
+    uint16_t *idx0 = wl_array_add(&indices, sizeof(uint16_t));
+    uint16_t *idx1 = wl_array_add(&indices, sizeof(uint16_t));
+    *idx0 = 0;
+    *idx1 = 1;
+
+    zwp_linux_dmabuf_feedback_v1_send_tranche_target_device(feedback_resource, &dev_array);
+    zwp_linux_dmabuf_feedback_v1_send_tranche_formats(feedback_resource, &indices);
+    zwp_linux_dmabuf_feedback_v1_send_tranche_flags(feedback_resource, ZWP_LINUX_DMABUF_FEEDBACK_V1_TRANCHE_FLAGS_SCANOUT);
+    zwp_linux_dmabuf_feedback_v1_send_tranche_done(feedback_resource);
+
+    wl_array_release(&indices);
+    wl_array_release(&dev_array);
+
+    zwp_linux_dmabuf_feedback_v1_send_done(feedback_resource);
+    debug_log("send_dmabuf_feedback: sent feedback with 2 formats");
+}
+
+// DMA-BUF global implementation
+static void linux_dmabuf_destroy(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    wl_resource_destroy(resource);
+}
+
+static void linux_dmabuf_create_params(struct wl_client *client,
+                                       struct wl_resource *resource, uint32_t params_id) {
+    struct bridge_client *bridge_client = get_or_create_client(client);
+    if (!bridge_client) {
+        debug_log("linux_dmabuf_create_params: failed to get client");
+        return;
+    }
+
+    struct dmabuf_params *params = calloc(1, sizeof(*params));
+    if (!params) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
+    params->client = bridge_client;
+    for (int i = 0; i < 4; i++) {
+        params->fds[i] = -1;
+    }
+
+    params->resource = wl_resource_create(client, &zwp_linux_buffer_params_v1_interface,
+                                         wl_resource_get_version(resource), params_id);
+    wl_resource_set_implementation(params->resource, &params_implementation,
+                                  params, params_destroy_handler);
+
+    debug_log("linux_dmabuf_create_params: created params object");
+}
+
+static void linux_dmabuf_get_default_feedback(struct wl_client *client,
+                                              struct wl_resource *resource, uint32_t id) {
+    (void)resource;
+    struct dmabuf_feedback *feedback = calloc(1, sizeof(*feedback));
+    if (!feedback) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
+    feedback->resource = wl_resource_create(client, &zwp_linux_dmabuf_feedback_v1_interface, 1, id);
+    wl_resource_set_implementation(feedback->resource, &feedback_implementation,
+                                  feedback, feedback_destroy_handler);
+
+    send_dmabuf_feedback(feedback->resource);
+    debug_log("linux_dmabuf_get_default_feedback: sent default feedback");
+}
+
+static void linux_dmabuf_get_surface_feedback(struct wl_client *client,
+                                              struct wl_resource *resource,
+                                              uint32_t id, struct wl_resource *surface) {
+    (void)resource;
+    (void)surface;
+    struct dmabuf_feedback *feedback = calloc(1, sizeof(*feedback));
+    if (!feedback) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
+    feedback->surface_resource = surface;
+    feedback->resource = wl_resource_create(client, &zwp_linux_dmabuf_feedback_v1_interface, 1, id);
+    wl_resource_set_implementation(feedback->resource, &feedback_implementation,
+                                  feedback, feedback_destroy_handler);
+
+    send_dmabuf_feedback(feedback->resource);
+    debug_log("linux_dmabuf_get_surface_feedback: sent surface feedback");
+}
+
+static const struct zwp_linux_dmabuf_v1_interface linux_dmabuf_implementation = {
+    .destroy = linux_dmabuf_destroy,
+    .create_params = linux_dmabuf_create_params,
+    .get_default_feedback = linux_dmabuf_get_default_feedback,
+    .get_surface_feedback = linux_dmabuf_get_surface_feedback,
+};
+
+static void linux_dmabuf_bind(struct wl_client *client, void *data,
+                             uint32_t version, uint32_t id) {
+    (void)data;
+    struct wl_resource *resource = wl_resource_create(client,
+        &zwp_linux_dmabuf_v1_interface, version, id);
+    wl_resource_set_implementation(resource, &linux_dmabuf_implementation, NULL, NULL);
+
+    if (version < 4) {
+        zwp_linux_dmabuf_v1_send_format(resource, 0x34325241);
+        zwp_linux_dmabuf_v1_send_format(resource, 0x34325258);
+
+        if (version >= 3) {
+            zwp_linux_dmabuf_v1_send_modifier(resource, 0x34325241, 0, 0);
+            zwp_linux_dmabuf_v1_send_modifier(resource, 0x34325258, 0, 0);
+        }
+    }
+
+    debug_log("linux_dmabuf_bind: client bound to dmabuf interface version %u", version);
+}
+
 static void seat_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     (void)data;
     pid_t pid = 0; uid_t uid = 0; gid_t gid = 0;
@@ -1735,6 +2278,12 @@ int wayland_server_run(const char *display_name, const char *swm_socket, const c
         if (g_debug_file) fclose(g_debug_file);
         return 1;
     }
+    if (!wl_global_create(g_server.display, &zwp_linux_dmabuf_v1_interface, 4, NULL, linux_dmabuf_bind)) {
+        wl_display_destroy(g_server.display);
+        if (g_debug_file) fclose(g_debug_file);
+        return 1;
+    }
+    debug_log("Registered zwp_linux_dmabuf_v1 global (version 4)");
 
     int socket_added = wl_display_add_socket(g_server.display, display_name);
     if (socket_added < 0) {

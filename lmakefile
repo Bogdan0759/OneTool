@@ -688,7 +688,11 @@ task build() {
         @echo("[CC] %s", "tools/gui/wlbridge/viewporter-protocol.c");
         @run("%s %s -Itools/gui/wlbridge -c %s -o %s", CC, CFLAGS, "tools/gui/wlbridge/viewporter-protocol.c", "tools/gui/wlbridge/viewporter-protocol.o");
     }
-    if (@is_outdated("tools/gui/wlbridge/wayland_server.o", "tools/gui/wlbridge/wayland_server.c", "tools/gui/wlbridge/wayland_server.h", "tools/gui/wlbridge/xdg-shell-protocol.h", "tools/gui/wlbridge/xdg-decoration-protocol.h", "tools/gui/wlbridge/viewporter-protocol.h", SPROT_HDR, SPROT_CLIENT_HDR, SRAPI_HDR)) {
+    if (@is_outdated("tools/gui/wlbridge/linux-dmabuf-protocol.o", "tools/gui/wlbridge/linux-dmabuf-protocol.c", "tools/gui/wlbridge/linux-dmabuf-protocol.h")) {
+        @echo("[CC] %s", "tools/gui/wlbridge/linux-dmabuf-protocol.c");
+        @run("%s %s -Itools/gui/wlbridge -c %s -o %s", CC, CFLAGS, "tools/gui/wlbridge/linux-dmabuf-protocol.c", "tools/gui/wlbridge/linux-dmabuf-protocol.o");
+    }
+    if (@is_outdated("tools/gui/wlbridge/wayland_server.o", "tools/gui/wlbridge/wayland_server.c", "tools/gui/wlbridge/wayland_server.h", "tools/gui/wlbridge/xdg-shell-protocol.h", "tools/gui/wlbridge/xdg-decoration-protocol.h", "tools/gui/wlbridge/viewporter-protocol.h", "tools/gui/wlbridge/linux-dmabuf-protocol.h", SPROT_HDR, SPROT_CLIENT_HDR, SPROT_VK_INTEROP_HDR, SRAPI_HDR)) {
         @echo("[CC] %s", "tools/gui/wlbridge/wayland_server.c");
         @run("%s %s -Ilibs/gui/sprot/include -Ilibs/srapi/include -Itools/gui/wlbridge -c %s -o %s", CC, CFLAGS, "tools/gui/wlbridge/wayland_server.c", "tools/gui/wlbridge/wayland_server.o");
     }
@@ -696,9 +700,9 @@ task build() {
         @echo("[CC] %s", "tools/gui/wlbridge/main.c");
         @run("%s %s -Ilibs/gui/sprot/include -Itools/gui/wlbridge -c %s -o %s", CC, CFLAGS, "tools/gui/wlbridge/main.c", "tools/gui/wlbridge/main.o");
     }
-    if (@is_outdated("wlbridge", "tools/gui/wlbridge/main.o", "tools/gui/wlbridge/wayland_server.o", "tools/gui/wlbridge/xdg-shell-protocol.o", "tools/gui/wlbridge/xdg-decoration-protocol.o", "tools/gui/wlbridge/viewporter-protocol.o", SPROT_CLIENT_OBJ, SPROT_MSG_OBJ)) {
+    if (@is_outdated("wlbridge", "tools/gui/wlbridge/main.o", "tools/gui/wlbridge/wayland_server.o", "tools/gui/wlbridge/xdg-shell-protocol.o", "tools/gui/wlbridge/xdg-decoration-protocol.o", "tools/gui/wlbridge/viewporter-protocol.o", "tools/gui/wlbridge/linux-dmabuf-protocol.o", SPROT_CLIENT_OBJ, SPROT_MSG_OBJ, SPROT_VK_INTEROP_OBJ)) {
         @echo("[LD] %s", "wlbridge");
-        @run("%s tools/gui/wlbridge/main.o tools/gui/wlbridge/wayland_server.o tools/gui/wlbridge/xdg-shell-protocol.o tools/gui/wlbridge/xdg-decoration-protocol.o tools/gui/wlbridge/viewporter-protocol.o libs/gui/sprot/src/client.o libs/gui/sprot/src/msg.o -lwayland-server -o wlbridge", CC);
+        @run("%s tools/gui/wlbridge/main.o tools/gui/wlbridge/wayland_server.o tools/gui/wlbridge/xdg-shell-protocol.o tools/gui/wlbridge/xdg-decoration-protocol.o tools/gui/wlbridge/viewporter-protocol.o tools/gui/wlbridge/linux-dmabuf-protocol.o libs/gui/sprot/src/client.o libs/gui/sprot/src/msg.o libs/gui/sprot/src/vk_interop.o -lwayland-server -o wlbridge", CC);
     }
 
     @echo("[GEN] extra tools");
@@ -926,6 +930,7 @@ task clean() {
     @run("rm -f %s", "tools/gui/wlbridge/xdg-shell-protocol.o");
     @run("rm -f %s", "tools/gui/wlbridge/xdg-decoration-protocol.o");
     @run("rm -f %s", "tools/gui/wlbridge/viewporter-protocol.o");
+    @run("rm -f %s", "tools/gui/wlbridge/linux-dmabuf-protocol.o");
     @run("rm -f %s", "tools/gui/wlbridge/wayland_server.o");
     @run("rm -f %s", "tools/gui/wlbridge/main.o");
     @run("rm -f %s", "wlbridge");
