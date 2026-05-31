@@ -178,6 +178,7 @@ const char *sprot_msg_type_name(uint16_t type) {
         case SPROT_REQ_SET_CURSOR:        return "REQ_SET_CURSOR";
         case SPROT_REQ_SURFACE_ATTACH_DMABUF: return "REQ_SURFACE_ATTACH_DMABUF";
         case SPROT_REQ_QUERY_RENDER_NODE: return "REQ_QUERY_RENDER_NODE";
+        case SPROT_REQ_SET_CURSOR_IMAGE:  return "REQ_SET_CURSOR_IMAGE";
         case SPROT_REQ_PING:              return "REQ_PING";
         case SPROT_EVT_WELCOME:           return "EVT_WELCOME";
         case SPROT_EVT_SURFACE_CREATED:   return "EVT_SURFACE_CREATED";

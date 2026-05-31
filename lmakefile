@@ -688,9 +688,9 @@ task build() {
         @echo("[CC] %s", "tools/gui/wlbridge/viewporter-protocol.c");
         @run("%s %s -Itools/gui/wlbridge -c %s -o %s", CC, CFLAGS, "tools/gui/wlbridge/viewporter-protocol.c", "tools/gui/wlbridge/viewporter-protocol.o");
     }
-    if (@is_outdated("tools/gui/wlbridge/wayland_server.o", "tools/gui/wlbridge/wayland_server.c", "tools/gui/wlbridge/wayland_server.h", "tools/gui/wlbridge/xdg-shell-protocol.h", "tools/gui/wlbridge/xdg-decoration-protocol.h", "tools/gui/wlbridge/viewporter-protocol.h", SPROT_HDR, SPROT_CLIENT_HDR)) {
+    if (@is_outdated("tools/gui/wlbridge/wayland_server.o", "tools/gui/wlbridge/wayland_server.c", "tools/gui/wlbridge/wayland_server.h", "tools/gui/wlbridge/xdg-shell-protocol.h", "tools/gui/wlbridge/xdg-decoration-protocol.h", "tools/gui/wlbridge/viewporter-protocol.h", SPROT_HDR, SPROT_CLIENT_HDR, SRAPI_HDR)) {
         @echo("[CC] %s", "tools/gui/wlbridge/wayland_server.c");
-        @run("%s %s -Ilibs/gui/sprot/include -Itools/gui/wlbridge -c %s -o %s", CC, CFLAGS, "tools/gui/wlbridge/wayland_server.c", "tools/gui/wlbridge/wayland_server.o");
+        @run("%s %s -Ilibs/gui/sprot/include -Ilibs/srapi/include -Itools/gui/wlbridge -c %s -o %s", CC, CFLAGS, "tools/gui/wlbridge/wayland_server.c", "tools/gui/wlbridge/wayland_server.o");
     }
     if (@is_outdated("tools/gui/wlbridge/main.o", "tools/gui/wlbridge/main.c", "tools/gui/wlbridge/wayland_server.h")) {
         @echo("[CC] %s", "tools/gui/wlbridge/main.c");

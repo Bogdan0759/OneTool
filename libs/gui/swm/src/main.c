@@ -251,6 +251,15 @@ static int handle_surface_create(swm_client_t *c, const sprot_header_t *hdr, con
     return 0;
 }
 
+static int validate_surface_buffer_dims(uint32_t width, uint32_t height, uint32_t stride, size_t buffer_size) {
+    if (width == 0 || height == 0 || stride < width * 4u ||
+        buffer_size < (size_t)stride * height ||
+        width > g_swm.display_w * 2 || height > g_swm.display_h * 2) {
+        return -1;
+    }
+    return 0;
+}
+
 static int handle_surface_attach(swm_client_t *c, const sprot_header_t *hdr, const void *body, size_t blen, int incoming_fd) {
     if (blen < sizeof(sprot_body_surface_attach_t)) {
         if (incoming_fd >= 0) close(incoming_fd);
@@ -269,12 +278,15 @@ static int handle_surface_attach(swm_client_t *c, const sprot_header_t *hdr, con
         send_error(c->sock, SPROT_ERROR_INVALID_ARG, "bad surface id");
         return -1;
     }
-    if (b.width != s->width || b.height != s->height || b.stride != s->stride ||
-        b.buffer_size != s->buffer_size) {
+    if (validate_surface_buffer_dims(b.width, b.height, b.stride, b.buffer_size) != 0) {
         close(incoming_fd);
-        send_error(c->sock, SPROT_ERROR_INVALID_ARG, "ATTACH dims mismatch");
+        send_error(c->sock, SPROT_ERROR_INVALID_ARG, "bad ATTACH dims");
         return -1;
     }
+    s->width = b.width;
+    s->height = b.height;
+    s->stride = b.stride;
+    s->buffer_size = b.buffer_size;
     swm_buffer_destroy(s->buffer);
     s->buffer = swm_buffer_create(SPROT_BUFFER_SHM, incoming_fd, s->width, s->height, s->stride, s->buffer_size);
     if (s->buffer == NULL) {
@@ -309,13 +321,16 @@ static int handle_surface_attach_buffer(swm_client_t *c, const sprot_header_t *h
     }
     if ((b.buffer_kind != SPROT_BUFFER_SHM && b.buffer_kind != SPROT_BUFFER_DMABUF) ||
         b.format != SPROT_PIXEL_FORMAT_BGRA8888 ||
-        b.width != s->width || b.height != s->height || b.stride != s->stride ||
-        b.buffer_size != s->buffer_size) {
+        validate_surface_buffer_dims(b.width, b.height, b.stride, b.buffer_size) != 0) {
         close(incoming_fd);
-        send_error(c->sock, SPROT_ERROR_INVALID_ARG, "ATTACH_BUFFER mismatch");
+        send_error(c->sock, SPROT_ERROR_INVALID_ARG, "bad ATTACH_BUFFER dims");
         return -1;
     }
 
+    s->width = b.width;
+    s->height = b.height;
+    s->stride = b.stride;
+    s->buffer_size = b.buffer_size;
     swm_buffer_destroy(s->buffer);
     s->buffer = swm_buffer_create(b.buffer_kind, incoming_fd, b.width, b.height, b.stride, b.buffer_size);
     if (s->buffer == NULL) {
@@ -409,6 +424,55 @@ static int handle_set_cursor(swm_client_t *c, const sprot_header_t *hdr, const v
     if (s == NULL || s->owner != c) return 0;
     // to be perfectly accurate we'd check if `s` is hovered, but setting global cursor works for now.
     g_swm.current_cursor = b.cursor_type;
+    return 0;
+}
+
+static int handle_set_cursor_image(swm_client_t *c, const sprot_header_t *hdr, const void *body, size_t blen, int incoming_fd) {
+    if (blen < sizeof(sprot_body_set_cursor_image_t)) {
+        if (incoming_fd >= 0) close(incoming_fd);
+        send_error(c->sock, SPROT_ERROR_PROTOCOL, "short SET_CURSOR_IMAGE");
+        return -1;
+    }
+
+    swm_surface_t *s = find_surface(hdr->object_id);
+    if (s == NULL || s->owner != c) {
+        if (incoming_fd >= 0) close(incoming_fd);
+        return 0;
+    }
+
+    sprot_body_set_cursor_image_t b;
+    memcpy(&b, body, sizeof(b));
+    if (!b.visible) {
+        if (incoming_fd >= 0) close(incoming_fd);
+        swm_buffer_destroy(g_swm.cursor_buffer);
+        g_swm.cursor_buffer = NULL;
+        g_swm.cursor_visible = 0;
+        return 0;
+    }
+
+    if (incoming_fd < 0) {
+        send_error(c->sock, SPROT_ERROR_PROTOCOL, "SET_CURSOR_IMAGE missing fd");
+        return -1;
+    }
+    if (b.format != SPROT_PIXEL_FORMAT_BGRA8888 || b.width == 0 || b.height == 0 ||
+        b.width > 256 || b.height > 256 || b.stride < b.width * 4u ||
+        b.buffer_size < b.stride * b.height) {
+        close(incoming_fd);
+        send_error(c->sock, SPROT_ERROR_INVALID_ARG, "bad cursor image");
+        return -1;
+    }
+
+    swm_buffer_t *cursor = swm_buffer_create(SPROT_BUFFER_SHM, incoming_fd,
+                                             b.width, b.height, b.stride, b.buffer_size);
+    if (cursor == NULL) {
+        send_error(c->sock, SPROT_ERROR_OUT_OF_MEMORY, "cursor import failed");
+        return -1;
+    }
+    swm_buffer_destroy(g_swm.cursor_buffer);
+    g_swm.cursor_buffer = cursor;
+    g_swm.cursor_visible = 1;
+    g_swm.cursor_hotspot_x = b.hotspot_x;
+    g_swm.cursor_hotspot_y = b.hotspot_y;
     return 0;
 }
 
@@ -546,6 +610,8 @@ static int dispatch_message(swm_client_t *c) {
         case SPROT_REQ_SURFACE_SET_TITLE: rc = handle_surface_set_title(c, &hdr, body, blen); break;
         case SPROT_REQ_SURFACE_SET_ROLE:  rc = handle_surface_set_role(c, &hdr, body, blen); break;
         case SPROT_REQ_SET_CURSOR:        rc = handle_set_cursor(c, &hdr, body, blen); break;
+        case SPROT_REQ_SET_CURSOR_IMAGE:  rc = handle_set_cursor_image(c, &hdr, body, blen, incoming_fd);
+                                        incoming_fd = -1; break;
         case SPROT_REQ_PING:            rc = handle_ping(c, &hdr); break;
         default:
             logf_("unknown msg type 0x%x from fd=%d", hdr.type, c->sock);
@@ -804,6 +870,45 @@ static void draw_cursor(uint32_t *dst, int32_t dst_w, int32_t dst_h, int32_t dst
     }
 }
 
+static void draw_cursor_image(uint32_t *dst, int32_t dst_w, int32_t dst_h, int32_t dst_pitch_px,
+                              int32_t cx, int32_t cy) {
+    swm_buffer_t *buffer = g_swm.cursor_buffer;
+    if (buffer == NULL || !g_swm.cursor_visible) return;
+    if (swm_buffer_begin_cpu_read(buffer) != 0) return;
+
+    const uint32_t *src = swm_buffer_pixels(buffer);
+    int32_t src_w = (int32_t)swm_buffer_width(buffer);
+    int32_t src_h = (int32_t)swm_buffer_height(buffer);
+    int32_t src_pitch_px = (int32_t)(swm_buffer_stride(buffer) / 4u);
+    int32_t x0 = cx - g_swm.cursor_hotspot_x;
+    int32_t y0 = cy - g_swm.cursor_hotspot_y;
+
+    if (src != NULL) {
+        for (int32_t y = 0; y < src_h; y++) {
+            int32_t dy = y0 + y;
+            if (dy < 0 || dy >= dst_h) continue;
+            const uint32_t *sr = src + y * src_pitch_px;
+            uint32_t *dr = dst + dy * dst_pitch_px;
+            for (int32_t x = 0; x < src_w; x++) {
+                int32_t dx = x0 + x;
+                if (dx < 0 || dx >= dst_w) continue;
+                uint32_t sp = sr[x];
+                uint32_t a = sp >> 24;
+                if (a == 0) continue;
+                if (a == 255) {
+                    dr[dx] = sp;
+                    continue;
+                }
+                uint32_t dp = dr[dx];
+                uint32_t rb = (sp & 0x00FF00FFu) + (((dp & 0x00FF00FFu) * (255u - a)) >> 8);
+                uint32_t g = (sp & 0x0000FF00u) + (((dp & 0x0000FF00u) * (255u - a)) >> 8);
+                dr[dx] = 0xFF000000u | (rb & 0x00FF00FFu) | (g & 0x0000FF00u);
+            }
+        }
+    }
+    swm_buffer_end_cpu_read(buffer);
+}
+
 static void draw_titlebar_chrome(uint32_t *dst, int32_t dst_w, int32_t dst_h, int32_t dst_pitch_px,
                                  swm_surface_t *s, int is_focused) {
     uint32_t bar_color    = is_focused ? 0xFF3A6CB0u : 0xFF333742u;
@@ -905,7 +1010,11 @@ static void composite_surfaces(srapi_framebuffer_t *fb, uint32_t bg_color) {
     if (g_swm.de != NULL) {
         de_render(g_swm.de, fb);
     }
-    draw_cursor(dst, dst_w, dst_h, dst_pitch_px, g_swm.mouse_x, g_swm.mouse_y, g_swm.current_cursor);
+    if (g_swm.cursor_buffer != NULL && g_swm.cursor_visible) {
+        draw_cursor_image(dst, dst_w, dst_h, dst_pitch_px, g_swm.mouse_x, g_swm.mouse_y);
+    } else {
+        draw_cursor(dst, dst_w, dst_h, dst_pitch_px, g_swm.mouse_x, g_swm.mouse_y, g_swm.current_cursor);
+    }
 }
 
 static void send_close_to(swm_surface_t *s) {
@@ -916,9 +1025,13 @@ static void send_close_to(swm_surface_t *s) {
 
 static void send_configure_to(swm_surface_t *s, uint32_t state_flags) {
     if (s == NULL || s->owner == NULL) return;
+    int32_t x, y, w, h;
+    surface_effective_rect(s, &x, &y, &w, &h);
+    if (w <= 0) w = (int32_t)s->width;
+    if (h <= 0) h = (int32_t)s->height;
     sprot_body_configure_t body = {
-        .width = s->width,
-        .height = s->height,
+        .width = (uint32_t)w,
+        .height = (uint32_t)h,
         .state = state_flags,
         .serial = ++g_swm.next_z,
     };

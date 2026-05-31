@@ -4,6 +4,7 @@
 #include "xdg-decoration-protocol.h"
 #include "viewporter-protocol.h"
 #include <sprot/client.h>
+#include <srapi/srapi.h>
 
 #include <wayland-server.h>
 #include <sys/mman.h>
@@ -44,6 +45,12 @@ struct bridge_surface {
     int pending_height;
     int pending_stride;
     size_t pending_size;
+    int is_subsurface;
+    int is_cursor;
+    int32_t subsurface_x;
+    int32_t subsurface_y;
+    int32_t cursor_hotspot_x;
+    int32_t cursor_hotspot_y;
 };
 
 struct seat_resource {
@@ -189,6 +196,115 @@ static uint32_t evdev_to_xkb_mod(uint32_t scancode) {
     }
 }
 
+static uint32_t srapi_scancode_to_evdev(uint32_t scancode) {
+    switch ((srapi_scancode_t)scancode) {
+        case SRAPI_SCANCODE_A: return KEY_A;
+        case SRAPI_SCANCODE_B: return KEY_B;
+        case SRAPI_SCANCODE_C: return KEY_C;
+        case SRAPI_SCANCODE_D: return KEY_D;
+        case SRAPI_SCANCODE_E: return KEY_E;
+        case SRAPI_SCANCODE_F: return KEY_F;
+        case SRAPI_SCANCODE_G: return KEY_G;
+        case SRAPI_SCANCODE_H: return KEY_H;
+        case SRAPI_SCANCODE_I: return KEY_I;
+        case SRAPI_SCANCODE_J: return KEY_J;
+        case SRAPI_SCANCODE_K: return KEY_K;
+        case SRAPI_SCANCODE_L: return KEY_L;
+        case SRAPI_SCANCODE_M: return KEY_M;
+        case SRAPI_SCANCODE_N: return KEY_N;
+        case SRAPI_SCANCODE_O: return KEY_O;
+        case SRAPI_SCANCODE_P: return KEY_P;
+        case SRAPI_SCANCODE_Q: return KEY_Q;
+        case SRAPI_SCANCODE_R: return KEY_R;
+        case SRAPI_SCANCODE_S: return KEY_S;
+        case SRAPI_SCANCODE_T: return KEY_T;
+        case SRAPI_SCANCODE_U: return KEY_U;
+        case SRAPI_SCANCODE_V: return KEY_V;
+        case SRAPI_SCANCODE_W: return KEY_W;
+        case SRAPI_SCANCODE_X: return KEY_X;
+        case SRAPI_SCANCODE_Y: return KEY_Y;
+        case SRAPI_SCANCODE_Z: return KEY_Z;
+        case SRAPI_SCANCODE_1: return KEY_1;
+        case SRAPI_SCANCODE_2: return KEY_2;
+        case SRAPI_SCANCODE_3: return KEY_3;
+        case SRAPI_SCANCODE_4: return KEY_4;
+        case SRAPI_SCANCODE_5: return KEY_5;
+        case SRAPI_SCANCODE_6: return KEY_6;
+        case SRAPI_SCANCODE_7: return KEY_7;
+        case SRAPI_SCANCODE_8: return KEY_8;
+        case SRAPI_SCANCODE_9: return KEY_9;
+        case SRAPI_SCANCODE_0: return KEY_0;
+        case SRAPI_SCANCODE_RETURN: return KEY_ENTER;
+        case SRAPI_SCANCODE_ESCAPE: return KEY_ESC;
+        case SRAPI_SCANCODE_BACKSPACE: return KEY_BACKSPACE;
+        case SRAPI_SCANCODE_TAB: return KEY_TAB;
+        case SRAPI_SCANCODE_SPACE: return KEY_SPACE;
+        case SRAPI_SCANCODE_MINUS: return KEY_MINUS;
+        case SRAPI_SCANCODE_EQUALS: return KEY_EQUAL;
+        case SRAPI_SCANCODE_LEFTBRACKET: return KEY_LEFTBRACE;
+        case SRAPI_SCANCODE_RIGHTBRACKET: return KEY_RIGHTBRACE;
+        case SRAPI_SCANCODE_BACKSLASH: return KEY_BACKSLASH;
+        case SRAPI_SCANCODE_SEMICOLON: return KEY_SEMICOLON;
+        case SRAPI_SCANCODE_APOSTROPHE: return KEY_APOSTROPHE;
+        case SRAPI_SCANCODE_GRAVE: return KEY_GRAVE;
+        case SRAPI_SCANCODE_COMMA: return KEY_COMMA;
+        case SRAPI_SCANCODE_PERIOD: return KEY_DOT;
+        case SRAPI_SCANCODE_SLASH: return KEY_SLASH;
+        case SRAPI_SCANCODE_CAPSLOCK: return KEY_CAPSLOCK;
+        case SRAPI_SCANCODE_F1: return KEY_F1;
+        case SRAPI_SCANCODE_F2: return KEY_F2;
+        case SRAPI_SCANCODE_F3: return KEY_F3;
+        case SRAPI_SCANCODE_F4: return KEY_F4;
+        case SRAPI_SCANCODE_F5: return KEY_F5;
+        case SRAPI_SCANCODE_F6: return KEY_F6;
+        case SRAPI_SCANCODE_F7: return KEY_F7;
+        case SRAPI_SCANCODE_F8: return KEY_F8;
+        case SRAPI_SCANCODE_F9: return KEY_F9;
+        case SRAPI_SCANCODE_F10: return KEY_F10;
+        case SRAPI_SCANCODE_F11: return KEY_F11;
+        case SRAPI_SCANCODE_F12: return KEY_F12;
+        case SRAPI_SCANCODE_PRINTSCREEN: return KEY_SYSRQ;
+        case SRAPI_SCANCODE_SCROLLLOCK: return KEY_SCROLLLOCK;
+        case SRAPI_SCANCODE_PAUSE: return KEY_PAUSE;
+        case SRAPI_SCANCODE_INSERT: return KEY_INSERT;
+        case SRAPI_SCANCODE_HOME: return KEY_HOME;
+        case SRAPI_SCANCODE_PAGEUP: return KEY_PAGEUP;
+        case SRAPI_SCANCODE_DELETE: return KEY_DELETE;
+        case SRAPI_SCANCODE_END: return KEY_END;
+        case SRAPI_SCANCODE_PAGEDOWN: return KEY_PAGEDOWN;
+        case SRAPI_SCANCODE_RIGHT: return KEY_RIGHT;
+        case SRAPI_SCANCODE_LEFT: return KEY_LEFT;
+        case SRAPI_SCANCODE_DOWN: return KEY_DOWN;
+        case SRAPI_SCANCODE_UP: return KEY_UP;
+        case SRAPI_SCANCODE_NUMLOCK: return KEY_NUMLOCK;
+        case SRAPI_SCANCODE_KP_DIVIDE: return KEY_KPSLASH;
+        case SRAPI_SCANCODE_KP_MULTIPLY: return KEY_KPASTERISK;
+        case SRAPI_SCANCODE_KP_MINUS: return KEY_KPMINUS;
+        case SRAPI_SCANCODE_KP_PLUS: return KEY_KPPLUS;
+        case SRAPI_SCANCODE_KP_ENTER: return KEY_KPENTER;
+        case SRAPI_SCANCODE_KP_1: return KEY_KP1;
+        case SRAPI_SCANCODE_KP_2: return KEY_KP2;
+        case SRAPI_SCANCODE_KP_3: return KEY_KP3;
+        case SRAPI_SCANCODE_KP_4: return KEY_KP4;
+        case SRAPI_SCANCODE_KP_5: return KEY_KP5;
+        case SRAPI_SCANCODE_KP_6: return KEY_KP6;
+        case SRAPI_SCANCODE_KP_7: return KEY_KP7;
+        case SRAPI_SCANCODE_KP_8: return KEY_KP8;
+        case SRAPI_SCANCODE_KP_9: return KEY_KP9;
+        case SRAPI_SCANCODE_KP_0: return KEY_KP0;
+        case SRAPI_SCANCODE_KP_PERIOD: return KEY_KPDOT;
+        case SRAPI_SCANCODE_LCTRL: return KEY_LEFTCTRL;
+        case SRAPI_SCANCODE_LSHIFT: return KEY_LEFTSHIFT;
+        case SRAPI_SCANCODE_LALT: return KEY_LEFTALT;
+        case SRAPI_SCANCODE_LGUI: return KEY_LEFTMETA;
+        case SRAPI_SCANCODE_RCTRL: return KEY_RIGHTCTRL;
+        case SRAPI_SCANCODE_RSHIFT: return KEY_RIGHTSHIFT;
+        case SRAPI_SCANCODE_RALT: return KEY_RIGHTALT;
+        case SRAPI_SCANCODE_RGUI: return KEY_RIGHTMETA;
+        default: return 0;
+    }
+}
+
 static void send_keyboard_modifiers(struct bridge_client *c, uint32_t serial) {
     struct seat_resource *sr;
     wl_list_for_each(sr, &c->seat_keyboards, link) {
@@ -243,7 +359,7 @@ static void update_pressed_keys(struct bridge_client *c, uint32_t scancode, uint
     }
 
     if (pressed) {
-        if (i == c->pressed_key_count && c->pressed_key_count < MAX_SURFACES) {
+        if (i == c->pressed_key_count && c->pressed_key_count < sizeof(c->pressed_keys) / sizeof(c->pressed_keys[0])) {
             c->pressed_keys[c->pressed_key_count++] = scancode;
         }
     } else if (i < c->pressed_key_count) {
@@ -301,20 +417,11 @@ static const struct wl_surface_interface surface_implementation;
 static const struct xdg_surface_interface xdg_surface_implementation;
 static const struct xdg_toplevel_interface xdg_toplevel_implementation;
 
-static struct bridge_surface *find_surface_by_handle(struct bridge_client *c, uint32_t handle) {
-    struct bridge_surface *s;
-    wl_list_for_each(s, &c->surfaces, link) {
-        if (s->client_handle == handle) {
-            return s;
-        }
-    }
-    return NULL;
-}
-
 static struct bridge_surface *find_surface_by_sprot_id(struct bridge_client *c, uint32_t sprot_id) {
     struct bridge_surface *s;
     wl_list_for_each(s, &c->surfaces, link) {
-        if (s->sprot_id == sprot_id) {
+        if (s->sprot_id == sprot_id ||
+            (s->sprot_surface && sprot_surface_id(s->sprot_surface) == sprot_id)) {
             return s;
         }
     }
@@ -355,10 +462,11 @@ static int client_sprot_fd_handler(int fd, uint32_t mask, void *data) {
                 break;
 
             case SPROT_EVENT_SURFACE_CREATED: {
-                struct bridge_surface *s = find_surface_by_handle(c, ev.u.surface_created.client_handle);
+                struct bridge_surface *s = find_surface_by_sprot_id(c, ev.u.surface_created.surface_id);
                 if (s) {
                     s->sprot_id = ev.u.surface_created.surface_id;
-                    debug_log("Sprot event: Surface created. Sprot ID=%u assigned to handle=%u", s->sprot_id, s->client_handle);
+                    debug_log("Sprot event: Surface created. Sprot ID=%u assigned to handle=%u (sprot_handle=%u)",
+                        s->sprot_id, s->client_handle, ev.u.surface_created.client_handle);
                     // Explicitly set the Sprot surface role to TOPLEVEL so that SWM maps the window
                     int role_res = sprot_set_role(s->sprot_surface, SPROT_SURFACE_ROLE_TOPLEVEL, 0, 0, 0);
                     debug_log("Set Sprot role to SPROT_SURFACE_ROLE_TOPLEVEL for Sprot ID=%u (res=%d)", s->sprot_id, role_res);
@@ -483,13 +591,18 @@ static int client_sprot_fd_handler(int fd, uint32_t mask, void *data) {
             case SPROT_EVENT_KEY: {
                 debug_log("Sprot event: Keyboard key scancode=%u state=%u", ev.u.key.scancode, ev.u.key.state);
                 if (c->keyboard_focus != NULL) {
+                    uint32_t evdev_key = srapi_scancode_to_evdev(ev.u.key.scancode);
+                    if (evdev_key == 0) {
+                        debug_log("Sprot event: unmapped SRAPI scancode=%u", ev.u.key.scancode);
+                        break;
+                    }
                     uint32_t serial = ev.serial ? ev.serial : next_keyboard_serial(c);
                     uint32_t state = ev.u.key.state ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED;
-                    update_pressed_keys(c, ev.u.key.scancode, ev.u.key.state);
+                    update_pressed_keys(c, evdev_key, ev.u.key.state);
 
                     struct seat_resource *sr;
                     wl_list_for_each(sr, &c->seat_keyboards, link) {
-                        wl_keyboard_send_key(sr->resource, serial, 0, ev.u.key.scancode, state);
+                        wl_keyboard_send_key(sr->resource, serial, 0, evdev_key, state);
                     }
                     send_keyboard_modifiers(c, serial);
                 }
@@ -522,13 +635,13 @@ static void client_destroy_listener(struct wl_listener *listener, void *data) {
     if (c->sprot_source) {
         wl_event_source_remove(c->sprot_source);
     }
-    if (c->sprot_conn) {
-        sprot_disconnect(c->sprot_conn);
-    }
-
     struct bridge_surface *s, *stmp;
     wl_list_for_each_safe(s, stmp, &c->surfaces, link) {
         destroy_bridge_surface(s);
+    }
+
+    if (c->sprot_conn) {
+        sprot_disconnect(c->sprot_conn);
     }
 
     struct seat_resource *sr, *srtmp;
@@ -606,6 +719,64 @@ static void surface_damage(struct wl_client *client, struct wl_resource *resourc
     (void)client; (void)resource; (void)x; (void)y; (void)width; (void)height;
 }
 
+static void send_cursor_image(struct bridge_client *c, struct bridge_surface *cursor_surface) {
+    if (!c || !c->keyboard_focus || !c->keyboard_focus->sprot_surface) {
+        return;
+    }
+
+    if (!cursor_surface->buffer_resource) {
+        int res = sprot_set_cursor_image(c->keyboard_focus->sprot_surface, -1, 0, 0, 0, 0, 0, 0, 0);
+        debug_log("cursor_image: hide res=%d", res);
+        return;
+    }
+
+    struct wl_shm_buffer *shm_buf = wl_shm_buffer_get(cursor_surface->buffer_resource);
+    if (!shm_buf) {
+        debug_log("cursor_image: cursor buffer is not SHM");
+        return;
+    }
+
+    int32_t width = wl_shm_buffer_get_width(shm_buf);
+    int32_t height = wl_shm_buffer_get_height(shm_buf);
+    int32_t stride = wl_shm_buffer_get_stride(shm_buf);
+    size_t size = (size_t)stride * height;
+    if (width <= 0 || height <= 0 || stride < width * 4 || size == 0) {
+        return;
+    }
+
+    int fd = memfd_create("wlbridge-cursor", MFD_CLOEXEC);
+    if (fd < 0) {
+        debug_log("cursor_image: memfd_create failed: %s", strerror(errno));
+        return;
+    }
+    if (ftruncate(fd, size) != 0) {
+        debug_log("cursor_image: ftruncate failed: %s", strerror(errno));
+        close(fd);
+        return;
+    }
+    void *map = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (map == MAP_FAILED) {
+        debug_log("cursor_image: mmap failed: %s", strerror(errno));
+        close(fd);
+        return;
+    }
+
+    wl_shm_buffer_begin_access(shm_buf);
+    void *src = wl_shm_buffer_get_data(shm_buf);
+    if (src) {
+        memcpy(map, src, size);
+    }
+    wl_shm_buffer_end_access(shm_buf);
+    munmap(map, size);
+
+    int res = sprot_set_cursor_image(c->keyboard_focus->sprot_surface, fd,
+        (uint32_t)width, (uint32_t)height, (uint32_t)stride, (uint32_t)size,
+        cursor_surface->cursor_hotspot_x, cursor_surface->cursor_hotspot_y, 1);
+    debug_log("cursor_image: sent %dx%d hotspot=%d,%d res=%d",
+        width, height, cursor_surface->cursor_hotspot_x, cursor_surface->cursor_hotspot_y, res);
+    close(fd);
+}
+
 static void callback_resource_destroy(struct wl_resource *resource) {
     wl_list_remove(wl_resource_get_link(resource));
 }
@@ -632,6 +803,37 @@ static void surface_commit(struct wl_client *client, struct wl_resource *resourc
 
     debug_log("surface_commit: handle=%u buffer=%s configured=%d sprot_id=%u",
         s->client_handle, s->buffer_resource ? "set" : "null", s->configured, s->sprot_id);
+
+    if (s->is_cursor) {
+        send_cursor_image(s->client, s);
+        debug_log("surface_commit: skipping cursor handle=%u pos=%d,%d",
+            s->client_handle, s->subsurface_x, s->subsurface_y);
+        if (s->buffer_resource) {
+            wl_buffer_send_release(s->buffer_resource);
+            s->buffer_resource = NULL;
+        }
+        struct wl_resource *cb, *tmp;
+        wl_resource_for_each_safe(cb, tmp, &s->frame_callbacks) {
+            wl_callback_send_done(cb, 0);
+            wl_resource_destroy(cb);
+        }
+        return;
+    }
+
+    if (s->is_subsurface) {
+        debug_log("surface_commit: skipping %s handle=%u pos=%d,%d",
+            "subsurface", s->client_handle, s->subsurface_x, s->subsurface_y);
+        if (s->buffer_resource) {
+            wl_buffer_send_release(s->buffer_resource);
+            s->buffer_resource = NULL;
+        }
+        struct wl_resource *cb, *tmp;
+        wl_resource_for_each_safe(cb, tmp, &s->frame_callbacks) {
+            wl_callback_send_done(cb, 0);
+            wl_resource_destroy(cb);
+        }
+        return;
+    }
 
     if (!s->buffer_resource) {
         if (!s->configured) {
@@ -1099,7 +1301,12 @@ static void subsurface_destroy(struct wl_client *client, struct wl_resource *res
 }
 
 static void subsurface_set_position(struct wl_client *client, struct wl_resource *resource, int32_t x, int32_t y) {
-    (void)client; (void)resource;
+    (void)client;
+    struct bridge_surface *s = wl_resource_get_user_data(resource);
+    if (s) {
+        s->subsurface_x = x;
+        s->subsurface_y = y;
+    }
     debug_log("subsurface_set_position: %d,%d", x, y);
 }
 
@@ -1136,15 +1343,20 @@ static void subcompositor_destroy(struct wl_client *client, struct wl_resource *
 static void subcompositor_get_subsurface(struct wl_client *client, struct wl_resource *resource,
                                          uint32_t id, struct wl_resource *surface,
                                          struct wl_resource *parent) {
-    (void)surface; (void)parent;
+    (void)parent;
     uint32_t version = wl_resource_get_version(resource);
-    debug_log("subcompositor_get_subsurface: id=%u version=%u", id, version);
+    struct bridge_surface *s = wl_resource_get_user_data(surface);
+    if (s) {
+        s->is_subsurface = 1;
+    }
+    debug_log("subcompositor_get_subsurface: id=%u version=%u surface_handle=%u",
+        id, version, s ? s->client_handle : 0);
     struct wl_resource *subsurface = wl_resource_create(client, &wl_subsurface_interface, version, id);
     if (!subsurface) {
         wl_client_post_no_memory(client);
         return;
     }
-    wl_resource_set_implementation(subsurface, &subsurface_implementation, NULL, NULL);
+    wl_resource_set_implementation(subsurface, &subsurface_implementation, s, NULL);
 }
 
 static const struct wl_subcompositor_interface subcompositor_implementation = {
@@ -1294,6 +1506,37 @@ static void seat_keyboard_destroy(struct wl_resource *resource) {
     free(sr);
 }
 
+static void pointer_set_cursor(struct wl_client *client, struct wl_resource *resource,
+                               uint32_t serial, struct wl_resource *surface,
+                               int32_t hotspot_x, int32_t hotspot_y) {
+    (void)client;
+    struct seat_resource *sr = wl_resource_get_user_data(resource);
+    struct bridge_client *c = sr ? sr->client : NULL;
+    struct bridge_surface *s = surface ? wl_resource_get_user_data(surface) : NULL;
+    if (s) {
+        s->is_cursor = 1;
+        s->cursor_hotspot_x = hotspot_x;
+        s->cursor_hotspot_y = hotspot_y;
+    }
+    debug_log("pointer_set_cursor: serial=%u surface_handle=%u hotspot=%d,%d",
+        serial, s ? s->client_handle : 0, hotspot_x, hotspot_y);
+
+    if (!surface && c && c->keyboard_focus && c->keyboard_focus->sprot_surface) {
+        int res = sprot_set_cursor_image(c->keyboard_focus->sprot_surface, -1, 0, 0, 0, 0, 0, 0, 0);
+        debug_log("pointer_set_cursor: hide cursor res=%d", res);
+    }
+}
+
+static void pointer_release(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    wl_resource_destroy(resource);
+}
+
+static const struct wl_pointer_interface pointer_implementation = {
+    .set_cursor = pointer_set_cursor,
+    .release = pointer_release,
+};
+
 static void seat_get_pointer(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
     struct bridge_client *c = wl_resource_get_user_data(resource);
     (void)client;
@@ -1301,7 +1544,7 @@ static void seat_get_pointer(struct wl_client *client, struct wl_resource *resou
 
     struct seat_resource *sr = calloc(1, sizeof(*sr));
     sr->resource = wl_resource_create(client, &wl_pointer_interface, wl_resource_get_version(resource), id);
-    wl_resource_set_implementation(sr->resource, NULL, sr, seat_pointer_destroy);
+    wl_resource_set_implementation(sr->resource, &pointer_implementation, sr, seat_pointer_destroy);
     wl_list_insert(&c->seat_pointers, &sr->link);
     debug_log("seat_get_pointer: done, pointer resource created");
 }

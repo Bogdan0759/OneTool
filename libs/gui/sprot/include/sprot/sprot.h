@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #define SPROT_VERSION_MAJOR  0
-#define SPROT_VERSION_MINOR  3
+#define SPROT_VERSION_MINOR  4
 #define SPROT_DEFAULT_SOCKET "/tmp/swm.sock"
 #define SPROT_MAX_MESSAGE    4096
 #define SPROT_PIXEL_FORMAT_BGRA8888  0u
@@ -44,6 +44,7 @@ typedef enum {
     SPROT_REQ_SURFACE_ATTACH_BUFFER = 0x0019,
     SPROT_REQ_SURFACE_ATTACH_DMABUF = 0x001A,
     SPROT_REQ_QUERY_RENDER_NODE     = 0x001B,
+    SPROT_REQ_SET_CURSOR_IMAGE      = 0x001C,
     SPROT_REQ_PING             = 0x0080,
 
     SPROT_EVT_WELCOME          = 0x4001,
@@ -171,6 +172,17 @@ typedef struct {
 typedef struct {
     uint32_t cursor_type;
 } sprot_body_set_cursor_t;
+
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+    uint32_t stride;
+    uint32_t buffer_size;
+    int32_t hotspot_x;
+    int32_t hotspot_y;
+    uint32_t visible;
+    uint32_t format;
+} sprot_body_set_cursor_image_t;
 
 typedef struct {
     uint32_t width;

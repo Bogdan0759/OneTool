@@ -78,6 +78,17 @@ int sprot_request_frame(sprot_surface_t *surface);
 int sprot_set_title(sprot_surface_t *surface, const char *title);
 int sprot_set_role(sprot_surface_t *surface, uint32_t role, uint32_t parent_id, int32_t x, int32_t y);
 int sprot_set_cursor(sprot_surface_t *surface, uint32_t cursor_type);
+int sprot_set_cursor_image(
+    sprot_surface_t *surface,
+    int fd,
+    uint32_t width,
+    uint32_t height,
+    uint32_t stride,
+    uint32_t buffer_size,
+    int32_t hotspot_x,
+    int32_t hotspot_y,
+    uint32_t visible
+);
 
 int sprot_poll_event(sprot_connection_t *conn, sprot_event_t *out_event, int timeout_ms);
 int sprot_ping(sprot_connection_t *conn, uint32_t serial);

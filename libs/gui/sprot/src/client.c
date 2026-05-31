@@ -472,6 +472,42 @@ int sprot_set_cursor(sprot_surface_t *surface, uint32_t cursor_type) {
     return sprot_send_message(surface->conn->fd, &hdr, &body, sizeof(body), -1);
 }
 
+int sprot_set_cursor_image(
+    sprot_surface_t *surface,
+    int fd,
+    uint32_t width,
+    uint32_t height,
+    uint32_t stride,
+    uint32_t buffer_size,
+    int32_t hotspot_x,
+    int32_t hotspot_y,
+    uint32_t visible
+) {
+    if (surface == NULL || surface->conn == NULL || surface->id == 0) {
+        return -1;
+    }
+    if (visible && (fd < 0 || width == 0 || height == 0 || stride < width * 4u ||
+                    buffer_size < stride * height)) {
+        return -1;
+    }
+    sprot_header_t hdr = {
+        .type = SPROT_REQ_SET_CURSOR_IMAGE,
+        .object_id = surface->id,
+        .serial = surface->conn->serial++,
+    };
+    sprot_body_set_cursor_image_t body = {
+        .width = width,
+        .height = height,
+        .stride = stride,
+        .buffer_size = buffer_size,
+        .hotspot_x = hotspot_x,
+        .hotspot_y = hotspot_y,
+        .visible = visible ? 1u : 0u,
+        .format = SPROT_PIXEL_FORMAT_BGRA8888,
+    };
+    return sprot_send_message(surface->conn->fd, &hdr, &body, sizeof(body), visible ? fd : -1);
+}
+
 int sprot_ping(sprot_connection_t *conn, uint32_t serial) {
     if (conn == NULL) return -1;
     sprot_header_t hdr = { .type = SPROT_REQ_PING, .serial = serial };

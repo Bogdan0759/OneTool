@@ -69,6 +69,10 @@ typedef struct {
     int32_t mouse_x;
     int32_t mouse_y;
     uint32_t current_cursor;
+    swm_buffer_t *cursor_buffer;
+    int cursor_visible;
+    int32_t cursor_hotspot_x;
+    int32_t cursor_hotspot_y;
     uint32_t modifiers;
     int mouse_left_down;
     swm_interact_t interaction;
