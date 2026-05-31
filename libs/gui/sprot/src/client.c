@@ -630,6 +630,10 @@ int sprot_poll_event(sprot_connection_t *conn, sprot_event_t *out_event, int tim
             out_event->kind = SPROT_EVENT_POINTER_BUTTON;
             break;
         case SPROT_EVT_POINTER_ENTER:
+            memset(&out_event->u.pointer_motion, 0, sizeof(out_event->u.pointer_motion));
+            if (hdr.length - sizeof(hdr) >= sizeof(sprot_body_pointer_motion_t)) {
+                memcpy(&out_event->u.pointer_motion, body, sizeof(sprot_body_pointer_motion_t));
+            }
             out_event->kind = SPROT_EVENT_POINTER_ENTER;
             break;
         case SPROT_EVT_POINTER_LEAVE:

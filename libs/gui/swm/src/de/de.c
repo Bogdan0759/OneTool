@@ -552,6 +552,10 @@ static int rect_contains(int32_t mx, int32_t my, int32_t rx, int32_t ry, int32_t
     return mx >= rx && mx < rx + rw && my >= ry && my < ry + rh;
 }
 
+static int de_surface_is_window(const swm_surface_t *s) {
+    return s != NULL && s->in_use && s->committed && s->role == SPROT_SURFACE_ROLE_TOPLEVEL;
+}
+
 int de_point_in_panel(const de_t *de, int32_t mx, int32_t my) {
     if (de == NULL) return 0;
     if (my >= de->taskbar_top) return 1;
@@ -572,7 +576,7 @@ static void rebuild_items_from_swm(de_t *de) {
         swm_surface_t *picked = NULL;
         for (int i = 0; i < SWM_MAX_SURFACES; i++) {
             swm_surface_t *s = &swm->surfaces[i];
-            if (!s->in_use || !s->committed) continue;
+            if (!de_surface_is_window(s)) continue;
             if (s->id <= seen_max_id) continue;
             if (next_id == 0 || s->id < next_id) {
                 next_id = s->id;
@@ -598,7 +602,7 @@ static void rebuild_items_from_swm(de_t *de) {
     int best_z = -1;
     for (int i = 0; i < SWM_MAX_SURFACES; i++) {
         swm_surface_t *s = &swm->surfaces[i];
-        if (!s->in_use || !s->committed || s->minimized) continue;
+        if (!de_surface_is_window(s) || s->minimized) continue;
         if (s->z > best_z) { best_z = s->z; focused = s; }
     }
     if (focused != NULL) {
@@ -771,7 +775,7 @@ static void de_action_tile(de_t *de) {
     swm_surface_t *list[SWM_MAX_SURFACES];
     for (int i = 0; i < SWM_MAX_SURFACES; i++) {
         swm_surface_t *s = &swm->surfaces[i];
-        if (s->in_use && s->committed && !s->minimized) list[count++] = s;
+        if (de_surface_is_window(s) && !s->minimized) list[count++] = s;
     }
     if (count == 0) return;
     int cols = 1, rows = 1;
@@ -801,7 +805,7 @@ static void de_action_cascade(de_t *de) {
     int32_t base_x = 48, base_y = 56;
     for (int i = 0; i < SWM_MAX_SURFACES; i++) {
         swm_surface_t *s = &swm->surfaces[i];
-        if (!s->in_use || !s->committed) continue;
+        if (!de_surface_is_window(s)) continue;
         s->maximized = 0;
         s->minimized = 0;
         s->pos_x = base_x + idx * step;
@@ -816,7 +820,7 @@ static void de_action_minimize_all(de_t *de) {
     swm_state_t *swm = de->swm;
     for (int i = 0; i < SWM_MAX_SURFACES; i++) {
         swm_surface_t *s = &swm->surfaces[i];
-        if (!s->in_use || !s->committed) continue;
+        if (!de_surface_is_window(s)) continue;
         s->minimized = 1;
     }
 }
@@ -898,14 +902,14 @@ static void item_clicked(de_t *de, int idx) {
             break;
         }
     }
-    if (s == NULL) return;
+    if (!de_surface_is_window(s)) return;
     /* Find topmost (focused) non-minimized surface to decide between
        raise-and-focus vs minimize. */
     swm_surface_t *focused = NULL;
     int best_z = -1;
     for (int i = 0; i < SWM_MAX_SURFACES; i++) {
         swm_surface_t *x = &swm->surfaces[i];
-        if (!x->in_use || !x->committed || x->minimized) continue;
+        if (!de_surface_is_window(x) || x->minimized) continue;
         if (x->z > best_z) { best_z = x->z; focused = x; }
     }
     if (s->minimized) {

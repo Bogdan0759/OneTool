@@ -35,6 +35,7 @@ struct bridge_surface {
     uint32_t client_handle;
     struct wl_resource *xdg_surface_resource;
     struct wl_resource *xdg_toplevel_resource;
+    struct wl_resource *xdg_popup_resource;
     struct wl_resource *buffer_resource;
     int32_t width, height;
     int memfd;
@@ -50,7 +51,21 @@ struct bridge_surface {
     size_t pending_size;
     struct dmabuf_buffer *pending_dmabuf;
     int is_subsurface;
+    struct wl_resource *subsurface_resource;
+    struct bridge_surface *subsurface_parent;
     int is_cursor;
+    int is_popup;
+    int popup_grabbed;
+    struct bridge_surface *popup_parent;
+    int32_t popup_x;
+    int32_t popup_y;
+    int32_t popup_width;
+    int32_t popup_height;
+    int window_geometry_set;
+    int32_t window_geometry_x;
+    int32_t window_geometry_y;
+    int32_t window_geometry_width;
+    int32_t window_geometry_height;
     int32_t subsurface_x;
     int32_t subsurface_y;
     int32_t cursor_hotspot_x;
@@ -93,7 +108,6 @@ struct bridge_server {
 
 struct dmabuf_buffer {
     struct wl_resource *resource;
-    struct wl_listener destroy_listener;
     int is_dmabuf;
 
     int fd;
@@ -123,6 +137,28 @@ struct dmabuf_params {
 struct dmabuf_feedback {
     struct wl_resource *resource;
     struct wl_resource *surface_resource;
+};
+
+struct xdg_positioner_data {
+    int has_size;
+    int32_t width;
+    int32_t height;
+    int has_anchor_rect;
+    int32_t anchor_rect_x;
+    int32_t anchor_rect_y;
+    int32_t anchor_rect_width;
+    int32_t anchor_rect_height;
+    uint32_t anchor;
+    uint32_t gravity;
+    uint32_t constraint_adjustment;
+    int32_t offset_x;
+    int32_t offset_y;
+    int reactive;
+    int has_parent_size;
+    int32_t parent_width;
+    int32_t parent_height;
+    int has_parent_configure;
+    uint32_t parent_configure_serial;
 };
 
 static struct bridge_server g_server;
@@ -176,6 +212,25 @@ static void debug_log(const char *fmt, ...) {
     fflush(g_debug_file);
 }
 
+static uint32_t wlbridge_now_ms(void) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
+        return 0;
+    }
+    return (uint32_t)(ts.tv_sec * 1000u + ts.tv_nsec / 1000000u);
+}
+
+static uint32_t wayland_button_from_srapi(uint32_t button) {
+    switch (button) {
+        case SRAPI_MOUSE_BUTTON_LEFT:   return BTN_LEFT;
+        case SRAPI_MOUSE_BUTTON_RIGHT:  return BTN_RIGHT;
+        case SRAPI_MOUSE_BUTTON_MIDDLE: return BTN_MIDDLE;
+        case SRAPI_MOUSE_BUTTON_X1:     return BTN_SIDE;
+        case SRAPI_MOUSE_BUTTON_X2:     return BTN_EXTRA;
+        default: return button;
+    }
+}
+
 static void on_client_created(struct wl_listener *listener, void *data) {
     (void)listener;
     struct wl_client *client = (struct wl_client *)data;
@@ -221,6 +276,264 @@ static uint32_t next_keyboard_serial(struct bridge_client *c) {
         c->keyboard_serial = 1;
     }
     return c->keyboard_serial;
+}
+
+static int32_t bridge_surface_window_x(const struct bridge_surface *s) {
+    return s && s->window_geometry_set ? s->window_geometry_x : 0;
+}
+
+static int32_t bridge_surface_window_y(const struct bridge_surface *s) {
+    return s && s->window_geometry_set ? s->window_geometry_y : 0;
+}
+
+static int32_t bridge_surface_window_width(const struct bridge_surface *s) {
+    if (!s) return 0;
+    if (s->window_geometry_set && s->window_geometry_width > 0) return s->window_geometry_width;
+    return s->width;
+}
+
+static int32_t bridge_surface_window_height(const struct bridge_surface *s) {
+    if (!s) return 0;
+    if (s->window_geometry_set && s->window_geometry_height > 0) return s->window_geometry_height;
+    return s->height;
+}
+
+static int positioner_anchor_left(uint32_t anchor) {
+    return anchor == XDG_POSITIONER_ANCHOR_LEFT ||
+           anchor == XDG_POSITIONER_ANCHOR_TOP_LEFT ||
+           anchor == XDG_POSITIONER_ANCHOR_BOTTOM_LEFT;
+}
+
+static int positioner_anchor_right(uint32_t anchor) {
+    return anchor == XDG_POSITIONER_ANCHOR_RIGHT ||
+           anchor == XDG_POSITIONER_ANCHOR_TOP_RIGHT ||
+           anchor == XDG_POSITIONER_ANCHOR_BOTTOM_RIGHT;
+}
+
+static int positioner_anchor_top(uint32_t anchor) {
+    return anchor == XDG_POSITIONER_ANCHOR_TOP ||
+           anchor == XDG_POSITIONER_ANCHOR_TOP_LEFT ||
+           anchor == XDG_POSITIONER_ANCHOR_TOP_RIGHT;
+}
+
+static int positioner_anchor_bottom(uint32_t anchor) {
+    return anchor == XDG_POSITIONER_ANCHOR_BOTTOM ||
+           anchor == XDG_POSITIONER_ANCHOR_BOTTOM_LEFT ||
+           anchor == XDG_POSITIONER_ANCHOR_BOTTOM_RIGHT;
+}
+
+static int positioner_gravity_left(uint32_t gravity) {
+    return gravity == XDG_POSITIONER_GRAVITY_LEFT ||
+           gravity == XDG_POSITIONER_GRAVITY_TOP_LEFT ||
+           gravity == XDG_POSITIONER_GRAVITY_BOTTOM_LEFT;
+}
+
+static int positioner_gravity_right(uint32_t gravity) {
+    return gravity == XDG_POSITIONER_GRAVITY_RIGHT ||
+           gravity == XDG_POSITIONER_GRAVITY_TOP_RIGHT ||
+           gravity == XDG_POSITIONER_GRAVITY_BOTTOM_RIGHT;
+}
+
+static int positioner_gravity_top(uint32_t gravity) {
+    return gravity == XDG_POSITIONER_GRAVITY_TOP ||
+           gravity == XDG_POSITIONER_GRAVITY_TOP_LEFT ||
+           gravity == XDG_POSITIONER_GRAVITY_TOP_RIGHT;
+}
+
+static int positioner_gravity_bottom(uint32_t gravity) {
+    return gravity == XDG_POSITIONER_GRAVITY_BOTTOM ||
+           gravity == XDG_POSITIONER_GRAVITY_BOTTOM_LEFT ||
+           gravity == XDG_POSITIONER_GRAVITY_BOTTOM_RIGHT;
+}
+
+static uint32_t positioner_flip_anchor_x(uint32_t anchor) {
+    switch (anchor) {
+        case XDG_POSITIONER_ANCHOR_LEFT: return XDG_POSITIONER_ANCHOR_RIGHT;
+        case XDG_POSITIONER_ANCHOR_RIGHT: return XDG_POSITIONER_ANCHOR_LEFT;
+        case XDG_POSITIONER_ANCHOR_TOP_LEFT: return XDG_POSITIONER_ANCHOR_TOP_RIGHT;
+        case XDG_POSITIONER_ANCHOR_TOP_RIGHT: return XDG_POSITIONER_ANCHOR_TOP_LEFT;
+        case XDG_POSITIONER_ANCHOR_BOTTOM_LEFT: return XDG_POSITIONER_ANCHOR_BOTTOM_RIGHT;
+        case XDG_POSITIONER_ANCHOR_BOTTOM_RIGHT: return XDG_POSITIONER_ANCHOR_BOTTOM_LEFT;
+        default: return anchor;
+    }
+}
+
+static uint32_t positioner_flip_anchor_y(uint32_t anchor) {
+    switch (anchor) {
+        case XDG_POSITIONER_ANCHOR_TOP: return XDG_POSITIONER_ANCHOR_BOTTOM;
+        case XDG_POSITIONER_ANCHOR_BOTTOM: return XDG_POSITIONER_ANCHOR_TOP;
+        case XDG_POSITIONER_ANCHOR_TOP_LEFT: return XDG_POSITIONER_ANCHOR_BOTTOM_LEFT;
+        case XDG_POSITIONER_ANCHOR_BOTTOM_LEFT: return XDG_POSITIONER_ANCHOR_TOP_LEFT;
+        case XDG_POSITIONER_ANCHOR_TOP_RIGHT: return XDG_POSITIONER_ANCHOR_BOTTOM_RIGHT;
+        case XDG_POSITIONER_ANCHOR_BOTTOM_RIGHT: return XDG_POSITIONER_ANCHOR_TOP_RIGHT;
+        default: return anchor;
+    }
+}
+
+static uint32_t positioner_flip_gravity_x(uint32_t gravity) {
+    switch (gravity) {
+        case XDG_POSITIONER_GRAVITY_LEFT: return XDG_POSITIONER_GRAVITY_RIGHT;
+        case XDG_POSITIONER_GRAVITY_RIGHT: return XDG_POSITIONER_GRAVITY_LEFT;
+        case XDG_POSITIONER_GRAVITY_TOP_LEFT: return XDG_POSITIONER_GRAVITY_TOP_RIGHT;
+        case XDG_POSITIONER_GRAVITY_TOP_RIGHT: return XDG_POSITIONER_GRAVITY_TOP_LEFT;
+        case XDG_POSITIONER_GRAVITY_BOTTOM_LEFT: return XDG_POSITIONER_GRAVITY_BOTTOM_RIGHT;
+        case XDG_POSITIONER_GRAVITY_BOTTOM_RIGHT: return XDG_POSITIONER_GRAVITY_BOTTOM_LEFT;
+        default: return gravity;
+    }
+}
+
+static uint32_t positioner_flip_gravity_y(uint32_t gravity) {
+    switch (gravity) {
+        case XDG_POSITIONER_GRAVITY_TOP: return XDG_POSITIONER_GRAVITY_BOTTOM;
+        case XDG_POSITIONER_GRAVITY_BOTTOM: return XDG_POSITIONER_GRAVITY_TOP;
+        case XDG_POSITIONER_GRAVITY_TOP_LEFT: return XDG_POSITIONER_GRAVITY_BOTTOM_LEFT;
+        case XDG_POSITIONER_GRAVITY_BOTTOM_LEFT: return XDG_POSITIONER_GRAVITY_TOP_LEFT;
+        case XDG_POSITIONER_GRAVITY_TOP_RIGHT: return XDG_POSITIONER_GRAVITY_BOTTOM_RIGHT;
+        case XDG_POSITIONER_GRAVITY_BOTTOM_RIGHT: return XDG_POSITIONER_GRAVITY_TOP_RIGHT;
+        default: return gravity;
+    }
+}
+
+static void positioner_calc_xy(const struct xdg_positioner_data *pos,
+                               uint32_t anchor, uint32_t gravity,
+                               int32_t width, int32_t height,
+                               int32_t *out_x, int32_t *out_y) {
+    int32_t ax = pos->anchor_rect_x;
+    int32_t ay = pos->anchor_rect_y;
+
+    if (positioner_anchor_right(anchor)) ax += pos->anchor_rect_width;
+    else if (!positioner_anchor_left(anchor)) ax += pos->anchor_rect_width / 2;
+
+    if (positioner_anchor_bottom(anchor)) ay += pos->anchor_rect_height;
+    else if (!positioner_anchor_top(anchor)) ay += pos->anchor_rect_height / 2;
+
+    if (positioner_gravity_left(gravity)) *out_x = ax - width;
+    else if (positioner_gravity_right(gravity)) *out_x = ax;
+    else *out_x = ax - width / 2;
+
+    if (positioner_gravity_top(gravity)) *out_y = ay - height;
+    else if (positioner_gravity_bottom(gravity)) *out_y = ay;
+    else *out_y = ay - height / 2;
+
+    *out_x += pos->offset_x;
+    *out_y += pos->offset_y;
+}
+
+static int positioner_axis_fits(int32_t value, int32_t size, int32_t bounds) {
+    return bounds <= 0 || (value >= 0 && value + size <= bounds);
+}
+
+static void positioner_apply_constraints(const struct xdg_positioner_data *pos,
+                                         const struct bridge_surface *parent,
+                                         int32_t *x, int32_t *y,
+                                         int32_t *width, int32_t *height) {
+    int32_t bounds_w = pos->has_parent_size ? pos->parent_width : bridge_surface_window_width(parent);
+    int32_t bounds_h = pos->has_parent_size ? pos->parent_height : bridge_surface_window_height(parent);
+
+    if (*width < 1) *width = 1;
+    if (*height < 1) *height = 1;
+
+    if (bounds_w > 0 && !positioner_axis_fits(*x, *width, bounds_w)) {
+        if (pos->constraint_adjustment & XDG_POSITIONER_CONSTRAINT_ADJUSTMENT_FLIP_X) {
+            int32_t fx, fy;
+            positioner_calc_xy(pos, positioner_flip_anchor_x(pos->anchor),
+                               positioner_flip_gravity_x(pos->gravity),
+                               *width, *height, &fx, &fy);
+            if (positioner_axis_fits(fx, *width, bounds_w)) *x = fx;
+        }
+        if ((pos->constraint_adjustment & XDG_POSITIONER_CONSTRAINT_ADJUSTMENT_SLIDE_X) &&
+            !positioner_axis_fits(*x, *width, bounds_w)) {
+            if (*width <= bounds_w) {
+                if (*x < 0) *x = 0;
+                if (*x + *width > bounds_w) *x = bounds_w - *width;
+            }
+        }
+        if ((pos->constraint_adjustment & XDG_POSITIONER_CONSTRAINT_ADJUSTMENT_RESIZE_X) &&
+            !positioner_axis_fits(*x, *width, bounds_w)) {
+            if (*x < 0) *x = 0;
+            if (*x >= bounds_w) *x = bounds_w - 1;
+            if (*x + *width > bounds_w) *width = bounds_w - *x;
+            if (*width < 1) *width = 1;
+        }
+    }
+
+    if (bounds_h > 0 && !positioner_axis_fits(*y, *height, bounds_h)) {
+        if (pos->constraint_adjustment & XDG_POSITIONER_CONSTRAINT_ADJUSTMENT_FLIP_Y) {
+            int32_t fx, fy;
+            positioner_calc_xy(pos, positioner_flip_anchor_y(pos->anchor),
+                               positioner_flip_gravity_y(pos->gravity),
+                               *width, *height, &fx, &fy);
+            if (positioner_axis_fits(fy, *height, bounds_h)) *y = fy;
+        }
+        if ((pos->constraint_adjustment & XDG_POSITIONER_CONSTRAINT_ADJUSTMENT_SLIDE_Y) &&
+            !positioner_axis_fits(*y, *height, bounds_h)) {
+            if (*height <= bounds_h) {
+                if (*y < 0) *y = 0;
+                if (*y + *height > bounds_h) *y = bounds_h - *height;
+            }
+        }
+        if ((pos->constraint_adjustment & XDG_POSITIONER_CONSTRAINT_ADJUSTMENT_RESIZE_Y) &&
+            !positioner_axis_fits(*y, *height, bounds_h)) {
+            if (*y < 0) *y = 0;
+            if (*y >= bounds_h) *y = bounds_h - 1;
+            if (*y + *height > bounds_h) *height = bounds_h - *y;
+            if (*height < 1) *height = 1;
+        }
+    }
+}
+
+static void compute_popup_geometry(struct bridge_surface *popup,
+                                   struct bridge_surface *parent,
+                                   const struct xdg_positioner_data *pos) {
+    int32_t x, y;
+    int32_t width = pos->width;
+    int32_t height = pos->height;
+
+    positioner_calc_xy(pos, pos->anchor, pos->gravity, width, height, &x, &y);
+    positioner_apply_constraints(pos, parent, &x, &y, &width, &height);
+
+    popup->popup_x = x;
+    popup->popup_y = y;
+    popup->popup_width = width;
+    popup->popup_height = height;
+}
+
+static int32_t popup_sprot_x(const struct bridge_surface *s) {
+    return s ? s->popup_x + bridge_surface_window_x(s->popup_parent) : 0;
+}
+
+static int32_t popup_sprot_y(const struct bridge_surface *s) {
+    return s ? s->popup_y + bridge_surface_window_y(s->popup_parent) : 0;
+}
+
+static int send_sprot_role_for_surface(struct bridge_surface *s) {
+    if (!s || !s->sprot_surface || s->sprot_id == 0) return -1;
+
+    if (s->is_popup) {
+        if (!s->popup_parent || s->popup_parent->sprot_id == 0) return -2;
+        uint32_t parent_id = s->popup_parent ? s->popup_parent->sprot_id : 0;
+        return sprot_set_role(s->sprot_surface, SPROT_SURFACE_ROLE_POPUP,
+                              parent_id, popup_sprot_x(s), popup_sprot_y(s));
+    }
+    if (s->is_subsurface) {
+        if (!s->subsurface_parent || s->subsurface_parent->sprot_id == 0) return -2;
+        uint32_t parent_id = s->subsurface_parent ? s->subsurface_parent->sprot_id : 0;
+        return sprot_set_role(s->sprot_surface, SPROT_SURFACE_ROLE_SUBSURFACE,
+                              parent_id, s->subsurface_x, s->subsurface_y);
+    }
+    return sprot_set_role(s->sprot_surface, SPROT_SURFACE_ROLE_TOPLEVEL, 0, 0, 0);
+}
+
+static void configure_popup_surface(struct bridge_surface *s, uint32_t token, int repositioned) {
+    if (!s || !s->xdg_popup_resource || !s->xdg_surface_resource) return;
+    uint32_t version = wl_resource_get_version(s->xdg_popup_resource);
+    if (repositioned && version >= XDG_POPUP_REPOSITIONED_SINCE_VERSION) {
+        xdg_popup_send_repositioned(s->xdg_popup_resource, token);
+    }
+    xdg_popup_send_configure(s->xdg_popup_resource, s->popup_x, s->popup_y,
+                             s->popup_width, s->popup_height);
+    xdg_surface_send_configure(s->xdg_surface_resource, next_keyboard_serial(s->client));
+    s->configured = 1;
 }
 
 static uint32_t evdev_to_xkb_mod(uint32_t scancode) {
@@ -461,6 +774,8 @@ static int ensure_keymap(void) {
 static const struct wl_surface_interface surface_implementation;
 static const struct xdg_surface_interface xdg_surface_implementation;
 static const struct xdg_toplevel_interface xdg_toplevel_implementation;
+static const struct xdg_positioner_interface xdg_positioner_implementation;
+static const struct xdg_popup_interface xdg_popup_implementation;
 
 static struct bridge_surface *find_surface_by_sprot_id(struct bridge_client *c, uint32_t sprot_id) {
     struct bridge_surface *s;
@@ -474,6 +789,34 @@ static struct bridge_surface *find_surface_by_sprot_id(struct bridge_client *c, 
 }
 
 static void destroy_bridge_surface(struct bridge_surface *s) {
+    if (!s) return;
+
+    if (s->client && s->client->keyboard_focus == s) {
+        s->client->keyboard_focus = NULL;
+    }
+    if (s->client) {
+        struct bridge_surface *other;
+        wl_list_for_each(other, &s->client->surfaces, link) {
+            if (other->popup_parent == s) other->popup_parent = NULL;
+            if (other->subsurface_parent == s) other->subsurface_parent = NULL;
+        }
+    }
+    if (s->resource) {
+        wl_resource_set_user_data(s->resource, NULL);
+    }
+    if (s->xdg_surface_resource) {
+        wl_resource_set_user_data(s->xdg_surface_resource, NULL);
+    }
+    if (s->xdg_toplevel_resource) {
+        wl_resource_set_user_data(s->xdg_toplevel_resource, NULL);
+    }
+    if (s->xdg_popup_resource) {
+        wl_resource_set_user_data(s->xdg_popup_resource, NULL);
+    }
+    if (s->subsurface_resource) {
+        wl_resource_set_user_data(s->subsurface_resource, NULL);
+    }
+
     if (s->sprot_surface) {
         sprot_destroy_surface(s->sprot_surface);
     }
@@ -491,6 +834,109 @@ static void destroy_bridge_surface(struct bridge_surface *s) {
 
     wl_list_remove(&s->link);
     free(s);
+}
+
+static void free_seat_resource(struct seat_resource *sr) {
+    if (!sr) return;
+    if (sr->resource) {
+        wl_resource_set_user_data(sr->resource, NULL);
+    }
+    wl_list_remove(&sr->link);
+    free(sr);
+}
+
+static int surface_parent_ready(struct bridge_surface *s) {
+    if (!s) return 0;
+    if (s->is_popup) {
+        return s->popup_parent != NULL && s->popup_parent->sprot_id != 0;
+    }
+    if (s->is_subsurface) {
+        return s->subsurface_parent != NULL && s->subsurface_parent->sprot_id != 0;
+    }
+    return 1;
+}
+
+static void flush_pending_surface_commit(struct bridge_surface *s) {
+    if (!s || !s->sprot_surface || s->sprot_id == 0) return;
+
+    if (!surface_parent_ready(s)) {
+        debug_log("Deferring role/commit for child handle=%u until parent gets a Sprot ID", s->client_handle);
+        return;
+    }
+
+    int role_res = send_sprot_role_for_surface(s);
+    if (s->is_popup || s->is_subsurface) {
+        uint32_t parent_id = s->is_popup
+            ? (s->popup_parent ? s->popup_parent->sprot_id : 0)
+            : (s->subsurface_parent ? s->subsurface_parent->sprot_id : 0);
+        int32_t x = s->is_popup ? popup_sprot_x(s) : s->subsurface_x;
+        int32_t y = s->is_popup ? popup_sprot_y(s) : s->subsurface_y;
+        debug_log("Set Sprot role to %s for Sprot ID=%u parent=%u pos=%d,%d (res=%d)",
+            s->is_popup ? "SPROT_SURFACE_ROLE_POPUP" : "SPROT_SURFACE_ROLE_SUBSURFACE",
+            s->sprot_id, parent_id, x, y, role_res);
+    } else {
+        debug_log("Set Sprot role to SPROT_SURFACE_ROLE_TOPLEVEL for Sprot ID=%u (res=%d)",
+                  s->sprot_id, role_res);
+    }
+    if (role_res != 0) return;
+
+    if (!s->pending_commit) return;
+
+    if (s->pending_dmabuf) {
+        debug_log("Executing deferred DMA-BUF commit for surface Sprot ID=%u", s->sprot_id);
+        int dup_fd = dup(s->pending_dmabuf->fd);
+        if (dup_fd >= 0) {
+            int attach_res = sprot_surface_attach_dmabuf(
+                s->sprot_surface,
+                dup_fd,
+                s->pending_dmabuf->width,
+                s->pending_dmabuf->height,
+                s->pending_dmabuf->format,
+                s->pending_dmabuf->modifier,
+                s->pending_dmabuf->num_planes,
+                s->pending_dmabuf->offsets,
+                s->pending_dmabuf->strides,
+                s->pending_dmabuf->strides[0] * s->pending_dmabuf->height
+            );
+            int commit_res = sprot_commit(s->sprot_surface);
+            sprot_request_frame(s->sprot_surface);
+            debug_log("Deferred DMA-BUF commit results: attach=%d, commit=%d", attach_res, commit_res);
+        } else {
+            debug_log("Error: deferred dup failed for dmabuf: %s", strerror(errno));
+        }
+        s->pending_dmabuf = NULL;
+    } else {
+        debug_log("Executing deferred SHM commit for surface Sprot ID=%u", s->sprot_id);
+        int dup_fd = dup(s->memfd);
+        if (dup_fd >= 0) {
+            int attach_res = sprot_attach_fd(s->sprot_surface, dup_fd, s->pending_width,
+                                             s->pending_height, s->pending_stride,
+                                             (uint32_t)s->pending_size, SPROT_BUFFER_SHM,
+                                             SPROT_PIXEL_FORMAT_BGRA8888);
+            int commit_res = sprot_commit(s->sprot_surface);
+            sprot_request_frame(s->sprot_surface);
+            debug_log("Deferred SHM commit results: attach=%d, commit=%d", attach_res, commit_res);
+        } else {
+            debug_log("Error: deferred dup failed: %s", strerror(errno));
+        }
+    }
+    s->pending_commit = 0;
+
+    if (s->buffer_resource) {
+        wl_buffer_send_release(s->buffer_resource);
+        s->buffer_resource = NULL;
+    }
+}
+
+static void flush_children_waiting_for_parent(struct bridge_surface *parent) {
+    if (!parent || !parent->client || parent->sprot_id == 0) return;
+    struct bridge_surface *child;
+    wl_list_for_each(child, &parent->client->surfaces, link) {
+        if ((child->is_popup && child->popup_parent == parent) ||
+            (child->is_subsurface && child->subsurface_parent == parent)) {
+            flush_pending_surface_commit(child);
+        }
+    }
 }
 
 // Sprot FD event handler
@@ -512,52 +958,8 @@ static int client_sprot_fd_handler(int fd, uint32_t mask, void *data) {
                     s->sprot_id = ev.u.surface_created.surface_id;
                     debug_log("Sprot event: Surface created. Sprot ID=%u assigned to handle=%u (sprot_handle=%u)",
                         s->sprot_id, s->client_handle, ev.u.surface_created.client_handle);
-                    int role_res = sprot_set_role(s->sprot_surface, SPROT_SURFACE_ROLE_TOPLEVEL, 0, 0, 0);
-                    debug_log("Set Sprot role to SPROT_SURFACE_ROLE_TOPLEVEL for Sprot ID=%u (res=%d)", s->sprot_id, role_res);
-
-                    if (s->pending_commit) {
-                        if (s->pending_dmabuf) {
-                            debug_log("Executing deferred DMA-BUF commit for surface Sprot ID=%u", s->sprot_id);
-                            int dup_fd = dup(s->pending_dmabuf->fd);
-                            if (dup_fd >= 0) {
-                                int attach_res = sprot_surface_attach_dmabuf(
-                                    s->sprot_surface,
-                                    dup_fd,
-                                    s->pending_dmabuf->width,
-                                    s->pending_dmabuf->height,
-                                    s->pending_dmabuf->format,
-                                    s->pending_dmabuf->modifier,
-                                    s->pending_dmabuf->num_planes,
-                                    s->pending_dmabuf->offsets,
-                                    s->pending_dmabuf->strides,
-                                    s->pending_dmabuf->strides[0] * s->pending_dmabuf->height
-                                );
-                                int commit_res = sprot_commit(s->sprot_surface);
-                                sprot_request_frame(s->sprot_surface);
-                                debug_log("Deferred DMA-BUF commit results: attach=%d, commit=%d", attach_res, commit_res);
-                            } else {
-                                debug_log("Error: deferred dup failed for dmabuf: %s", strerror(errno));
-                            }
-                            s->pending_dmabuf = NULL;
-                        } else {
-                            debug_log("Executing deferred SHM commit for surface Sprot ID=%u", s->sprot_id);
-                            int dup_fd = dup(s->memfd);
-                            if (dup_fd >= 0) {
-                                int attach_res = sprot_attach_fd(s->sprot_surface, dup_fd, s->pending_width, s->pending_height, s->pending_stride, (uint32_t)s->pending_size, SPROT_BUFFER_SHM, SPROT_PIXEL_FORMAT_BGRA8888);
-                                int commit_res = sprot_commit(s->sprot_surface);
-                                sprot_request_frame(s->sprot_surface);
-                                debug_log("Deferred SHM commit results: attach=%d, commit=%d", attach_res, commit_res);
-                            } else {
-                                debug_log("Error: deferred dup failed: %s", strerror(errno));
-                            }
-                        }
-                        s->pending_commit = 0;
-
-                        if (s->buffer_resource) {
-                            wl_buffer_send_release(s->buffer_resource);
-                            s->buffer_resource = NULL;
-                        }
-                    }
+                    flush_pending_surface_commit(s);
+                    flush_children_waiting_for_parent(s);
                 }
                 break;
             }
@@ -593,7 +995,9 @@ static int client_sprot_fd_handler(int fd, uint32_t mask, void *data) {
             case SPROT_EVENT_SURFACE_CLOSE: {
                 struct bridge_surface *s = find_surface_by_sprot_id(c, ev.object_id);
                 debug_log("Sprot event: Close surface Sprot ID=%u", ev.object_id);
-                if (s && s->xdg_toplevel_resource) {
+                if (s && s->xdg_popup_resource) {
+                    xdg_popup_send_popup_done(s->xdg_popup_resource);
+                } else if (s && s->xdg_toplevel_resource) {
                     xdg_toplevel_send_close(s->xdg_toplevel_resource);
                 }
                 break;
@@ -650,8 +1054,9 @@ static int client_sprot_fd_handler(int fd, uint32_t mask, void *data) {
 
             case SPROT_EVENT_POINTER_MOTION: {
                 struct seat_resource *sr;
+                uint32_t time_ms = wlbridge_now_ms();
                 wl_list_for_each(sr, &c->seat_pointers, link) {
-                    wl_pointer_send_motion(sr->resource, 0,
+                    wl_pointer_send_motion(sr->resource, time_ms,
                         wl_fixed_from_int(ev.u.pointer_motion.x),
                         wl_fixed_from_int(ev.u.pointer_motion.y));
                 }
@@ -660,11 +1065,15 @@ static int client_sprot_fd_handler(int fd, uint32_t mask, void *data) {
 
             case SPROT_EVENT_POINTER_BUTTON: {
                 struct seat_resource *sr;
-                debug_log("Sprot event: Pointer button button=%u state=%u", ev.u.pointer_button.button, ev.u.pointer_button.state);
+                uint32_t wl_button = wayland_button_from_srapi(ev.u.pointer_button.button);
+                debug_log("Sprot event: Pointer button button=%u wl_button=%u state=%u",
+                    ev.u.pointer_button.button, wl_button, ev.u.pointer_button.state);
+                uint32_t serial = ev.serial ? ev.serial : next_keyboard_serial(c);
+                uint32_t time_ms = wlbridge_now_ms();
                 wl_list_for_each(sr, &c->seat_pointers, link) {
                     // Translate button state: pressed = 1, released = 0
                     uint32_t state = ev.u.pointer_button.state ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED;
-                    wl_pointer_send_button(sr->resource, ev.serial, 0, ev.u.pointer_button.button, state);
+                    wl_pointer_send_button(sr->resource, serial, time_ms, wl_button, state);
                 }
                 break;
             }
@@ -727,16 +1136,13 @@ static void client_destroy_listener(struct wl_listener *listener, void *data) {
 
     struct seat_resource *sr, *srtmp;
     wl_list_for_each_safe(sr, srtmp, &c->seat_pointers, link) {
-        wl_list_remove(&sr->link);
-        free(sr);
+        free_seat_resource(sr);
     }
     wl_list_for_each_safe(sr, srtmp, &c->seat_keyboards, link) {
-        wl_list_remove(&sr->link);
-        free(sr);
+        free_seat_resource(sr);
     }
     wl_list_for_each_safe(sr, srtmp, &c->seat_resources, link) {
-        wl_list_remove(&sr->link);
-        free(sr);
+        free_seat_resource(sr);
     }
 
     wl_list_remove(&c->link);
@@ -912,8 +1318,8 @@ static void handle_dmabuf_buffer(struct bridge_surface *s, struct dmabuf_buffer 
         }
     }
 
-    if (s->sprot_id == 0) {
-        debug_log("Sprot surface ID is not yet ready. Deferring dmabuf attach.");
+    if (s->sprot_id == 0 || !surface_parent_ready(s)) {
+        debug_log("Sprot surface/parent is not ready. Deferring dmabuf attach.");
         s->pending_dmabuf = dmabuf;
         s->pending_commit = 1;
         return;
@@ -965,15 +1371,7 @@ static void surface_commit(struct wl_client *client, struct wl_resource *resourc
         return;
     }
 
-    if (s->is_subsurface) {
-        debug_log("surface_commit: skipping %s handle=%u pos=%d,%d",
-            "subsurface", s->client_handle, s->subsurface_x, s->subsurface_y);
-        release_attached_buffer(s);
-        finish_frame_callbacks(s);
-        return;
-    }
-
-    if (!s->xdg_toplevel_resource) {
+    if (!s->xdg_toplevel_resource && !s->xdg_popup_resource && !s->is_subsurface) {
         debug_log("surface_commit: skipping unroled surface handle=%u", s->client_handle);
         finish_frame_callbacks(s);
         return;
@@ -982,13 +1380,20 @@ static void surface_commit(struct wl_client *client, struct wl_resource *resourc
     if (!s->buffer_resource) {
         if (!s->configured) {
             debug_log("surface_commit: initial commit (no buffer) for handle=%u. Sending XDG configure.", s->client_handle);
+            if (s->is_subsurface) {
+                debug_log("surface_commit: subsurface handle=%u has no buffer", s->client_handle);
+                finish_frame_callbacks(s);
+                return;
+            }
             if (s->xdg_toplevel_resource) {
                 struct wl_array states;
                 wl_array_init(&states);
                 xdg_toplevel_send_configure(s->xdg_toplevel_resource, 0, 0, &states);
                 wl_array_release(&states);
+            } else if (s->xdg_popup_resource) {
+                configure_popup_surface(s, 0, 0);
             }
-            if (s->xdg_surface_resource) {
+            if (s->xdg_surface_resource && !s->xdg_popup_resource) {
                 xdg_surface_send_configure(s->xdg_surface_resource, 1);
             }
             s->configured = 1;
@@ -1055,8 +1460,8 @@ static void surface_commit(struct wl_client *client, struct wl_resource *resourc
         }
         wl_shm_buffer_end_access(shm_buf);
 
-        if (s->sprot_id == 0) {
-            debug_log("Sprot surface ID is not yet ready. Deferring attach and commit.");
+        if (s->sprot_id == 0 || !surface_parent_ready(s)) {
+            debug_log("Sprot surface/parent is not ready. Deferring attach and commit.");
             s->pending_commit = 1;
             s->pending_width = width;
             s->pending_height = height;
@@ -1201,9 +1606,135 @@ static void xdg_wm_base_destroy(struct wl_client *client, struct wl_resource *re
     wl_resource_destroy(resource);
 }
 
+static void xdg_positioner_resource_destroy(struct wl_resource *resource) {
+    struct xdg_positioner_data *pos = wl_resource_get_user_data(resource);
+    free(pos);
+}
+
+static void xdg_positioner_destroy(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    wl_resource_destroy(resource);
+}
+
+static void xdg_positioner_set_size(struct wl_client *client, struct wl_resource *resource,
+                                    int32_t width, int32_t height) {
+    (void)client;
+    struct xdg_positioner_data *pos = wl_resource_get_user_data(resource);
+    if (width <= 0 || height <= 0) {
+        wl_resource_post_error(resource, XDG_POSITIONER_ERROR_INVALID_INPUT, "bad positioner size");
+        return;
+    }
+    pos->has_size = 1;
+    pos->width = width;
+    pos->height = height;
+}
+
+static void xdg_positioner_set_anchor_rect(struct wl_client *client, struct wl_resource *resource,
+                                           int32_t x, int32_t y, int32_t width, int32_t height) {
+    (void)client;
+    struct xdg_positioner_data *pos = wl_resource_get_user_data(resource);
+    if (width < 0 || height < 0) {
+        wl_resource_post_error(resource, XDG_POSITIONER_ERROR_INVALID_INPUT, "bad anchor rect");
+        return;
+    }
+    pos->has_anchor_rect = 1;
+    pos->anchor_rect_x = x;
+    pos->anchor_rect_y = y;
+    pos->anchor_rect_width = width;
+    pos->anchor_rect_height = height;
+}
+
+static void xdg_positioner_set_anchor(struct wl_client *client, struct wl_resource *resource, uint32_t anchor) {
+    (void)client;
+    if (!xdg_positioner_anchor_is_valid(anchor, wl_resource_get_version(resource))) {
+        wl_resource_post_error(resource, XDG_POSITIONER_ERROR_INVALID_INPUT, "bad anchor");
+        return;
+    }
+    struct xdg_positioner_data *pos = wl_resource_get_user_data(resource);
+    pos->anchor = anchor;
+}
+
+static void xdg_positioner_set_gravity(struct wl_client *client, struct wl_resource *resource, uint32_t gravity) {
+    (void)client;
+    if (!xdg_positioner_gravity_is_valid(gravity, wl_resource_get_version(resource))) {
+        wl_resource_post_error(resource, XDG_POSITIONER_ERROR_INVALID_INPUT, "bad gravity");
+        return;
+    }
+    struct xdg_positioner_data *pos = wl_resource_get_user_data(resource);
+    pos->gravity = gravity;
+}
+
+static void xdg_positioner_set_constraint_adjustment(struct wl_client *client, struct wl_resource *resource,
+                                                     uint32_t constraint_adjustment) {
+    (void)client;
+    if (!xdg_positioner_constraint_adjustment_is_valid(constraint_adjustment, wl_resource_get_version(resource))) {
+        wl_resource_post_error(resource, XDG_POSITIONER_ERROR_INVALID_INPUT, "bad constraint adjustment");
+        return;
+    }
+    struct xdg_positioner_data *pos = wl_resource_get_user_data(resource);
+    pos->constraint_adjustment = constraint_adjustment;
+}
+
+static void xdg_positioner_set_offset(struct wl_client *client, struct wl_resource *resource,
+                                      int32_t x, int32_t y) {
+    (void)client;
+    struct xdg_positioner_data *pos = wl_resource_get_user_data(resource);
+    pos->offset_x = x;
+    pos->offset_y = y;
+}
+
+static void xdg_positioner_set_reactive(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    struct xdg_positioner_data *pos = wl_resource_get_user_data(resource);
+    pos->reactive = 1;
+}
+
+static void xdg_positioner_set_parent_size(struct wl_client *client, struct wl_resource *resource,
+                                           int32_t parent_width, int32_t parent_height) {
+    (void)client;
+    struct xdg_positioner_data *pos = wl_resource_get_user_data(resource);
+    pos->has_parent_size = parent_width > 0 && parent_height > 0;
+    pos->parent_width = parent_width;
+    pos->parent_height = parent_height;
+}
+
+static void xdg_positioner_set_parent_configure(struct wl_client *client, struct wl_resource *resource,
+                                                uint32_t serial) {
+    (void)client;
+    struct xdg_positioner_data *pos = wl_resource_get_user_data(resource);
+    pos->has_parent_configure = 1;
+    pos->parent_configure_serial = serial;
+}
+
+static const struct xdg_positioner_interface xdg_positioner_implementation = {
+    .destroy = xdg_positioner_destroy,
+    .set_size = xdg_positioner_set_size,
+    .set_anchor_rect = xdg_positioner_set_anchor_rect,
+    .set_anchor = xdg_positioner_set_anchor,
+    .set_gravity = xdg_positioner_set_gravity,
+    .set_constraint_adjustment = xdg_positioner_set_constraint_adjustment,
+    .set_offset = xdg_positioner_set_offset,
+    .set_reactive = xdg_positioner_set_reactive,
+    .set_parent_size = xdg_positioner_set_parent_size,
+    .set_parent_configure = xdg_positioner_set_parent_configure,
+};
+
 static void xdg_wm_base_create_positioner(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
-    (void)client; (void)resource;
     debug_log("xdg_wm_base_create_positioner: id=%u", id);
+    struct xdg_positioner_data *pos = calloc(1, sizeof(*pos));
+    if (!pos) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+    struct wl_resource *positioner = wl_resource_create(client, &xdg_positioner_interface,
+                                                       wl_resource_get_version(resource), id);
+    if (!positioner) {
+        free(pos);
+        wl_client_post_no_memory(client);
+        return;
+    }
+    wl_resource_set_implementation(positioner, &xdg_positioner_implementation,
+                                   pos, xdg_positioner_resource_destroy);
 }
 
 static void xdg_surface_resource_destroy(struct wl_resource *resource) {
@@ -1217,22 +1748,133 @@ static void xdg_surface_destroy(struct wl_client *client, struct wl_resource *re
     wl_resource_destroy(resource);
 }
 
+static void xdg_toplevel_resource_destroy(struct wl_resource *resource) {
+    struct bridge_surface *s = wl_resource_get_user_data(resource);
+    if (s && s->xdg_toplevel_resource == resource) {
+        s->xdg_toplevel_resource = NULL;
+    }
+}
+
 static void xdg_surface_get_toplevel(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
     struct bridge_surface *s = wl_resource_get_user_data(resource);
     debug_log("Wayland request: xdg_surface.get_toplevel for surface handle=%u", s->client_handle);
 
+    if (s->xdg_toplevel_resource || s->xdg_popup_resource) {
+        wl_resource_post_error(resource, XDG_WM_BASE_ERROR_ROLE, "xdg_surface already has a role");
+        return;
+    }
+
     s->xdg_toplevel_resource = wl_resource_create(client, &xdg_toplevel_interface, wl_resource_get_version(resource), id);
-    wl_resource_set_implementation(s->xdg_toplevel_resource, &xdg_toplevel_implementation, s, NULL);
+    wl_resource_set_implementation(s->xdg_toplevel_resource, &xdg_toplevel_implementation, s, xdg_toplevel_resource_destroy);
 }
 
+static void xdg_popup_resource_destroy(struct wl_resource *resource) {
+    struct bridge_surface *s = wl_resource_get_user_data(resource);
+    if (!s || s->xdg_popup_resource != resource) return;
+
+    debug_log("xdg_popup destroyed for surface handle=%u", s->client_handle);
+    s->xdg_popup_resource = NULL;
+    s->is_popup = 0;
+    s->popup_grabbed = 0;
+    s->popup_parent = NULL;
+    s->configured = 0;
+    if (s->sprot_surface) {
+        sprot_destroy_surface(s->sprot_surface);
+        s->sprot_surface = NULL;
+        s->sprot_id = 0;
+    }
+}
+
+static void xdg_popup_destroy(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    wl_resource_destroy(resource);
+}
+
+static void xdg_popup_grab(struct wl_client *client, struct wl_resource *resource,
+                           struct wl_resource *seat, uint32_t serial) {
+    (void)client; (void)seat;
+    struct bridge_surface *s = wl_resource_get_user_data(resource);
+    if (s) {
+        s->popup_grabbed = 1;
+        debug_log("xdg_popup.grab: handle=%u serial=%u", s->client_handle, serial);
+    }
+}
+
+static void xdg_popup_reposition(struct wl_client *client, struct wl_resource *resource,
+                                 struct wl_resource *positioner, uint32_t token) {
+    (void)client;
+    struct bridge_surface *s = wl_resource_get_user_data(resource);
+    struct xdg_positioner_data *pos = positioner ? wl_resource_get_user_data(positioner) : NULL;
+    if (!s || !pos || !pos->has_size || !pos->has_anchor_rect) {
+        wl_resource_post_error(resource, XDG_WM_BASE_ERROR_INVALID_POSITIONER, "bad popup repositioner");
+        return;
+    }
+
+    compute_popup_geometry(s, s->popup_parent, pos);
+    if (s->sprot_surface && s->sprot_id != 0) {
+        send_sprot_role_for_surface(s);
+    }
+    debug_log("xdg_popup.reposition: handle=%u pos=%d,%d size=%dx%d token=%u",
+              s->client_handle, s->popup_x, s->popup_y,
+              s->popup_width, s->popup_height, token);
+    configure_popup_surface(s, token, 1);
+}
+
+static const struct xdg_popup_interface xdg_popup_implementation = {
+    .destroy = xdg_popup_destroy,
+    .grab = xdg_popup_grab,
+    .reposition = xdg_popup_reposition,
+};
+
 static void xdg_surface_get_popup(struct wl_client *client, struct wl_resource *resource, uint32_t id, struct wl_resource *parent, struct wl_resource *positioner) {
-    (void)client; (void)resource; (void)parent; (void)positioner; (void)id;
-    debug_log("Wayland request: xdg_surface.get_popup");
+    struct bridge_surface *s = wl_resource_get_user_data(resource);
+    struct bridge_surface *parent_s = parent ? wl_resource_get_user_data(parent) : NULL;
+    struct xdg_positioner_data *pos = positioner ? wl_resource_get_user_data(positioner) : NULL;
+    debug_log("Wayland request: xdg_surface.get_popup for surface handle=%u", s ? s->client_handle : 0);
+
+    if (!s || !parent_s || (!parent_s->xdg_toplevel_resource && !parent_s->xdg_popup_resource)) {
+        wl_resource_post_error(resource, XDG_WM_BASE_ERROR_INVALID_POPUP_PARENT, "bad popup parent");
+        return;
+    }
+    if (!pos || !pos->has_size || !pos->has_anchor_rect) {
+        wl_resource_post_error(resource, XDG_WM_BASE_ERROR_INVALID_POSITIONER, "bad popup positioner");
+        return;
+    }
+    if (s->xdg_toplevel_resource || s->xdg_popup_resource) {
+        wl_resource_post_error(resource, XDG_WM_BASE_ERROR_ROLE, "xdg_surface already has a role");
+        return;
+    }
+
+    s->xdg_popup_resource = wl_resource_create(client, &xdg_popup_interface,
+                                               wl_resource_get_version(resource), id);
+    if (!s->xdg_popup_resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
+    s->is_popup = 1;
+    s->popup_parent = parent_s;
+    compute_popup_geometry(s, parent_s, pos);
+
+    wl_resource_set_implementation(s->xdg_popup_resource, &xdg_popup_implementation,
+                                   s, xdg_popup_resource_destroy);
+    debug_log("xdg_surface.get_popup: handle=%u parent_handle=%u pos=%d,%d size=%dx%d",
+              s->client_handle, parent_s->client_handle, s->popup_x, s->popup_y,
+              s->popup_width, s->popup_height);
+    configure_popup_surface(s, 0, 0);
 }
 
 static void xdg_surface_set_window_geometry(struct wl_client *client, struct wl_resource *resource, int32_t x, int32_t y, int32_t width, int32_t height) {
-    (void)client; (void)resource; (void)x; (void)y; (void)width; (void)height;
-    debug_log("Wayland request: xdg_surface.set_window_geometry to %dx%d", width, height);
+    (void)client;
+    struct bridge_surface *s = wl_resource_get_user_data(resource);
+    if (s && width > 0 && height > 0) {
+        s->window_geometry_set = 1;
+        s->window_geometry_x = x;
+        s->window_geometry_y = y;
+        s->window_geometry_width = width;
+        s->window_geometry_height = height;
+    }
+    debug_log("Wayland request: xdg_surface.set_window_geometry to %d,%d %dx%d", x, y, width, height);
 }
 
 static void xdg_surface_ack_configure(struct wl_client *client, struct wl_resource *resource, uint32_t serial) {
@@ -1443,7 +2085,22 @@ static void data_device_manager_bind(struct wl_client *client, void *data, uint3
     wl_resource_set_implementation(resource, &data_device_manager_implementation, NULL, NULL);
 }
 
-// Subcompositor stubs
+// Subcompositor
+static void subsurface_resource_destroy(struct wl_resource *resource) {
+    struct bridge_surface *s = wl_resource_get_user_data(resource);
+    if (!s || s->subsurface_resource != resource) return;
+
+    debug_log("subsurface destroyed for surface handle=%u", s->client_handle);
+    s->subsurface_resource = NULL;
+    s->is_subsurface = 0;
+    s->subsurface_parent = NULL;
+    if (s->sprot_surface) {
+        sprot_destroy_surface(s->sprot_surface);
+        s->sprot_surface = NULL;
+        s->sprot_id = 0;
+    }
+}
+
 static void subsurface_destroy(struct wl_client *client, struct wl_resource *resource) {
     (void)client;
     wl_resource_destroy(resource);
@@ -1455,16 +2112,27 @@ static void subsurface_set_position(struct wl_client *client, struct wl_resource
     if (s) {
         s->subsurface_x = x;
         s->subsurface_y = y;
+        send_sprot_role_for_surface(s);
     }
     debug_log("subsurface_set_position: %d,%d", x, y);
 }
 
 static void subsurface_place_above(struct wl_client *client, struct wl_resource *resource, struct wl_resource *sibling) {
-    (void)client; (void)resource; (void)sibling;
+    (void)client; (void)sibling;
+    struct bridge_surface *s = wl_resource_get_user_data(resource);
+    if (s) {
+        debug_log("subsurface_place_above: handle=%u", s->client_handle);
+        send_sprot_role_for_surface(s);
+    }
 }
 
 static void subsurface_place_below(struct wl_client *client, struct wl_resource *resource, struct wl_resource *sibling) {
-    (void)client; (void)resource; (void)sibling;
+    (void)client; (void)sibling;
+    struct bridge_surface *s = wl_resource_get_user_data(resource);
+    if (s) {
+        debug_log("subsurface_place_below: handle=%u", s->client_handle);
+        send_sprot_role_for_surface(s);
+    }
 }
 
 static void subsurface_set_sync(struct wl_client *client, struct wl_resource *resource) {
@@ -1492,20 +2160,22 @@ static void subcompositor_destroy(struct wl_client *client, struct wl_resource *
 static void subcompositor_get_subsurface(struct wl_client *client, struct wl_resource *resource,
                                          uint32_t id, struct wl_resource *surface,
                                          struct wl_resource *parent) {
-    (void)parent;
     uint32_t version = wl_resource_get_version(resource);
     struct bridge_surface *s = wl_resource_get_user_data(surface);
+    struct bridge_surface *parent_s = wl_resource_get_user_data(parent);
     if (s) {
         s->is_subsurface = 1;
+        s->subsurface_parent = parent_s;
     }
-    debug_log("subcompositor_get_subsurface: id=%u version=%u surface_handle=%u",
-        id, version, s ? s->client_handle : 0);
+    debug_log("subcompositor_get_subsurface: id=%u version=%u surface_handle=%u parent_handle=%u",
+        id, version, s ? s->client_handle : 0, parent_s ? parent_s->client_handle : 0);
     struct wl_resource *subsurface = wl_resource_create(client, &wl_subsurface_interface, version, id);
     if (!subsurface) {
         wl_client_post_no_memory(client);
         return;
     }
-    wl_resource_set_implementation(subsurface, &subsurface_implementation, s, NULL);
+    if (s) s->subsurface_resource = subsurface;
+    wl_resource_set_implementation(subsurface, &subsurface_implementation, s, subsurface_resource_destroy);
 }
 
 static const struct wl_subcompositor_interface subcompositor_implementation = {
@@ -1584,6 +2254,8 @@ static void viewporter_bind(struct wl_client *client, void *data, uint32_t versi
 }
 
 // xdg-decoration stubs
+#define WLBRIDGE_DECORATION_MODE ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
+
 static void toplevel_decoration_destroy(struct wl_client *client, struct wl_resource *resource) {
     (void)client;
     wl_resource_destroy(resource);
@@ -1592,13 +2264,13 @@ static void toplevel_decoration_destroy(struct wl_client *client, struct wl_reso
 static void toplevel_decoration_set_mode(struct wl_client *client, struct wl_resource *resource, uint32_t mode) {
     (void)client;
     debug_log("toplevel_decoration_set_mode: mode=%u", mode);
-    zxdg_toplevel_decoration_v1_send_configure(resource, ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE);
+    zxdg_toplevel_decoration_v1_send_configure(resource, WLBRIDGE_DECORATION_MODE);
 }
 
 static void toplevel_decoration_unset_mode(struct wl_client *client, struct wl_resource *resource) {
     (void)client;
     debug_log("toplevel_decoration_unset_mode");
-    zxdg_toplevel_decoration_v1_send_configure(resource, ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE);
+    zxdg_toplevel_decoration_v1_send_configure(resource, WLBRIDGE_DECORATION_MODE);
 }
 
 static const struct zxdg_toplevel_decoration_v1_interface toplevel_decoration_implementation = {
@@ -1623,7 +2295,7 @@ static void decoration_manager_get_toplevel_decoration(struct wl_client *client,
         return;
     }
     wl_resource_set_implementation(decoration, &toplevel_decoration_implementation, NULL, NULL);
-    zxdg_toplevel_decoration_v1_send_configure(decoration, ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE);
+    zxdg_toplevel_decoration_v1_send_configure(decoration, WLBRIDGE_DECORATION_MODE);
 }
 
 static const struct zxdg_decoration_manager_v1_interface decoration_manager_implementation = {
@@ -1645,14 +2317,12 @@ static void decoration_manager_bind(struct wl_client *client, void *data, uint32
 // Seat resources
 static void seat_pointer_destroy(struct wl_resource *resource) {
     struct seat_resource *sr = wl_resource_get_user_data(resource);
-    wl_list_remove(&sr->link);
-    free(sr);
+    free_seat_resource(sr);
 }
 
 static void seat_keyboard_destroy(struct wl_resource *resource) {
     struct seat_resource *sr = wl_resource_get_user_data(resource);
-    wl_list_remove(&sr->link);
-    free(sr);
+    free_seat_resource(sr);
 }
 
 static void pointer_set_cursor(struct wl_client *client, struct wl_resource *resource,
@@ -1691,26 +2361,59 @@ static const struct wl_pointer_interface pointer_implementation = {
     .release = pointer_release,
 };
 
+static void keyboard_release(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    wl_resource_destroy(resource);
+}
+
+static const struct wl_keyboard_interface keyboard_implementation = {
+    .release = keyboard_release,
+};
+
 static void seat_get_pointer(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
-    struct bridge_client *c = wl_resource_get_user_data(resource);
+    struct seat_resource *seat = wl_resource_get_user_data(resource);
+    struct bridge_client *c = seat ? seat->client : NULL;
     (void)client;
     debug_log("seat_get_pointer: id=%u", id);
+    if (!c) return;
 
     struct seat_resource *sr = calloc(1, sizeof(*sr));
+    if (!sr) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+    sr->client = c;
     sr->resource = wl_resource_create(client, &wl_pointer_interface, wl_resource_get_version(resource), id);
+    if (!sr->resource) {
+        free(sr);
+        wl_client_post_no_memory(client);
+        return;
+    }
     wl_resource_set_implementation(sr->resource, &pointer_implementation, sr, seat_pointer_destroy);
     wl_list_insert(&c->seat_pointers, &sr->link);
     debug_log("seat_get_pointer: done, pointer resource created");
 }
 
 static void seat_get_keyboard(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
-    struct bridge_client *c = wl_resource_get_user_data(resource);
+    struct seat_resource *seat = wl_resource_get_user_data(resource);
+    struct bridge_client *c = seat ? seat->client : NULL;
     (void)client;
     debug_log("seat_get_keyboard: id=%u seat_version=%u", id, wl_resource_get_version(resource));
+    if (!c) return;
 
     struct seat_resource *sr = calloc(1, sizeof(*sr));
+    if (!sr) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+    sr->client = c;
     sr->resource = wl_resource_create(client, &wl_keyboard_interface, wl_resource_get_version(resource), id);
-    wl_resource_set_implementation(sr->resource, NULL, sr, seat_keyboard_destroy);
+    if (!sr->resource) {
+        free(sr);
+        wl_client_post_no_memory(client);
+        return;
+    }
+    wl_resource_set_implementation(sr->resource, &keyboard_implementation, sr, seat_keyboard_destroy);
     wl_list_insert(&c->seat_keyboards, &sr->link);
     debug_log("seat_get_keyboard: keyboard resource created, version=%u", wl_resource_get_version(sr->resource));
 
@@ -1763,8 +2466,7 @@ static const struct wl_seat_interface seat_implementation = {
 
 static void seat_resource_destroy(struct wl_resource *resource) {
     struct seat_resource *sr = wl_resource_get_user_data(resource);
-    wl_list_remove(&sr->link);
-    free(sr);
+    free_seat_resource(sr);
 }
 
 // DMA-BUF buffer implementation
@@ -1772,21 +2474,21 @@ static void dmabuf_buffer_destroy(struct wl_resource *resource) {
     struct dmabuf_buffer *buf = wl_resource_get_user_data(resource);
     if (!buf) return;
 
-    wl_list_remove(&buf->destroy_listener.link);
+    wl_resource_set_user_data(resource, NULL);
     if (buf->fd >= 0) {
         close(buf->fd);
     }
     free(buf);
 }
 
-static void dmabuf_buffer_handle_destroy(struct wl_listener *listener, void *data) {
-    (void)data;
-    struct dmabuf_buffer *buf = wl_container_of(listener, buf, destroy_listener);
-    if (buf->fd >= 0) {
-        close(buf->fd);
-        buf->fd = -1;
-    }
+static void dmabuf_buffer_destroy_request(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    wl_resource_destroy(resource);
 }
+
+static const struct wl_buffer_interface dmabuf_buffer_implementation = {
+    .destroy = dmabuf_buffer_destroy_request,
+};
 
 // DMA-BUF params implementation
 static void params_destroy_handler(struct wl_resource *resource) {
@@ -1925,10 +2627,7 @@ static struct wl_resource* params_create_buffer(struct dmabuf_params *params,
         return NULL;
     }
 
-    wl_resource_set_implementation(buf->resource, NULL, buf, dmabuf_buffer_destroy);
-
-    buf->destroy_listener.notify = dmabuf_buffer_handle_destroy;
-    wl_resource_add_destroy_listener(buf->resource, &buf->destroy_listener);
+    wl_resource_set_implementation(buf->resource, &dmabuf_buffer_implementation, buf, dmabuf_buffer_destroy);
 
     debug_log("Created dmabuf buffer: %dx%d format=0x%x modifier=0x%lx stride=%u",
               width, height, format, (unsigned long)params->modifier, params->strides[0]);
@@ -2219,8 +2918,18 @@ static void seat_bind(struct wl_client *client, void *data, uint32_t version, ui
     }
 
     struct seat_resource *sr = calloc(1, sizeof(*sr));
+    if (!sr) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+    sr->client = c;
     sr->resource = wl_resource_create(client, &wl_seat_interface, version, id);
-    wl_resource_set_implementation(sr->resource, &seat_implementation, c, seat_resource_destroy);
+    if (!sr->resource) {
+        free(sr);
+        wl_client_post_no_memory(client);
+        return;
+    }
+    wl_resource_set_implementation(sr->resource, &seat_implementation, sr, seat_resource_destroy);
     wl_list_insert(&c->seat_resources, &sr->link);
 
     uint32_t caps = WL_SEAT_CAPABILITY_POINTER | WL_SEAT_CAPABILITY_KEYBOARD;
@@ -2234,13 +2943,26 @@ static void seat_bind(struct wl_client *client, void *data, uint32_t version, ui
 }
 
 // Output implementation
+static void output_release(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    wl_resource_destroy(resource);
+}
+
+static const struct wl_output_interface output_implementation = {
+    .release = output_release,
+};
+
 static void output_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     (void)data;
     pid_t pid = 0; uid_t uid = 0; gid_t gid = 0;
     wl_client_get_credentials(client, &pid, &uid, &gid);
     debug_log("output_bind: version=%u id=%u pid=%d", version, id, (int)pid);
     struct wl_resource *resource = wl_resource_create(client, &wl_output_interface, version, id);
-    wl_resource_set_implementation(resource, NULL, NULL, NULL);
+    if (!resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+    wl_resource_set_implementation(resource, &output_implementation, NULL, NULL);
 
     wl_output_send_geometry(resource, 0, 0, 1920, 1080, 0, "swm", "wayland_bridge", WL_OUTPUT_TRANSFORM_NORMAL);
     if (version >= 2) {

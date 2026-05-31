@@ -22,6 +22,8 @@
 static swm_state_t g_swm;
 static volatile sig_atomic_t g_signal_quit = 0;
 
+static void clear_client_cursor(void);
+
 static void on_signal(int sig) {
     (void)sig;
     g_signal_quit = 1;
@@ -34,6 +36,14 @@ static void logf_(const char *fmt, ...) {
     vfprintf(stderr, fmt, ap);
     va_end(ap);
     fputc('\n', stderr);
+}
+
+static int surface_role_is_child(uint32_t role) {
+    return role == SPROT_SURFACE_ROLE_POPUP || role == SPROT_SURFACE_ROLE_SUBSURFACE;
+}
+
+static int surface_role_is_window(uint32_t role) {
+    return role == SPROT_SURFACE_ROLE_TOPLEVEL;
 }
 
 static swm_surface_t *alloc_surface(void) {
@@ -49,6 +59,13 @@ static swm_surface_t *alloc_surface(void) {
 
 static void free_surface(swm_surface_t *s) {
     if (s == NULL || !s->in_use) return;
+    uint32_t surface_id = s->id;
+    for (int i = 0; i < SWM_MAX_SURFACES; i++) {
+        swm_surface_t *child = &g_swm.surfaces[i];
+        if (child->in_use && surface_role_is_child(child->role) && child->parent_id == surface_id) {
+            free_surface(child);
+        }
+    }
     if (g_swm.grab_surface == s) {
         g_swm.grab_surface = NULL;
         g_swm.interaction = SWM_INTERACT_NONE;
@@ -402,11 +419,28 @@ static int handle_surface_set_role(swm_client_t *c, const sprot_header_t *hdr, c
     memcpy(&b, body, sizeof(b));
     swm_surface_t *s = find_surface(hdr->object_id);
     if (s == NULL || s->owner != c) return 0;
+    if (b.role != SPROT_SURFACE_ROLE_TOPLEVEL && !surface_role_is_child(b.role)) {
+        send_error(c->sock, SPROT_ERROR_INVALID_ARG, "bad surface role");
+        return -1;
+    }
+    int z_order_changed = s->role != b.role || s->parent_id != b.parent_id;
     s->role = b.role;
-    if (b.role == SPROT_SURFACE_ROLE_POPUP) {
+    if (surface_role_is_child(b.role)) {
+        swm_surface_t *parent = find_surface(b.parent_id);
+        if (parent == NULL || parent == s || parent->owner != c) {
+            send_error(c->sock, SPROT_ERROR_INVALID_ARG, "bad popup parent");
+            return -1;
+        }
         s->parent_id = b.parent_id;
         s->rel_x = b.x;
         s->rel_y = b.y;
+        s->maximized = 0;
+        s->minimized = 0;
+        if (z_order_changed || s->z == 0) s->z = ++g_swm.next_z;
+    } else {
+        s->parent_id = 0;
+        s->rel_x = 0;
+        s->rel_y = 0;
     }
     return 0;
 }
@@ -418,11 +452,10 @@ static int handle_set_cursor(swm_client_t *c, const sprot_header_t *hdr, const v
     }
     sprot_body_set_cursor_t b;
     memcpy(&b, body, sizeof(b));
-    // only update cursor if this client owns the topmost focused surface
-    // or we could just set it.
     swm_surface_t *s = find_surface(hdr->object_id);
     if (s == NULL || s->owner != c) return 0;
-    // to be perfectly accurate we'd check if `s` is hovered, but setting global cursor works for now.
+    if (g_swm.hovered_surface != s) return 0;
+    clear_client_cursor();
     g_swm.current_cursor = b.cursor_type;
     return 0;
 }
@@ -434,19 +467,18 @@ static int handle_set_cursor_image(swm_client_t *c, const sprot_header_t *hdr, c
         return -1;
     }
 
+    sprot_body_set_cursor_image_t b;
+    memcpy(&b, body, sizeof(b));
+
     swm_surface_t *s = find_surface(hdr->object_id);
-    if (s == NULL || s->owner != c) {
+    if (s == NULL || s->owner != c || g_swm.hovered_surface != s) {
         if (incoming_fd >= 0) close(incoming_fd);
         return 0;
     }
 
-    sprot_body_set_cursor_image_t b;
-    memcpy(&b, body, sizeof(b));
     if (!b.visible) {
         if (incoming_fd >= 0) close(incoming_fd);
-        swm_buffer_destroy(g_swm.cursor_buffer);
-        g_swm.cursor_buffer = NULL;
-        g_swm.cursor_visible = 0;
+        clear_client_cursor();
         return 0;
     }
 
@@ -560,10 +592,14 @@ static int handle_surface_attach_dmabuf(swm_client_t *c, const sprot_header_t *h
     }
 
     swm_buffer_destroy(s->buffer);
+    errno = 0;
     s->buffer = swm_buffer_create(SPROT_BUFFER_DMABUF, incoming_fd,
                                   b.width, b.height, stride, (size_t)b.total_size);
     if (s->buffer == NULL) {
-        send_error(c->sock, SPROT_ERROR_OUT_OF_MEMORY, "dmabuf import failed");
+        char msg[128];
+        snprintf(msg, sizeof(msg), "dmabuf import failed: %s",
+                 errno ? strerror(errno) : "unknown error");
+        send_error(c->sock, SPROT_ERROR_OUT_OF_MEMORY, msg);
         return -1;
     }
 
@@ -633,11 +669,18 @@ static int z_compare_asc(const void *a, const void *b) {
     return 0;
 }
 
+static int surface_tree_is_visible(swm_surface_t *s, int depth) {
+    if (s == NULL || !s->in_use || !s->committed || s->minimized) return 0;
+    if (!surface_role_is_child(s->role)) return 1;
+    if (depth >= SWM_MAX_SURFACES) return 0;
+    return surface_tree_is_visible(find_surface(s->parent_id), depth + 1);
+}
+
 static int collect_surfaces_z_asc(swm_surface_t **out, int max) {
     int n = 0;
     for (int i = 0; i < SWM_MAX_SURFACES && n < max; i++) {
         swm_surface_t *s = &g_swm.surfaces[i];
-        if (!s->in_use || !s->committed || s->minimized) continue;
+        if (!surface_tree_is_visible(s, 0)) continue;
         out[n++] = s;
     }
     qsort(out, (size_t)n, sizeof(*out), z_compare_asc);
@@ -647,6 +690,17 @@ static int collect_surfaces_z_asc(swm_surface_t **out, int max) {
 static void raise_surface(swm_surface_t *s) {
     if (s == NULL) return;
     s->z = ++g_swm.next_z;
+}
+
+static void raise_surface_tree(swm_surface_t *s) {
+    if (s == NULL) return;
+    raise_surface(s);
+    for (int i = 0; i < SWM_MAX_SURFACES; i++) {
+        swm_surface_t *child = &g_swm.surfaces[i];
+        if (child->in_use && surface_role_is_child(child->role) && child->parent_id == s->id) {
+            raise_surface_tree(child);
+        }
+    }
 }
 
 typedef enum {
@@ -659,7 +713,7 @@ typedef enum {
 } swm_hit_region_t;
 
 static void surface_effective_rect(const swm_surface_t *s, int32_t *ex, int32_t *ey, int32_t *ew, int32_t *eh) {
-    if (s->role == SPROT_SURFACE_ROLE_POPUP) {
+    if (surface_role_is_child(s->role)) {
         swm_surface_t *parent = find_surface(s->parent_id);
         if (parent != NULL) {
             int32_t pex, pey, pew, peh;
@@ -702,7 +756,7 @@ static void surface_maximize_target(int32_t *tw, int32_t *th) {
 static void surface_outer_rect(const swm_surface_t *s, int32_t *ox, int32_t *oy, int32_t *ow, int32_t *oh) {
     int32_t ex, ey, ew, eh;
     surface_effective_rect(s, &ex, &ey, &ew, &eh);
-    if (s->role == SPROT_SURFACE_ROLE_POPUP) {
+    if (surface_role_is_child(s->role)) {
         *ox = ex;
         *oy = ey;
         *ow = ew;
@@ -732,6 +786,7 @@ static swm_hit_region_t hit_test(int32_t mx, int32_t my, swm_surface_t **out_sur
     int n = collect_surfaces_z_asc(list, SWM_MAX_SURFACES);
     for (int i = n - 1; i >= 0; i--) {
         swm_surface_t *s = list[i];
+        if (s->role == SPROT_SURFACE_ROLE_SUBSURFACE) continue;
         int32_t ox, oy, ow, oh;
         int32_t ex, ey, ew, eh;
         surface_outer_rect(s, &ox, &oy, &ow, &oh);
@@ -742,7 +797,7 @@ static swm_hit_region_t hit_test(int32_t mx, int32_t my, swm_surface_t **out_sur
             *out_surface = s;
             return SWM_HIT_CONTENT;
         }
-        if (s->role == SPROT_SURFACE_ROLE_POPUP) {
+        if (surface_role_is_child(s->role)) {
             continue;
         }
         int32_t bmin, bmax, bclose, by;
@@ -762,7 +817,35 @@ static swm_hit_region_t hit_test(int32_t mx, int32_t my, swm_surface_t **out_sur
 static swm_surface_t *topmost_surface(void) {
     swm_surface_t *list[SWM_MAX_SURFACES];
     int n = collect_surfaces_z_asc(list, SWM_MAX_SURFACES);
-    return n > 0 ? list[n - 1] : NULL;
+    for (int i = n - 1; i >= 0; i--) {
+        if (surface_role_is_window(list[i]->role)) return list[i];
+    }
+    return NULL;
+}
+
+static swm_surface_t *topmost_popup(void) {
+    swm_surface_t *list[SWM_MAX_SURFACES];
+    int n = collect_surfaces_z_asc(list, SWM_MAX_SURFACES);
+    for (int i = n - 1; i >= 0; i--) {
+        if (list[i]->role == SPROT_SURFACE_ROLE_POPUP) return list[i];
+    }
+    return NULL;
+}
+
+static void clear_client_cursor(void) {
+    if (g_swm.cursor_buffer != NULL) {
+        swm_buffer_destroy(g_swm.cursor_buffer);
+        g_swm.cursor_buffer = NULL;
+    }
+    g_swm.cursor_visible = 0;
+    g_swm.current_cursor = SPROT_CURSOR_ARROW;
+}
+
+static void surface_local_coords(swm_surface_t *s, int32_t mx, int32_t my, int32_t *lx, int32_t *ly) {
+    int32_t ex, ey, ew, eh;
+    surface_effective_rect(s, &ex, &ey, &ew, &eh);
+    *lx = (int32_t)(((int64_t)(mx - ex) * (int64_t)s->width) / (ew > 0 ? ew : 1));
+    *ly = (int32_t)(((int64_t)(my - ey) * (int64_t)s->height) / (eh > 0 ? eh : 1));
 }
 
 static void fill_rect(uint32_t *dst, int32_t dst_w, int32_t dst_h, int32_t dst_pitch_px,
@@ -919,6 +1002,16 @@ static void draw_cursor_image(uint32_t *dst, int32_t dst_w, int32_t dst_h, int32
     swm_buffer_end_cpu_read(buffer);
 }
 
+static uint32_t blend_premul_pixel(uint32_t dst, uint32_t src) {
+    uint32_t a = src >> 24;
+    if (a == 0) return dst;
+    if (a == 255) return src;
+    uint32_t inv = 255u - a;
+    uint32_t rb = (src & 0x00FF00FFu) + (((dst & 0x00FF00FFu) * inv) >> 8);
+    uint32_t g = (src & 0x0000FF00u) + (((dst & 0x0000FF00u) * inv) >> 8);
+    return 0xFF000000u | (rb & 0x00FF00FFu) | (g & 0x0000FF00u);
+}
+
 static void draw_titlebar_chrome(uint32_t *dst, int32_t dst_w, int32_t dst_h, int32_t dst_pitch_px,
                                  swm_surface_t *s, int is_focused) {
     uint32_t bar_color    = is_focused ? 0xFF3A6CB0u : 0xFF333742u;
@@ -963,11 +1056,11 @@ static void composite_surfaces(srapi_framebuffer_t *fb, uint32_t bg_color) {
 
     swm_surface_t *list[SWM_MAX_SURFACES];
     int n = collect_surfaces_z_asc(list, SWM_MAX_SURFACES);
-    swm_surface_t *focused = n > 0 ? list[n - 1] : NULL;
+    swm_surface_t *focused = topmost_surface();
 
     for (int i = 0; i < n; i++) {
         swm_surface_t *s = list[i];
-        if (s->role != SPROT_SURFACE_ROLE_POPUP) {
+        if (!surface_role_is_child(s->role)) {
             draw_titlebar_chrome(dst, dst_w, dst_h, dst_pitch_px, s, s == focused);
         }
 
@@ -995,7 +1088,13 @@ static void composite_surfaces(srapi_framebuffer_t *fb, uint32_t bg_color) {
             for (int32_t row = 0; row < h; row++) {
                 const uint32_t *sr = src + (sy0 + row) * src_pitch_px + sx0;
                 uint32_t *dr = dst + (dy + row) * dst_pitch_px + dx;
-                memcpy(dr, sr, (size_t)w * 4u);
+                if (surface_role_is_child(s->role)) {
+                    for (int32_t col = 0; col < w; col++) {
+                        dr[col] = blend_premul_pixel(dr[col], sr[col]);
+                    }
+                } else {
+                    memcpy(dr, sr, (size_t)w * 4u);
+                }
             }
         }
         if (began_read) swm_buffer_end_cpu_read(s->buffer);
@@ -1068,9 +1167,14 @@ static void forward_input(const srapi_input_event_t *ev) {
                 g_swm.grab_surface->pos_y = g_swm.mouse_y - g_swm.grab_offset_y;
                 return;
             }
-            if (g_swm.de != NULL) {
+            if (g_swm.de != NULL && topmost_popup() == NULL) {
                 de_on_mouse_motion(g_swm.de, g_swm.mouse_x, g_swm.mouse_y);
                 if (de_point_in_panel(g_swm.de, g_swm.mouse_x, g_swm.mouse_y)) {
+                    if (g_swm.hovered_surface != NULL && g_swm.hovered_surface->owner != NULL) {
+                        send_event_nb(g_swm.hovered_surface->owner->sock, SPROT_EVT_POINTER_LEAVE, g_swm.hovered_surface->id, 0, NULL, 0);
+                    }
+                    g_swm.hovered_surface = NULL;
+                    clear_client_cursor();
                     return;
                 }
             }
@@ -1080,31 +1184,43 @@ static void forward_input(const srapi_input_event_t *ev) {
                 if (g_swm.hovered_surface != NULL && g_swm.hovered_surface->owner != NULL) {
                     send_event_nb(g_swm.hovered_surface->owner->sock, SPROT_EVT_POINTER_LEAVE, g_swm.hovered_surface->id, 0, NULL, 0);
                 }
+                clear_client_cursor();
                 g_swm.hovered_surface = new_hover;
                 if (new_hover != NULL && new_hover->owner != NULL) {
-                    send_event_nb(new_hover->owner->sock, SPROT_EVT_POINTER_ENTER, new_hover->id, 0, NULL, 0);
+                    sprot_body_pointer_motion_t body;
+                    surface_local_coords(new_hover, g_swm.mouse_x, g_swm.mouse_y, &body.x, &body.y);
+                    send_event_nb(new_hover->owner->sock, SPROT_EVT_POINTER_ENTER, new_hover->id, 0, &body, sizeof(body));
                 }
             }
 
             if (region == SWM_HIT_CONTENT && s != NULL && s->owner != NULL) {
-                int32_t ex, ey, ew, eh;
-                surface_effective_rect(s, &ex, &ey, &ew, &eh);
-                int32_t lx = (int32_t)(((int64_t)(g_swm.mouse_x - ex) * (int64_t)s->width) / (ew > 0 ? ew : 1));
-                int32_t ly = (int32_t)(((int64_t)(g_swm.mouse_y - ey) * (int64_t)s->height) / (eh > 0 ? eh : 1));
+                int32_t lx, ly;
+                surface_local_coords(s, g_swm.mouse_x, g_swm.mouse_y, &lx, &ly);
                 sprot_body_pointer_motion_t body = { .x = lx, .y = ly };
                 send_event_nb(s->owner->sock, SPROT_EVT_POINTER_MOTION, s->id, 0, &body, sizeof(body));
+            } else {
+                clear_client_cursor();
             }
             break;
         }
         case SRAPI_INPUT_EVENT_MOUSE_BUTTON_DOWN: {
             g_swm.mouse_left_down = (ev->mouse_button.button == SRAPI_MOUSE_BUTTON_LEFT);
-            if (g_swm.de != NULL &&
+            swm_surface_t *active_popup = topmost_popup();
+            if (active_popup != NULL) {
+                region = hit_test(g_swm.mouse_x, g_swm.mouse_y, &s);
+                if (s != active_popup) {
+                    send_close_to(active_popup);
+                    return;
+                }
+            } else if (g_swm.de != NULL &&
                 de_on_mouse_button(g_swm.de, g_swm.mouse_x, g_swm.mouse_y,
                                    ev->mouse_button.button, 1)) {
                 return;
             }
-            region = hit_test(g_swm.mouse_x, g_swm.mouse_y, &s);
-            if (s != NULL) raise_surface(s);
+            if (active_popup == NULL) {
+                region = hit_test(g_swm.mouse_x, g_swm.mouse_y, &s);
+            }
+            if (s != NULL) raise_surface_tree(s);
             int alt_held = (g_swm.modifiers & SRAPI_KMOD_ALT) != 0;
             if (region == SWM_HIT_BTN_CLOSE) {
                 send_close_to(s);
@@ -1120,6 +1236,7 @@ static void forward_input(const srapi_input_event_t *ev) {
             }
             if ((region == SWM_HIT_TITLEBAR ||
                  (region == SWM_HIT_CONTENT && alt_held)) && s != NULL &&
+                !surface_role_is_child(s->role) &&
                 ev->mouse_button.button == SRAPI_MOUSE_BUTTON_LEFT && !s->maximized) {
                 g_swm.interaction = SWM_INTERACT_MOVE;
                 g_swm.grab_surface = s;
@@ -1145,12 +1262,20 @@ static void forward_input(const srapi_input_event_t *ev) {
                     return;
                 }
             }
-            if (g_swm.de != NULL &&
+            swm_surface_t *active_popup = topmost_popup();
+            if (active_popup != NULL) {
+                region = hit_test(g_swm.mouse_x, g_swm.mouse_y, &s);
+                if (s != active_popup) {
+                    return;
+                }
+            } else if (g_swm.de != NULL &&
                 de_on_mouse_button(g_swm.de, g_swm.mouse_x, g_swm.mouse_y,
                                    ev->mouse_button.button, 0)) {
                 return;
             }
-            region = hit_test(g_swm.mouse_x, g_swm.mouse_y, &s);
+            if (active_popup == NULL) {
+                region = hit_test(g_swm.mouse_x, g_swm.mouse_y, &s);
+            }
             if (region == SWM_HIT_CONTENT && s != NULL && s->owner != NULL) {
                 sprot_body_pointer_button_t body = {
                     .button = ev->mouse_button.button,
@@ -1178,6 +1303,13 @@ static void forward_input(const srapi_input_event_t *ev) {
                 (ev->key.modifiers & (SRAPI_KMOD_CTRL | SRAPI_KMOD_ALT)) != 0) {
                 g_swm.should_quit = 1;
                 break;
+            }
+            if (ev->type == SRAPI_INPUT_EVENT_KEY_DOWN && ev->key.scancode == SRAPI_SCANCODE_ESCAPE) {
+                swm_surface_t *popup = topmost_popup();
+                if (popup != NULL) {
+                    send_close_to(popup);
+                    break;
+                }
             }
             if (ev->key.scancode == SRAPI_SCANCODE_LGUI || ev->key.scancode == SRAPI_SCANCODE_RGUI) {
                 if (ev->type == SRAPI_INPUT_EVENT_KEY_DOWN) {

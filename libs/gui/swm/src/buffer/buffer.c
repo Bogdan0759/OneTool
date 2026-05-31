@@ -39,7 +39,10 @@ swm_buffer_t *swm_buffer_create(uint32_t kind, int fd, uint32_t width, uint32_t 
 
     buffer->map = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
     if (buffer->map == MAP_FAILED) {
+        int saved_errno = errno;
+        close(fd);
         free(buffer);
+        errno = saved_errno;
         return NULL;
     }
 
