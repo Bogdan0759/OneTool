@@ -288,7 +288,9 @@ void ranal_set_fill_parent(ranal_widget_t *w, int fill_x, int fill_y) {
 
 void ranal_set_visible(ranal_widget_t *w, int visible) {
     if (w == NULL) return;
-    w->visible = visible ? 1 : 0;
+    int next = visible ? 1 : 0;
+    if (w->visible == next) return;
+    w->visible = next;
     g_ranal->dirty = 1;
 }
 

@@ -701,11 +701,11 @@ void de_tick(de_t *de, uint64_t frame_count) {
     rebuild_items_from_swm(de);
     apply_items_to_widgets(de);
     apply_launcher_to_widgets(de);
-    ranal_invalidate();
+    if (de->taskbar_dirty) ranal_invalidate();
     if (de->menu_open) {
         ranal_set_current(de->menu_ctx);
         apply_menu_to_widgets(de);
-        ranal_invalidate();
+        if (de->menu_dirty) ranal_invalidate();
     }
     ranal_set_current(prev);
 

@@ -30,7 +30,7 @@ int swm_protocol_send_event(int fd, uint16_t type, uint32_t object_id,
 int swm_protocol_send_event_nb(int fd, uint16_t type, uint32_t object_id,
                                uint32_t serial, const void *body, size_t body_len) {
     struct pollfd pfd = { .fd = fd, .events = POLLOUT, .revents = 0 };
-    int pr = poll(&pfd, 1, 5);
+    int pr = poll(&pfd, 1, 0);
     if (pr <= 0 || (pfd.revents & POLLOUT) == 0) return -1;
     return swm_protocol_send_event(fd, type, object_id, serial, body, body_len);
 }
