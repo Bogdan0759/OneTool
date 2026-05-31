@@ -1088,7 +1088,8 @@ static void output_bind(struct wl_client *client, void *data, uint32_t version, 
 
 int wayland_server_run(const char *display_name, const char *swm_socket, const char *debug_file) {
     if (debug_file) {
-        g_debug_file = fopen(debug_file, "w");
+        const char *mode = getenv("WLBRIDGE_DEBUG_APPEND") ? "a" : "w";
+        g_debug_file = fopen(debug_file, mode);
         if (g_debug_file) {
             setvbuf(g_debug_file, NULL, _IONBF, 0);
         } else {

@@ -1,65 +1,136 @@
-[2026-05-31 10:41:27] wlbridge server starting. display: wayland-5, swm_socket: /tmp/swm.sock
-[2026-05-31 10:41:27] Wayland proxy running.
-[2026-05-31 10:41:28] [CLIENT_CONNECT] new wl_client pid=29069 uid=1000 ptr=0x5582b1409ca0
-[2026-05-31 10:41:28] [CLIENT_CONNECT] new wl_client pid=29069 uid=1000 ptr=0x5582b1409ca0
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_display@1.get_registry
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_registry@2.global
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_registry@2.global
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_registry@2.global
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_registry@2.global
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_registry@2.global
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_display@1.sync
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_callback@3.done
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_display@1.delete_id
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_registry@2.bind
-[2026-05-31 10:41:28] compositor_bind: version=3 id=4 pid=29069
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_registry@2.bind
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_shm@5.format
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_shm@5.format
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_registry@2.bind
-[2026-05-31 10:41:28] output_bind: version=2 id=6 pid=29069
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_output@6.geometry
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_output@6.mode
-[2026-05-31 10:41:28] output_bind: done
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_display@1.sync
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_callback@7.done
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_display@1.delete_id
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_shm@5.create_pool
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_shm_pool@3.resize
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_shm_pool@3.resize
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_shm_pool@3.resize
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_shm_pool@3.resize
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_shm_pool@3.resize
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_shm_pool@3.resize
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_shm_pool@3.resize
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_shm_pool@3.resize
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_registry@2.bind
-[2026-05-31 10:41:28] xdg_wm_base_bind: version=1 id=7 pid=29069
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_display@1.get_registry
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_registry@8.global
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_registry@8.global
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_registry@8.global
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_registry@8.global
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_registry@8.global
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_display@1.sync
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_callback@9.done
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_display@1.delete_id
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_registry@8.bind
-[2026-05-31 10:41:28] compositor_bind: version=4 id=10 pid=29069
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_registry@8.bind
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_shm@11.format
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_shm@11.format
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_registry@8.bind
-[2026-05-31 10:41:28] seat_bind: version=5 id=12 pid=29069
-[2026-05-31 10:41:28] New Wayland client connected. pid=29069 Initializing Sprot connection...
-[2026-05-31 10:41:28] Client registration complete.
-[2026-05-31 10:41:28] seat_bind: sending capabilities=0x3 (POINTER|KEYBOARD)
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_seat@12.capabilities
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_seat@12.name
-[2026-05-31 10:41:28] seat_bind: sent seat name 'seat0'
-[2026-05-31 10:41:28] seat_bind: done
-[2026-05-31 10:41:28] [PROTO REQ] pid=29069 wl_display@1.sync
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_callback@9.done
-[2026-05-31 10:41:28] [PROTO EVT] pid=29069 wl_display@1.delete_id
-[2026-05-31 10:41:28] [CLIENT_CONNECT] new wl_client pid=29086 uid=1000 ptr=0x5582b1409f20
-[2026-05-31 10:41:28] Wayland client disconnected. Cleaning up resources.
+[wayland_bridge 2026-05-31 15:52:39 pid=12693] starting argc=6 argv0=./onetool
+[wayland_bridge 2026-05-31 15:52:39 pid=12693] display=wayland-5 swm_socket=/tmp/swm.sock
+[wayland_bridge 2026-05-31 15:52:39 pid=12693] debug_file=glx.log
+[wayland_bridge 2026-05-31 15:52:39 pid=12693] app command=firefox
+[wayland_bridge 2026-05-31 15:52:39 pid=12693] wlbridge forked pid=12694
+[wayland_bridge 2026-05-31 15:52:39 pid=12694] exec wlbridge path=./wlbridge display_arg=--display=wayland-5 socket_arg=--socket=/tmp/swm.sock debug=glx.log
+[2026-05-31 15:52:39] wlbridge server starting. display: wayland-5, swm_socket: /tmp/swm.sock
+[2026-05-31 15:52:39] Wayland proxy running.
+[wayland_bridge 2026-05-31 15:52:39 pid=12693] wlbridge still running after startup delay
+[wayland_bridge 2026-05-31 15:52:39 pid=12693] starting app: firefox
+[wayland_bridge 2026-05-31 15:52:39 pid=12693] app forked pid=12697
+[wayland_bridge 2026-05-31 15:52:39 pid=12697] exec app via /bin/sh -c, WAYLAND_DISPLAY=wayland-5 XDG_RUNTIME_DIR=/run/user/1000
+[2026-05-31 15:52:39] [CLIENT_CONNECT] new wl_client pid=12698 uid=1000 ptr=0x5617bdb49ca0
+[2026-05-31 15:52:39] [CLIENT_CONNECT] new wl_client pid=12698 uid=1000 ptr=0x5617bdb49ca0
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_display@1.get_registry
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_registry@2.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_registry@2.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_registry@2.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_registry@2.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_registry@2.global
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_display@1.sync
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_callback@3.done
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_display@1.delete_id
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_registry@2.bind
+[2026-05-31 15:52:39] compositor_bind: version=3 id=4 pid=12698
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_registry@2.bind
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_shm@5.format
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_shm@5.format
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_registry@2.bind
+[2026-05-31 15:52:39] output_bind: version=2 id=6 pid=12698
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_output@6.geometry
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_output@6.mode
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_output@6.done
+[2026-05-31 15:52:39] output_bind: done
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_display@1.sync
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_callback@7.done
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_display@1.delete_id
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_shm@5.create_pool
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_shm_pool@3.resize
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_shm_pool@3.resize
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_shm_pool@3.resize
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_shm_pool@3.resize
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_shm_pool@3.resize
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_shm_pool@3.resize
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_shm_pool@3.resize
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_shm_pool@3.resize
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_registry@2.bind
+[2026-05-31 15:52:39] xdg_wm_base_bind: version=1 id=7 pid=12698
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_display@1.get_registry
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_registry@8.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_registry@8.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_registry@8.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_registry@8.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_registry@8.global
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_display@1.sync
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_callback@9.done
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_display@1.delete_id
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_registry@8.bind
+[2026-05-31 15:52:39] compositor_bind: version=4 id=10 pid=12698
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_registry@8.bind
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_shm@11.format
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_shm@11.format
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_registry@8.bind
+[2026-05-31 15:52:39] seat_bind: version=5 id=12 pid=12698
+[2026-05-31 15:52:39] New Wayland client connected. pid=12698 Initializing Sprot connection...
+[2026-05-31 15:52:39] Client registration complete.
+[2026-05-31 15:52:39] seat_bind: sending capabilities=0x3 (POINTER|KEYBOARD)
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_seat@12.capabilities
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_seat@12.name
+[2026-05-31 15:52:39] seat_bind: sent seat name 'seat0'
+[2026-05-31 15:52:39] seat_bind: done
+[2026-05-31 15:52:39] [PROTO REQ] pid=12698 wl_display@1.sync
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_callback@9.done
+[2026-05-31 15:52:39] [PROTO EVT] pid=12698 wl_display@1.delete_id
+[2026-05-31 15:52:39] [CLIENT_CONNECT] new wl_client pid=12714 uid=1000 ptr=0x5617bdb49f20
+[2026-05-31 15:52:39] [PROTO REQ] pid=12714 wl_display@1.get_registry
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@2.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@2.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@2.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@2.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@2.global
+[2026-05-31 15:52:39] [PROTO REQ] pid=12714 wl_display@1.sync
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_callback@3.done
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_display@1.delete_id
+[2026-05-31 15:52:39] [PROTO REQ] pid=12714 wl_display@1.sync
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_callback@3.done
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_display@1.delete_id
+[2026-05-31 15:52:39] [PROTO REQ] pid=12714 wl_display@1.get_registry
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@3.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@3.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@3.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@3.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@3.global
+[2026-05-31 15:52:39] [PROTO REQ] pid=12714 wl_display@1.sync
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_callback@4.done
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_display@1.delete_id
+[2026-05-31 15:52:39] [PROTO REQ] pid=12714 wl_display@1.sync
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_callback@4.done
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_display@1.delete_id
+[2026-05-31 15:52:39] [PROTO REQ] pid=12714 wl_display@1.get_registry
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@4.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@4.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@4.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@4.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@4.global
+[2026-05-31 15:52:39] [PROTO REQ] pid=12714 wl_display@1.sync
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_callback@5.done
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_display@1.delete_id
+[2026-05-31 15:52:39] [PROTO REQ] pid=12714 wl_registry@4.bind
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_shm@6.format
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_shm@6.format
+[2026-05-31 15:52:39] [PROTO REQ] pid=12714 wl_display@1.sync
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_callback@5.done
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_display@1.delete_id
+[2026-05-31 15:52:39] [PROTO REQ] pid=12714 wl_display@1.sync
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_callback@5.done
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_display@1.delete_id
+[2026-05-31 15:52:39] [PROTO REQ] pid=12714 wl_display@1.get_registry
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@5.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@5.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@5.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@5.global
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_registry@5.global
+[2026-05-31 15:52:39] [PROTO REQ] pid=12714 wl_display@1.sync
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_callback@7.done
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_display@1.delete_id
+[2026-05-31 15:52:39] [PROTO REQ] pid=12714 wl_registry@5.bind
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_shm@8.format
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_shm@8.format
+[2026-05-31 15:52:39] [PROTO REQ] pid=12714 wl_display@1.sync
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_callback@7.done
+[2026-05-31 15:52:39] [PROTO EVT] pid=12714 wl_display@1.delete_id
+[2026-05-31 15:52:39] Wayland client disconnected. Cleaning up resources.
+[wayland_bridge 2026-05-31 15:52:39 pid=12693] application exited with status 11
+[wayland_bridge 2026-05-31 15:52:39 pid=12693] stopping wlbridge pid=12694 after application exit
+[wayland_bridge 2026-05-31 15:52:39 pid=12693] done
