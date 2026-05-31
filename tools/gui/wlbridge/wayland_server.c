@@ -122,6 +122,28 @@ static void debug_log(const char *fmt, ...) {
     fflush(g_debug_file);
 }
 
+static void on_client_created(struct wl_listener *listener, void *data) {
+    (void)listener;
+    struct wl_client *client = (struct wl_client *)data;
+    pid_t pid = 0; uid_t uid = 0; gid_t gid = 0;
+    wl_client_get_credentials(client, &pid, &uid, &gid);
+    debug_log("[CLIENT_CONNECT] new wl_client pid=%d uid=%d ptr=%p", (int)pid, (int)uid, (void*)client);
+}
+
+static void on_protocol_log(void *ud, enum wl_protocol_logger_type dir,
+                             const struct wl_protocol_logger_message *msg) {
+    (void)ud;
+    if (!g_debug_file) return;
+    const char *dir_str = (dir == WL_PROTOCOL_LOGGER_REQUEST) ? "REQ" : "EVT";
+    const char *iface  = msg->resource ? wl_resource_get_class(msg->resource) : "?";
+    uint32_t res_id    = msg->resource ? wl_resource_get_id(msg->resource)    : 0;
+    const char *method = msg->message  ? msg->message->name                   : "?";
+    struct wl_client *client = msg->resource ? wl_resource_get_client(msg->resource) : NULL;
+    pid_t pid = 0;
+    if (client) { uid_t u; gid_t g; wl_client_get_credentials(client, &pid, &u, &g); }
+    debug_log("[PROTO %s] pid=%d %s@%u.%s", dir_str, (int)pid, iface, res_id, method);
+}
+
 static uint32_t next_keyboard_serial(struct bridge_client *c) {
     c->keyboard_serial++;
     if (c->keyboard_serial == 0) {
@@ -517,7 +539,9 @@ static struct bridge_client *get_or_create_client(struct wl_client *wl_client) {
         }
     }
 
-    debug_log("New Wayland client connected. Initializing Sprot connection...");
+    pid_t pid = 0; uid_t uid = 0; gid_t gid = 0;
+    wl_client_get_credentials(wl_client, &pid, &uid, &gid);
+    debug_log("New Wayland client connected. pid=%d Initializing Sprot connection...", (int)pid);
 
     c = calloc(1, sizeof(*c));
     c->wl_client = wl_client;
@@ -763,7 +787,9 @@ static const struct wl_compositor_interface compositor_implementation = {
 
 static void compositor_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     (void)data;
-    debug_log("compositor_bind: version=%u id=%u", version, id);
+    pid_t pid = 0; uid_t uid = 0; gid_t gid = 0;
+    wl_client_get_credentials(client, &pid, &uid, &gid);
+    debug_log("compositor_bind: version=%u id=%u pid=%d", version, id, (int)pid);
     struct wl_resource *resource = wl_resource_create(client, &wl_compositor_interface, version, id);
     wl_resource_set_implementation(resource, &compositor_implementation, NULL, NULL);
 }
@@ -843,7 +869,9 @@ static const struct xdg_wm_base_interface xdg_wm_base_implementation = {
 
 static void xdg_wm_base_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     (void)data;
-    debug_log("xdg_wm_base_bind: version=%u id=%u", version, id);
+    pid_t pid = 0; uid_t uid = 0; gid_t gid = 0;
+    wl_client_get_credentials(client, &pid, &uid, &gid);
+    debug_log("xdg_wm_base_bind: version=%u id=%u pid=%d", version, id, (int)pid);
     struct wl_resource *resource = wl_resource_create(client, &xdg_wm_base_interface, version, id);
     wl_resource_set_implementation(resource, &xdg_wm_base_implementation, NULL, NULL);
 }
@@ -1017,7 +1045,9 @@ static void seat_resource_destroy(struct wl_resource *resource) {
 
 static void seat_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     (void)data;
-    debug_log("seat_bind: version=%u id=%u", version, id);
+    pid_t pid = 0; uid_t uid = 0; gid_t gid = 0;
+    wl_client_get_credentials(client, &pid, &uid, &gid);
+    debug_log("seat_bind: version=%u id=%u pid=%d", version, id, (int)pid);
     struct bridge_client *c = get_or_create_client(client);
     if (!c) {
         debug_log("seat_bind: ERROR get_or_create_client returned NULL");
@@ -1042,18 +1072,15 @@ static void seat_bind(struct wl_client *client, void *data, uint32_t version, ui
 // Output implementation
 static void output_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     (void)data;
-    debug_log("output_bind: version=%u id=%u", version, id);
+    pid_t pid = 0; uid_t uid = 0; gid_t gid = 0;
+    wl_client_get_credentials(client, &pid, &uid, &gid);
+    debug_log("output_bind: version=%u id=%u pid=%d", version, id, (int)pid);
     struct wl_resource *resource = wl_resource_create(client, &wl_output_interface, version, id);
     wl_resource_set_implementation(resource, NULL, NULL, NULL);
 
     wl_output_send_geometry(resource, 0, 0, 1920, 1080, 0, "swm", "wayland_bridge", WL_OUTPUT_TRANSFORM_NORMAL);
     if (version >= 2) {
         wl_output_send_mode(resource, WL_OUTPUT_MODE_CURRENT | WL_OUTPUT_MODE_PREFERRED, 1920, 1080, 60000);
-    }
-    if (version >= 4) {
-        wl_output_send_scale(resource, 1);
-    }
-    if (version >= 3) {
         wl_output_send_done(resource);
     }
     debug_log("output_bind: done");
@@ -1083,7 +1110,14 @@ int wayland_server_run(const char *display_name, const char *swm_socket, const c
     wl_list_init(&g_server.clients);
     g_server.next_client_handle = 0;
 
-    // Add standard globals
+    /* log every new client connection */
+    static struct wl_listener client_created_listener;
+    client_created_listener.notify = on_client_created;
+    wl_display_add_client_created_listener(g_server.display, &client_created_listener);
+
+    /* log every protocol message */
+    wl_display_add_protocol_logger(g_server.display, on_protocol_log, NULL);
+
     if (!wl_global_create(g_server.display, &wl_compositor_interface, 4, NULL, compositor_bind)) {
         wl_display_destroy(g_server.display);
         if (g_debug_file) fclose(g_debug_file);
