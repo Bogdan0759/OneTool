@@ -532,9 +532,10 @@ static int handle_surface_attach_dmabuf(swm_client_t *c, const sprot_header_t *h
                    "swm only accepts DRM ARGB/XRGB 8888");
         return -1;
     }
-    if (b.width != s->width || b.height != s->height) {
+    if (validate_surface_buffer_dims(b.width, b.height, b.plane_strides[0],
+                                      (size_t)b.total_size) != 0) {
         close(incoming_fd);
-        send_error(c->sock, SPROT_ERROR_INVALID_ARG, "ATTACH_DMABUF dims mismatch");
+        send_error(c->sock, SPROT_ERROR_INVALID_ARG, "bad ATTACH_DMABUF dims");
         return -1;
     }
 
@@ -566,6 +567,8 @@ static int handle_surface_attach_dmabuf(swm_client_t *c, const sprot_header_t *h
         return -1;
     }
 
+    s->width        = b.width;
+    s->height       = b.height;
     s->stride       = stride;
     s->buffer_size  = (size_t)b.total_size;
     s->buffer_kind  = SPROT_BUFFER_DMABUF;
@@ -671,22 +674,29 @@ static void surface_effective_rect(const swm_surface_t *s, int32_t *ex, int32_t 
         *eh = (int32_t)s->height;
         return;
     }
+    if (s->maximized) {
+        *ex = SWM_BORDER;
+        *ey = SWM_TITLEBAR_H + SWM_BORDER;
+    } else {
+        *ex = s->pos_x;
+        *ey = s->pos_y;
+    }
+    *ew = (int32_t)s->width;
+    *eh = (int32_t)s->height;
+}
+
+static void surface_maximize_target(int32_t *tw, int32_t *th) {
     int32_t workspace_h = (int32_t)g_swm.display_h;
     if (g_swm.de != NULL) {
         int32_t top = de_workspace_height(g_swm.de);
         if (top > 0 && top < workspace_h) workspace_h = top;
     }
-    if (s->maximized) {
-        *ex = SWM_BORDER;
-        *ey = SWM_TITLEBAR_H + SWM_BORDER;
-        *ew = (int32_t)g_swm.display_w - 2 * SWM_BORDER;
-        *eh = workspace_h - SWM_TITLEBAR_H - 2 * SWM_BORDER;
-    } else {
-        *ex = s->pos_x;
-        *ey = s->pos_y;
-        *ew = (int32_t)s->width;
-        *eh = (int32_t)s->height;
-    }
+    int32_t w = (int32_t)g_swm.display_w - 2 * SWM_BORDER;
+    int32_t h = workspace_h - SWM_TITLEBAR_H - 2 * SWM_BORDER;
+    if (w < 1) w = 1;
+    if (h < 1) h = 1;
+    *tw = w;
+    *th = h;
 }
 
 static void surface_outer_rect(const swm_surface_t *s, int32_t *ox, int32_t *oy, int32_t *ow, int32_t *oh) {
@@ -973,36 +983,19 @@ static void composite_surfaces(srapi_framebuffer_t *fb, uint32_t bg_color) {
         if (swm_buffer_begin_cpu_read(s->buffer) != 0) continue;
         began_read = 1;
 
-        if (ew == src_w && eh == src_h) {
-            int32_t sx0 = 0, sy0 = 0;
-            int32_t w = src_w, h = src_h;
-            int32_t dx = ex, dy = ey;
-            if (dx < 0) { sx0 = -dx; w -= sx0; dx = 0; }
-            if (dy < 0) { sy0 = -dy; h -= sy0; dy = 0; }
-            if (dx + w > dst_w) w = dst_w - dx;
-            if (dy + h > dst_h) h = dst_h - dy;
-            if (w <= 0 || h <= 0) continue;
+        (void)ew; (void)eh;
+        int32_t sx0 = 0, sy0 = 0;
+        int32_t w = src_w, h = src_h;
+        int32_t dx = ex, dy = ey;
+        if (dx < 0) { sx0 = -dx; w -= sx0; dx = 0; }
+        if (dy < 0) { sy0 = -dy; h -= sy0; dy = 0; }
+        if (dx + w > dst_w) w = dst_w - dx;
+        if (dy + h > dst_h) h = dst_h - dy;
+        if (w > 0 && h > 0) {
             for (int32_t row = 0; row < h; row++) {
                 const uint32_t *sr = src + (sy0 + row) * src_pitch_px + sx0;
                 uint32_t *dr = dst + (dy + row) * dst_pitch_px + dx;
                 memcpy(dr, sr, (size_t)w * 4u);
-            }
-        } else {
-            int32_t dy0 = ey > 0 ? ey : 0;
-            int32_t dy1 = ey + eh < dst_h ? ey + eh : dst_h;
-            int32_t dx0 = ex > 0 ? ex : 0;
-            int32_t dx1 = ex + ew < dst_w ? ex + ew : dst_w;
-            if (ew <= 0 || eh <= 0) continue;
-            for (int32_t dy = dy0; dy < dy1; dy++) {
-                int32_t sy = (int32_t)(((int64_t)(dy - ey) * src_h) / eh);
-                if (sy < 0) sy = 0; else if (sy >= src_h) sy = src_h - 1;
-                const uint32_t *sr = src + sy * src_pitch_px;
-                uint32_t *dr = dst + dy * dst_pitch_px;
-                for (int32_t dx = dx0; dx < dx1; dx++) {
-                    int32_t sx = (int32_t)(((int64_t)(dx - ex) * src_w) / ew);
-                    if (sx < 0) sx = 0; else if (sx >= src_w) sx = src_w - 1;
-                    dr[dx] = sr[sx];
-                }
             }
         }
         if (began_read) swm_buffer_end_cpu_read(s->buffer);
@@ -1025,13 +1018,21 @@ static void send_close_to(swm_surface_t *s) {
 
 static void send_configure_to(swm_surface_t *s, uint32_t state_flags) {
     if (s == NULL || s->owner == NULL) return;
-    int32_t x, y, w, h;
-    surface_effective_rect(s, &x, &y, &w, &h);
-    if (w <= 0) w = (int32_t)s->width;
-    if (h <= 0) h = (int32_t)s->height;
+    int32_t tw, th;
+    if (s->maximized) {
+        surface_maximize_target(&tw, &th);
+    } else if (s->saved_width > 0 && s->saved_height > 0) {
+        tw = (int32_t)s->saved_width;
+        th = (int32_t)s->saved_height;
+    } else {
+        tw = (int32_t)s->width;
+        th = (int32_t)s->height;
+    }
+    if (tw <= 0) tw = (int32_t)s->width;
+    if (th <= 0) th = (int32_t)s->height;
     sprot_body_configure_t body = {
-        .width = (uint32_t)w,
-        .height = (uint32_t)h,
+        .width = (uint32_t)tw,
+        .height = (uint32_t)th,
         .state = state_flags,
         .serial = ++g_swm.next_z,
     };
@@ -1040,7 +1041,17 @@ static void send_configure_to(swm_surface_t *s, uint32_t state_flags) {
 }
 
 static void toggle_maximize(swm_surface_t *s) {
-    s->maximized = !s->maximized;
+    if (!s->maximized) {
+        s->saved_pos_x = s->pos_x;
+        s->saved_pos_y = s->pos_y;
+        s->saved_width = s->width;
+        s->saved_height = s->height;
+        s->maximized = 1;
+    } else {
+        s->maximized = 0;
+        s->pos_x = s->saved_pos_x;
+        s->pos_y = s->saved_pos_y;
+    }
     send_configure_to(s, (s->maximized ? SPROT_SURFACE_STATE_MAXIMIZED : 0) | SPROT_SURFACE_STATE_FOCUSED);
 }
 

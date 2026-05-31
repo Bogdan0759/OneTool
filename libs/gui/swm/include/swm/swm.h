@@ -47,6 +47,8 @@ typedef struct swm_surface {
     int32_t pos_y;
     int32_t saved_pos_x;
     int32_t saved_pos_y;
+    uint32_t saved_width;
+    uint32_t saved_height;
     int z;
     char title[128];
 } swm_surface_t;

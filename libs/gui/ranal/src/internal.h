@@ -108,6 +108,8 @@ struct ranal_context {
     void *sprot_conn;
     void *sprot_surface;
     int sprot_pending_frame;
+    uint32_t last_cursor_sent;
+    int cursor_arrow_dwell;
     int32_t width;
     int32_t height;
     ranal_widget_t *root;

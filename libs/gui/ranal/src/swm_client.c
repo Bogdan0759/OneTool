@@ -243,6 +243,42 @@ void ranal_swm_pump_events_(void) {
                 }
                 break;
             }
+            case SPROT_EVENT_SURFACE_CONFIGURE: {
+                int32_t new_w = (int32_t)ev.u.configure.width;
+                int32_t new_h = (int32_t)ev.u.configure.height;
+                if (new_w <= 0 || new_h <= 0) break;
+                if (new_w == g_ranal->width && new_h == g_ranal->height) break;
+                if (sprot_resize_surface((sprot_surface_t *)g_ranal->sprot_surface,
+                                         (uint32_t)new_w, (uint32_t)new_h) != 0) {
+                    break;
+                }
+                if (g_ranal->target != NULL) {
+                    if (g_ranal->target->fb != NULL && g_ranal->target->owns_fb) {
+                        srapi_destroy_framebuffer(g_ranal->target->fb);
+                        g_ranal->target->fb = NULL;
+                    }
+                    srapi_framebuffer_t *fb = NULL;
+                    if (srapi_create_framebuffer(g_ranal->ctx, &(srapi_framebuffer_desc_t){
+                            .width = (uint32_t)new_w, .height = (uint32_t)new_h,
+                        }, &fb) == SRAPI_OK) {
+                        g_ranal->target->fb = fb;
+                        g_ranal->target->owns_fb = 1;
+                        g_ranal->target->pixels = srapi_framebuffer_pixels(fb);
+                        g_ranal->target->width = new_w;
+                        g_ranal->target->height = new_h;
+                        g_ranal->target->pitch = (int32_t)srapi_framebuffer_pitch(fb);
+                    }
+                }
+                g_ranal->width = new_w;
+                g_ranal->height = new_h;
+                if (g_ranal->root != NULL) {
+                    g_ranal->root->width = new_w;
+                    g_ranal->root->height = new_h;
+                }
+                g_ranal->dirty = 1;
+                g_ranal->presented = 0;
+                break;
+            }
             case SPROT_EVENT_SURFACE_CLOSE:
                 g_ranal->should_close = 1;
                 break;

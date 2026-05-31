@@ -63,6 +63,7 @@ uint32_t sprot_surface_height(const sprot_surface_t *surface);
 uint32_t sprot_surface_stride(const sprot_surface_t *surface);
 uint32_t sprot_surface_id(const sprot_surface_t *surface);
 int sprot_commit(sprot_surface_t *surface);
+int sprot_resize_surface(sprot_surface_t *surface, uint32_t width, uint32_t height);
 int sprot_attach_fd(
     sprot_surface_t *surface,
     int fd,

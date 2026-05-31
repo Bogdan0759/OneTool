@@ -605,7 +605,25 @@ void ranal_event_pass_(void) {
             if (hot->kind == RANAL_WIDGET_TEXTBOX) cursor = 1; // SPROT_CURSOR_IBEAM
             else if (hot->kind == RANAL_WIDGET_BUTTON || hot->kind == RANAL_WIDGET_CHECKBOX) cursor = 2; // SPROT_CURSOR_HAND
         }
-        sprot_set_cursor((sprot_surface_t *)g_ranal->sprot_surface, cursor);
+        /* Hysteresis: when leaving an interactive cursor zone (HAND/IBEAM),
+         * hold the previous cursor for a few frames. The mouse often jitters
+         * across button↔panel boundaries; without this we get visible flicker
+         * between the two cursor shapes. Coming INTO an interactive cursor
+         * is always immediate. */
+        if (cursor == 0 && g_ranal->last_cursor_sent != 0) {
+            if (g_ranal->cursor_arrow_dwell < 4) {
+                g_ranal->cursor_arrow_dwell++;
+                cursor = g_ranal->last_cursor_sent;
+            } else {
+                g_ranal->cursor_arrow_dwell = 0;
+            }
+        } else {
+            g_ranal->cursor_arrow_dwell = 0;
+        }
+        if (cursor != g_ranal->last_cursor_sent) {
+            sprot_set_cursor((sprot_surface_t *)g_ranal->sprot_surface, cursor);
+            g_ranal->last_cursor_sent = cursor;
+        }
     }
 }
 

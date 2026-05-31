@@ -571,7 +571,14 @@ static int client_sprot_fd_handler(int fd, uint32_t mask, void *data) {
                     if (s->xdg_toplevel_resource) {
                         struct wl_array states;
                         wl_array_init(&states);
-                        // Forward top-level configure
+                        if (ev.u.configure.state & SPROT_SURFACE_STATE_MAXIMIZED) {
+                            uint32_t *p = wl_array_add(&states, sizeof(uint32_t));
+                            if (p != NULL) *p = XDG_TOPLEVEL_STATE_MAXIMIZED;
+                        }
+                        if (ev.u.configure.state & SPROT_SURFACE_STATE_FOCUSED) {
+                            uint32_t *p = wl_array_add(&states, sizeof(uint32_t));
+                            if (p != NULL) *p = XDG_TOPLEVEL_STATE_ACTIVATED;
+                        }
                         xdg_toplevel_send_configure(s->xdg_toplevel_resource, s->width, s->height, &states);
                         wl_array_release(&states);
                     }

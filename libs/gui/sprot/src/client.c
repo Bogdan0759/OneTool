@@ -353,6 +353,45 @@ int sprot_commit(sprot_surface_t *surface) {
     return 0;
 }
 
+int sprot_resize_surface(sprot_surface_t *surface, uint32_t width, uint32_t height) {
+    if (surface == NULL || surface->conn == NULL || width == 0 || height == 0) {
+        set_err("sprot: bad resize args");
+        return -1;
+    }
+    if (surface->width == width && surface->height == height) {
+        return 0;
+    }
+
+    uint32_t new_stride = width * 4u;
+    size_t new_size = (size_t)new_stride * height;
+    int new_fd = memfd_anon("sprot-buf", new_size);
+    if (new_fd < 0) {
+        set_err("sprot: resize memfd_create: %s", strerror(errno));
+        return -1;
+    }
+    void *new_map = mmap(NULL, new_size, PROT_READ | PROT_WRITE, MAP_SHARED, new_fd, 0);
+    if (new_map == MAP_FAILED) {
+        set_err("sprot: resize mmap: %s", strerror(errno));
+        close(new_fd);
+        return -1;
+    }
+    memset(new_map, 0, new_size);
+
+    if (surface->map != NULL && surface->map != MAP_FAILED) {
+        munmap(surface->map, surface->size);
+    }
+    if (surface->fd >= 0) close(surface->fd);
+
+    surface->fd = new_fd;
+    surface->map = new_map;
+    surface->width = width;
+    surface->height = height;
+    surface->stride = new_stride;
+    surface->size = new_size;
+    surface->attached = 0;
+    return 0;
+}
+
 int sprot_attach_fd(
     sprot_surface_t *surface,
     int fd,
