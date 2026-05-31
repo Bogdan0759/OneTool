@@ -666,7 +666,7 @@ task build() {
         @echo("[CC] %s", SPROT_VK_INTEROP_SRC);
         @run("%s %s %s -c %s -o %s", CC, CFLAGS, SPROT_CFLAGS, SPROT_VK_INTEROP_SRC, SPROT_VK_INTEROP_OBJ);
     }
-    if (@is_outdated(SWM_MAIN_OBJ, SWM_MAIN_SRC, SWM_HDR, SWM_DE_HDR, SWM_BACKEND_HDR, SWM_RENDER_HDR, SWM_PROTOCOL_HDR, SWM_INTERACTION_HDR, SPROT_HDR, SRAPI_HDR)) {
+    if (@is_outdated(SWM_MAIN_OBJ, SWM_MAIN_SRC, SWM_HDR, SWM_DE_HDR, SWM_BACKEND_HDR, SWM_RENDER_HDR, SWM_PROTOCOL_HDR, SWM_INTERACTION_HDR, SWM_SURFACE_HDR, SPROT_HDR, SRAPI_HDR)) {
         @echo("[CC] %s", SWM_MAIN_SRC);
         @run("%s %s %s -Dmain=sw -c %s -o %s", CC, CFLAGS, SWM_CFLAGS, SWM_MAIN_SRC, SWM_MAIN_OBJ);
     }
@@ -807,6 +807,10 @@ task build() {
         SWM_MAIN_OBJ,
         SWM_BACKEND_OBJ,
         SWM_BUFFER_OBJ,
+        SWM_SURFACE_OBJ,
+        SWM_RENDER_OBJ,
+        SWM_PROTOCOL_OBJ,
+        SWM_INTERACTION_OBJ,
         SWM_DE_OBJ,
         SWM_PROBE_RENDER_NODE_OBJ,
         SPROT_HELLO_OBJ,

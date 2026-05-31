@@ -171,9 +171,9 @@ void ranal_swm_pump_events_(void) {
         int r = sprot_poll_event(conn, &ev, timeout);
         if (r <= 0) break;
         timeout = 0;
-        g_ranal->dirty = 1;
         switch (ev.kind) {
             case SPROT_EVENT_POINTER_MOTION:
+                g_ranal->dirty = 1;
                 g_ranal->mouse_x = ev.u.pointer_motion.x;
                 g_ranal->mouse_y = ev.u.pointer_motion.y;
                 if (g_ranal->mouse_hook != NULL) {
@@ -185,6 +185,7 @@ void ranal_swm_pump_events_(void) {
                 }
                 break;
             case SPROT_EVENT_POINTER_BUTTON: {
+                g_ranal->dirty = 1;
                 int pressed = (ev.u.pointer_button.state == SPROT_BUTTON_STATE_PRESSED);
                 if (ev.u.pointer_button.button == 1) {
                     g_ranal->curr_mouse_left = pressed;
@@ -200,6 +201,7 @@ void ranal_swm_pump_events_(void) {
                 break;
             }
             case SPROT_EVENT_POINTER_AXIS:
+                g_ranal->dirty = 1;
                 if (g_ranal->mouse_hook != NULL) {
                     ranal_mouse_event_t me = {0};
                     me.kind = RANAL_MOUSE_WHEEL;
@@ -213,6 +215,7 @@ void ranal_swm_pump_events_(void) {
                 }
                 break;
             case SPROT_EVENT_KEY: {
+                g_ranal->dirty = 1;
                 int pressed = (ev.u.key.state == SPROT_KEY_STATE_PRESSED);
                 if (g_ranal->key_hook != NULL &&
                     g_ranal->key_hook(ev.u.key.scancode,
