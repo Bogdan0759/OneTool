@@ -3,7 +3,7 @@
 #include "../buffer/buffer.h"
 #include "../de/de.h"
 
-#include <stdlib.h>
+#include <limits.h>
 #include <string.h>
 
 int swm_surface_role_is_child(uint32_t role) {
@@ -68,12 +68,16 @@ swm_surface_t *swm_surface_find(swm_state_t *swm, uint32_t id) {
     return NULL;
 }
 
-static int z_compare_asc(const void *a, const void *b) {
-    const swm_surface_t * const *sa = a;
-    const swm_surface_t * const *sb = b;
-    if ((*sa)->z < (*sb)->z) return -1;
-    if ((*sa)->z > (*sb)->z) return 1;
-    return 0;
+static void sort_surfaces_by_z(swm_surface_t **list, int n) {
+    for (int i = 1; i < n; i++) {
+        swm_surface_t *s = list[i];
+        int j = i - 1;
+        while (j >= 0 && list[j]->z > s->z) {
+            list[j + 1] = list[j];
+            j--;
+        }
+        list[j + 1] = s;
+    }
 }
 
 static int surface_tree_is_visible(swm_state_t *swm, swm_surface_t *s, int depth) {
@@ -91,7 +95,7 @@ int swm_surface_collect_z_asc(swm_state_t *swm, swm_surface_t **out, int max) {
         if (!surface_tree_is_visible(swm, s, 0)) continue;
         out[n++] = s;
     }
-    qsort(out, (size_t)n, sizeof(*out), z_compare_asc);
+    sort_surfaces_by_z(out, n);
     return n;
 }
 
@@ -192,19 +196,31 @@ void swm_surface_local_coords(swm_state_t *swm, swm_surface_t *s,
 }
 
 swm_surface_t *swm_surface_topmost_window(swm_state_t *swm) {
-    swm_surface_t *list[SWM_MAX_SURFACES];
-    int n = swm_surface_collect_z_asc(swm, list, SWM_MAX_SURFACES);
-    for (int i = n - 1; i >= 0; i--) {
-        if (swm_surface_role_is_window(list[i]->role)) return list[i];
+    swm_surface_t *best = NULL;
+    int best_z = INT_MIN;
+    if (swm == NULL) return NULL;
+    for (int i = 0; i < SWM_MAX_SURFACES; i++) {
+        swm_surface_t *s = &swm->surfaces[i];
+        if (!surface_tree_is_visible(swm, s, 0) || !swm_surface_role_is_window(s->role)) continue;
+        if (best == NULL || s->z > best_z) {
+            best = s;
+            best_z = s->z;
+        }
     }
-    return NULL;
+    return best;
 }
 
 swm_surface_t *swm_surface_topmost_popup(swm_state_t *swm) {
-    swm_surface_t *list[SWM_MAX_SURFACES];
-    int n = swm_surface_collect_z_asc(swm, list, SWM_MAX_SURFACES);
-    for (int i = n - 1; i >= 0; i--) {
-        if (list[i]->role == SPROT_SURFACE_ROLE_POPUP) return list[i];
+    swm_surface_t *best = NULL;
+    int best_z = INT_MIN;
+    if (swm == NULL) return NULL;
+    for (int i = 0; i < SWM_MAX_SURFACES; i++) {
+        swm_surface_t *s = &swm->surfaces[i];
+        if (!surface_tree_is_visible(swm, s, 0) || s->role != SPROT_SURFACE_ROLE_POPUP) continue;
+        if (best == NULL || s->z > best_z) {
+            best = s;
+            best_z = s->z;
+        }
     }
-    return NULL;
+    return best;
 }

@@ -214,7 +214,13 @@ void swm_render_composite(swm_state_t *swm, srapi_framebuffer_t *fb, uint32_t bg
 
     swm_surface_t *list[SWM_MAX_SURFACES];
     int n = swm_surface_collect_z_asc(swm, list, SWM_MAX_SURFACES);
-    swm_surface_t *focused = swm_surface_topmost_window(swm);
+    swm_surface_t *focused = NULL;
+    for (int i = n - 1; i >= 0; i--) {
+        if (swm_surface_role_is_window(list[i]->role)) {
+            focused = list[i];
+            break;
+        }
+    }
 
     for (int i = 0; i < n; i++) {
         swm_surface_t *s = list[i];
