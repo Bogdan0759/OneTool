@@ -69,7 +69,6 @@ static void data_device_manager_get_data_device(struct wl_client *client, struct
         return;
     }
     wl_resource_set_implementation(device, &data_device_implementation, NULL, NULL);
-    wl_data_device_send_selection(device, NULL);
 }
 
 static const struct wl_data_device_manager_interface data_device_manager_implementation = {

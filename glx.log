@@ -1,0 +1,1342 @@
+[wayland_bridge 2026-06-01 00:11:05 pid=186562] starting argc=6 argv0=./onetool
+[wayland_bridge 2026-06-01 00:11:05 pid=186562] display=wayland-5 swm_socket=/tmp/swm.sock
+[wayland_bridge 2026-06-01 00:11:05 pid=186562] debug_file=glx.log
+[wayland_bridge 2026-06-01 00:11:05 pid=186562] app command=qbittorrent
+[wayland_bridge 2026-06-01 00:11:05 pid=186562] wlbridge forked pid=186563
+[wayland_bridge 2026-06-01 00:11:05 pid=186563] exec wlbridge path=./wlbridge display_arg=--display=wayland-5 socket_arg=--socket=/tmp/swm.sock debug=glx.log
+[2026-06-01 00:11:05] wlbridge server starting. display: wayland-5, swm_socket: /tmp/swm.sock
+[2026-06-01 00:11:05] Registered zwp_linux_dmabuf_v1 global (version 4)
+[2026-06-01 00:11:05] Wayland proxy running.
+[wayland_bridge 2026-06-01 00:11:06 pid=186562] wlbridge still running after startup delay
+[wayland_bridge 2026-06-01 00:11:06 pid=186562] starting app: qbittorrent
+[wayland_bridge 2026-06-01 00:11:06 pid=186562] app forked pid=186565
+[wayland_bridge 2026-06-01 00:11:06 pid=186565] exec app via /bin/sh -c, WAYLAND_DISPLAY=wayland-5 XDG_RUNTIME_DIR=/run/user/1000 GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1 QT_QPA_PLATFORM=wayland WAYLAND_DEBUG=1 GDK_DEBUG=misc,events,dnd,selection,clipboard,opengl,vulkan MOZ_LOG=Widget:5,WidgetWayland:5,WidgetPopup:5,Gtk:5 MOZ_LOG_FILE=glx.log.moz
+[2026-06-01 00:11:06] [CLIENT_CONNECT] new wl_client pid=186566 uid=1000 ptr=0x564d5324fe30
+[2026-06-01 00:11:06] [PROTO REQ] pid=186566 wl_display@1.get_registry argc=1
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_registry@2.global name=1 interface=wl_compositor version=4
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_registry@2.global name=2 interface=wl_subcompositor version=1
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_registry@2.global name=3 interface=wl_shm version=2
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_registry@2.global name=4 interface=wl_data_device_manager version=3
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_registry@2.global name=5 interface=wp_viewporter version=1
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_registry@2.global name=6 interface=xdg_wm_base version=7
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_registry@2.global name=7 interface=zxdg_decoration_manager_v1 version=1
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_registry@2.global name=8 interface=wl_seat version=5
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_registry@2.global name=9 interface=wl_output version=3
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_registry@2.global name=10 interface=zwp_linux_dmabuf_v1 version=4
+[2026-06-01 00:11:06] [PROTO REQ] pid=186566 wl_display@1.sync argc=1
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_callback@3.done argc=1
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:06] [PROTO REQ] pid=186566 wl_registry@2.bind name=1 interface=wl_compositor version=4 new_id=4
+[2026-06-01 00:11:06] compositor_bind: version=4 id=4 pid=186566
+[2026-06-01 00:11:06] [PROTO REQ] pid=186566 wl_registry@2.bind name=2 interface=wl_subcompositor version=1 new_id=5
+[2026-06-01 00:11:06] subcompositor_bind: version=1 id=5
+[2026-06-01 00:11:06] [PROTO REQ] pid=186566 wl_registry@2.bind name=3 interface=wl_shm version=1 new_id=6
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_shm@6.format argc=1
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_shm@6.format argc=1
+[2026-06-01 00:11:06] [PROTO REQ] pid=186566 wl_registry@2.bind name=4 interface=wl_data_device_manager version=3 new_id=7
+[2026-06-01 00:11:06] data_device_manager_bind: version=3 id=7
+[2026-06-01 00:11:06] [PROTO REQ] pid=186566 wl_registry@2.bind name=5 interface=wp_viewporter version=1 new_id=8
+[2026-06-01 00:11:06] viewporter_bind: version=1 id=8
+[2026-06-01 00:11:06] [PROTO REQ] pid=186566 wl_registry@2.bind name=8 interface=wl_seat version=5 new_id=9
+[2026-06-01 00:11:06] seat_bind: version=5 id=9 pid=186566
+[2026-06-01 00:11:06] New Wayland client connected. pid=186566 Initializing Sprot connection...
+[2026-06-01 00:11:06] Client registration complete.
+[2026-06-01 00:11:06] seat_bind: sending capabilities=0x3 (POINTER|KEYBOARD)
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_seat@9.capabilities argc=1
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_seat@9.name argc=1
+[2026-06-01 00:11:06] seat_bind: sent seat name 'seat0'
+[2026-06-01 00:11:06] seat_bind: done
+[2026-06-01 00:11:06] [PROTO REQ] pid=186566 wl_data_device_manager@7.get_data_device argc=2
+[2026-06-01 00:11:06] data_device_manager_get_data_device: id=10 seat=9 version=3
+[2026-06-01 00:11:06] [PROTO REQ] pid=186566 wl_registry@2.bind name=9 interface=wl_output version=3 new_id=11
+[2026-06-01 00:11:06] output_bind: version=3 id=11 pid=186566
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_output@11.geometry argc=8
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_output@11.mode argc=4
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_output@11.scale argc=1
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_output@11.done
+[2026-06-01 00:11:06] output_bind: done
+[2026-06-01 00:11:06] [PROTO REQ] pid=186566 wl_display@1.sync argc=1
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_callback@3.done argc=1
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:06] [PROTO REQ] pid=186566 wl_seat@9.get_keyboard argc=1
+[2026-06-01 00:11:06] seat_get_keyboard: id=12 seat_version=5
+[2026-06-01 00:11:06] seat_get_keyboard: keyboard resource created, version=5
+[2026-06-01 00:11:06] seat_get_keyboard: sending keymap fd=15 size=313
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_keyboard@12.keymap argc=3
+[2026-06-01 00:11:06] seat_get_keyboard: keymap sent
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_keyboard@12.repeat_info argc=2
+[2026-06-01 00:11:06] seat_get_keyboard: repeat_info sent
+[2026-06-01 00:11:06] [PROTO EVT] pid=186566 wl_keyboard@12.modifiers argc=5
+[2026-06-01 00:11:06] seat_get_keyboard: modifiers sent. keyboard_focus=null
+[2026-06-01 00:11:06] seat_get_keyboard: done
+[2026-06-01 00:11:06] [PROTO REQ] pid=186566 wl_seat@9.get_pointer argc=1
+[2026-06-01 00:11:06] seat_get_pointer: id=13
+[2026-06-01 00:11:06] seat_get_pointer: done, pointer resource created
+[2026-06-01 00:11:06] [PROTO REQ] pid=186566 wl_registry@2.bind name=6 interface=xdg_wm_base version=6 new_id=3
+[2026-06-01 00:11:06] xdg_wm_base_bind: version=6 id=3 pid=186566
+[2026-06-01 00:11:06] [PROTO REQ] pid=186566 wl_registry@2.bind name=7 interface=zxdg_decoration_manager_v1 version=1 new_id=14
+[2026-06-01 00:11:06] decoration_manager_bind: version=1 id=14
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_compositor@4.create_surface argc=1
+[2026-06-01 00:11:08] Wayland surface created. Assigned internal handle=1
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 xdg_wm_base@3.get_xdg_surface argc=2
+[2026-06-01 00:11:08] Wayland request: xdg_wm_base.get_xdg_surface for surface handle=1
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 xdg_surface@16.get_toplevel argc=1
+[2026-06-01 00:11:08] Wayland request: xdg_surface.get_toplevel for surface handle=1
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 zxdg_decoration_manager_v1@14.get_toplevel_decoration argc=2
+[2026-06-01 00:11:08] decoration_manager_get_toplevel_decoration: id=18 version=1
+[2026-06-01 00:11:08] [PROTO EVT] pid=186566 zxdg_toplevel_decoration_v1@18.configure argc=1
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 zxdg_toplevel_decoration_v1@18.unset_mode
+[2026-06-01 00:11:08] toplevel_decoration_unset_mode
+[2026-06-01 00:11:08] [PROTO EVT] pid=186566 zxdg_toplevel_decoration_v1@18.configure argc=1
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 xdg_toplevel@17.set_min_size argc=2
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 xdg_toplevel@17.set_max_size argc=2
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 xdg_toplevel@17.set_title argc=1
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 xdg_toplevel@17.set_app_id argc=1
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.set_buffer_scale argc=1
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 zxdg_toplevel_decoration_v1@18.unset_mode
+[2026-06-01 00:11:08] toplevel_decoration_unset_mode
+[2026-06-01 00:11:08] [PROTO EVT] pid=186566 zxdg_toplevel_decoration_v1@18.configure argc=1
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.set_buffer_transform argc=1
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:08] surface_commit: handle=1 buffer=null configured=0 sprot_id=0
+[2026-06-01 00:11:08] surface_commit: initial commit (no buffer) for handle=1. Sending XDG configure.
+[2026-06-01 00:11:08] [PROTO EVT] pid=186566 xdg_toplevel@17.configure argc=3
+[2026-06-01 00:11:08] [PROTO EVT] pid=186566 xdg_surface@16.configure argc=1
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_compositor@4.create_region argc=1
+[2026-06-01 00:11:08] compositor_create_region: id=19
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_region@19.add argc=4
+[2026-06-01 00:11:08] region_add: id=19 rect=0,0 1272x713
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.set_opaque_region argc=1
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_region@19.destroy
+[2026-06-01 00:11:08] region_destroy: id=19
+[2026-06-01 00:11:08] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 xdg_toplevel@17.set_min_size argc=2
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 xdg_toplevel@17.set_max_size argc=2
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 xdg_surface@16.ack_configure argc=1
+[2026-06-01 00:11:08] xdg_surface_ack_configure: handle=1 serial=1
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 xdg_surface@16.set_window_geometry argc=4
+[2026-06-01 00:11:08] Wayland request: xdg_surface.set_window_geometry to 0,0 1272x713
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 xdg_toplevel@17.set_min_size argc=2
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 xdg_toplevel@17.set_max_size argc=2
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_shm@6.create_pool argc=3
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_shm_pool@19.create_buffer argc=6
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.frame argc=1
+[2026-06-01 00:11:08] surface_frame: handle=1 id=21
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:08] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:08] surface_commit: handle=1 buffer=set configured=1 sprot_id=0
+[2026-06-01 00:11:08] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:08] Creating new Sprot surface for client connection...
+[2026-06-01 00:11:08] Created new shared memory mapping (memfd) of size 3627744 for surface handle=1
+[2026-06-01 00:11:08] Sprot surface/parent is not ready. Deferring attach and commit.
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_shm@6.create_pool argc=3
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_shm_pool@22.create_buffer argc=6
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:08] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:08] surface_commit: handle=1 buffer=set configured=1 sprot_id=0
+[2026-06-01 00:11:08] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:08] Sprot surface/parent is not ready. Deferring attach and commit.
+[2026-06-01 00:11:08] Sprot event: Surface created. Sprot ID=2 assigned to handle=1 (sprot_handle=1)
+[2026-06-01 00:11:08] Set Sprot role to SPROT_SURFACE_ROLE_TOPLEVEL for Sprot ID=2 (res=0)
+[2026-06-01 00:11:08] Executing deferred SHM commit for surface Sprot ID=2
+[2026-06-01 00:11:08] Deferred SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:08] [PROTO EVT] pid=186566 wl_buffer@23.release
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_shm@6.create_pool argc=3
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_shm_pool@24.create_buffer argc=6
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:08] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:08] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:08] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:08] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:08] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:08] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:08] [PROTO EVT] pid=186566 wl_buffer@25.release
+[2026-06-01 00:11:08] [PROTO EVT] pid=186566 wl_callback@21.done argc=1
+[2026-06-01 00:11:08] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:08] Sprot event: Frame update for surface Sprot ID=2. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:09] Sprot event: Pointer entered surface handle=1 at (92, 710)
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.enter argc=4
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_keyboard@12.enter argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_keyboard@12.modifiers argc=5
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:09] Sprot event: Pointer left surface handle=1
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_pointer@13.leave argc=2
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_keyboard@12.leave argc=2
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_shm@6.create_pool argc=3
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_shm_pool@21.resize argc=1
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_shm_pool@21.resize argc=1
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_shm_pool@21.resize argc=1
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_shm_pool@21.resize argc=1
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_shm_pool@21.resize argc=1
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_shm_pool@21.resize argc=1
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_shm_pool@21.resize argc=1
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_shm_pool@21.create_buffer argc=6
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_compositor@4.create_surface argc=1
+[2026-06-01 00:11:09] Wayland surface created. Assigned internal handle=2
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_pointer@13.set_cursor argc=4
+[2026-06-01 00:11:09] pointer_set_cursor: serial=2 surface_handle=2 hotspot=3,1
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_surface@27.set_buffer_scale argc=1
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_surface@27.attach argc=3
+[2026-06-01 00:11:09] surface_attach: handle=2 buffer=set
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_surface@27.damage argc=4
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_surface@27.commit
+[2026-06-01 00:11:09] surface_commit: handle=2 buffer=set configured=0 sprot_id=0
+[2026-06-01 00:11:09] surface_commit: skipping cursor handle=2 pos=0,0
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_buffer@26.release
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_display@1.sync argc=1
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_callback@28.done argc=1
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_surface@15.frame argc=1
+[2026-06-01 00:11:09] surface_frame: handle=1 id=29
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:09] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:09] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:09] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:09] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:09] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_buffer@25.release
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:09] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:09] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:09] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:09] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:09] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:09] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_buffer@23.release
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_callback@29.done argc=1
+[2026-06-01 00:11:09] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:09] Sprot event: Frame update for surface Sprot ID=2. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:11] Sprot event: Pointer entered surface handle=1 at (377, 1)
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.enter argc=4
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_keyboard@12.enter argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_keyboard@12.modifiers argc=5
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_pointer@13.set_cursor argc=4
+[2026-06-01 00:11:11] pointer_set_cursor: serial=4 surface_handle=2 hotspot=3,1
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@27.set_buffer_scale argc=1
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@27.attach argc=3
+[2026-06-01 00:11:11] surface_attach: handle=2 buffer=set
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@27.damage argc=4
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@27.commit
+[2026-06-01 00:11:11] surface_commit: handle=2 buffer=set configured=0 sprot_id=0
+[2026-06-01 00:11:11] cursor_image: sent 24x24 hotspot=3,1 res=0
+[2026-06-01 00:11:11] surface_commit: skipping cursor handle=2 pos=0,0
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_buffer@26.release
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_display@1.sync argc=1
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_callback@29.done argc=1
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.frame argc=1
+[2026-06-01 00:11:11] surface_frame: handle=1 id=29
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:11] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:11] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:11] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:11] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:11] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_buffer@23.release
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_callback@29.done argc=1
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:11] Sprot event: Frame update for surface Sprot ID=2. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.frame argc=1
+[2026-06-01 00:11:11] surface_frame: handle=1 id=29
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:11] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:11] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:11] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:11] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:11] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_buffer@23.release
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:11] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:11] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:11] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:11] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:11] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_buffer@25.release
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_callback@29.done argc=1
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:11] Sprot event: Frame update for surface Sprot ID=2. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] Sprot event: Pointer button button=1 wl_button=272 state=1
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.button argc=4
+[2026-06-01 00:11:11] Sprot event: Pointer button button=1 wl_button=272 state=0
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.button argc=4
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.frame argc=1
+[2026-06-01 00:11:11] surface_frame: handle=1 id=29
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:11] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:11] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:11] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:11] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:11] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_buffer@25.release
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:11] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:11] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:11] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:11] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:11] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:11] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_buffer@23.release
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_callback@29.done argc=1
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:11] Sprot event: Frame update for surface Sprot ID=2. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:11] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] Sprot event: Pointer button button=1 wl_button=272 state=1
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.button argc=4
+[2026-06-01 00:11:12] Sprot event: Pointer button button=1 wl_button=272 state=0
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.button argc=4
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO REQ] pid=186566 wl_surface@15.frame argc=1
+[2026-06-01 00:11:12] surface_frame: handle=1 id=29
+[2026-06-01 00:11:12] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:12] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:12] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:12] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:12] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:12] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:12] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:12] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_buffer@23.release
+[2026-06-01 00:11:12] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:12] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:12] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:12] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:12] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:12] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:12] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:12] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_buffer@25.release
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_callback@29.done argc=1
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:12] Sprot event: Frame update for surface Sprot ID=2. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO REQ] pid=186566 wl_surface@15.frame argc=1
+[2026-06-01 00:11:12] surface_frame: handle=1 id=29
+[2026-06-01 00:11:12] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:12] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:12] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:12] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:12] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:12] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:12] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:12] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_buffer@25.release
+[2026-06-01 00:11:12] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:12] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:12] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:12] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:12] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:12] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:12] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:12] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_buffer@23.release
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_callback@29.done argc=1
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:12] Sprot event: Frame update for surface Sprot ID=2. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:12] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] Sprot event: Pointer button button=1 wl_button=272 state=1
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.button argc=4
+[2026-06-01 00:11:13] [PROTO REQ] pid=186566 wl_surface@15.frame argc=1
+[2026-06-01 00:11:13] surface_frame: handle=1 id=29
+[2026-06-01 00:11:13] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:13] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:13] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:13] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:13] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:13] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:13] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:13] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_buffer@23.release
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_callback@29.done argc=1
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:13] Sprot event: Frame update for surface Sprot ID=2. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:13] Sprot event: Pointer button button=1 wl_button=272 state=0
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.button argc=4
+[2026-06-01 00:11:13] [PROTO REQ] pid=186566 wl_surface@15.frame argc=1
+[2026-06-01 00:11:13] surface_frame: handle=1 id=29
+[2026-06-01 00:11:13] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:13] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:13] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:13] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:13] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:13] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:13] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:13] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_buffer@23.release
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_callback@29.done argc=1
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:13] Sprot event: Frame update for surface Sprot ID=2. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO REQ] pid=186566 wl_compositor@4.create_surface argc=1
+[2026-06-01 00:11:13] Wayland surface created. Assigned internal handle=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:13] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_compositor@4.create_region argc=1
+[2026-06-01 00:11:14] compositor_create_region: id=28
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_region@28.add argc=4
+[2026-06-01 00:11:14] region_add: id=28 rect=0,0 463x128
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@29.set_opaque_region argc=1
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_region@28.destroy
+[2026-06-01 00:11:14] region_destroy: id=28
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_compositor@4.create_region argc=1
+[2026-06-01 00:11:14] compositor_create_region: id=30
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_region@30.add argc=4
+[2026-06-01 00:11:14] region_add: id=30 rect=0,0 463x141
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@29.set_opaque_region argc=1
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_region@30.destroy
+[2026-06-01 00:11:14] region_destroy: id=30
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 xdg_wm_base@3.get_xdg_surface argc=2
+[2026-06-01 00:11:14] Wayland request: xdg_wm_base.get_xdg_surface for surface handle=3
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 xdg_surface@31.get_toplevel argc=1
+[2026-06-01 00:11:14] Wayland request: xdg_surface.get_toplevel for surface handle=3
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 zxdg_decoration_manager_v1@14.get_toplevel_decoration argc=2
+[2026-06-01 00:11:14] decoration_manager_get_toplevel_decoration: id=33 version=1
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 zxdg_toplevel_decoration_v1@33.configure argc=1
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 zxdg_toplevel_decoration_v1@33.unset_mode
+[2026-06-01 00:11:14] toplevel_decoration_unset_mode
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 zxdg_toplevel_decoration_v1@33.configure argc=1
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 xdg_toplevel@32.set_parent argc=1
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 xdg_toplevel@32.set_min_size argc=2
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 xdg_toplevel@32.set_max_size argc=2
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 xdg_toplevel@32.set_title argc=1
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 xdg_toplevel@32.set_app_id argc=1
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@29.set_buffer_scale argc=1
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 zxdg_toplevel_decoration_v1@33.unset_mode
+[2026-06-01 00:11:14] toplevel_decoration_unset_mode
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 zxdg_toplevel_decoration_v1@33.configure argc=1
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@29.set_buffer_transform argc=1
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@29.commit
+[2026-06-01 00:11:14] surface_commit: handle=3 buffer=null configured=0 sprot_id=0
+[2026-06-01 00:11:14] surface_commit: initial commit (no buffer) for handle=3. Sending XDG configure.
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 xdg_toplevel@32.configure argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 xdg_surface@31.configure argc=1
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.frame argc=1
+[2026-06-01 00:11:14] surface_frame: handle=1 id=34
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:14] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:14] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:14] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:14] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:14] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_buffer@23.release
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 xdg_surface@31.ack_configure argc=1
+[2026-06-01 00:11:14] xdg_surface_ack_configure: handle=3 serial=1
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 xdg_surface@31.set_window_geometry argc=4
+[2026-06-01 00:11:14] Wayland request: xdg_surface.set_window_geometry to 0,0 463x141
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_shm@6.create_pool argc=3
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_shm_pool@30.create_buffer argc=6
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@29.frame argc=1
+[2026-06-01 00:11:14] surface_frame: handle=3 id=35
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@29.attach argc=3
+[2026-06-01 00:11:14] surface_attach: handle=3 buffer=set
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@29.damage_buffer argc=4
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@29.commit
+[2026-06-01 00:11:14] surface_commit: handle=3 buffer=set configured=1 sprot_id=0
+[2026-06-01 00:11:14] Surface commit for surface handle=3. Attached SHM buffer size: 463x141, stride: 1852, size: 261132
+[2026-06-01 00:11:14] Creating new Sprot surface for client connection...
+[2026-06-01 00:11:14] Created new shared memory mapping (memfd) of size 261132 for surface handle=3
+[2026-06-01 00:11:14] Sprot surface/parent is not ready. Deferring attach and commit.
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_callback@34.done argc=1
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:14] Sprot event: Frame update for surface Sprot ID=2. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] Sprot event: Surface created. Sprot ID=3 assigned to handle=3 (sprot_handle=2)
+[2026-06-01 00:11:14] Set Sprot role to SPROT_SURFACE_ROLE_TOPLEVEL for Sprot ID=3 (res=0)
+[2026-06-01 00:11:14] Executing deferred SHM commit for surface Sprot ID=3
+[2026-06-01 00:11:14] Deferred SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_buffer@28.release
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] Sprot event: Pointer left surface handle=1
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.leave argc=2
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_keyboard@12.leave argc=2
+[2026-06-01 00:11:14] Sprot event: Pointer entered surface handle=3 at (352, 126)
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.enter argc=4
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_keyboard@12.enter argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_keyboard@12.modifiers argc=5
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_display@1.sync argc=1
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_callback@34.done argc=1
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_pointer@13.set_cursor argc=4
+[2026-06-01 00:11:14] pointer_set_cursor: serial=12 surface_handle=2 hotspot=3,1
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@27.set_buffer_scale argc=1
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@27.attach argc=3
+[2026-06-01 00:11:14] surface_attach: handle=2 buffer=set
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@27.damage argc=4
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@27.commit
+[2026-06-01 00:11:14] surface_commit: handle=2 buffer=set configured=0 sprot_id=0
+[2026-06-01 00:11:14] cursor_image: sent 24x24 hotspot=3,1 res=0
+[2026-06-01 00:11:14] surface_commit: skipping cursor handle=2 pos=0,0
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_buffer@26.release
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@29.attach argc=3
+[2026-06-01 00:11:14] surface_attach: handle=3 buffer=set
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@29.damage_buffer argc=4
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@29.commit
+[2026-06-01 00:11:14] surface_commit: handle=3 buffer=set configured=1 sprot_id=3
+[2026-06-01 00:11:14] Surface commit for surface handle=3. Attached SHM buffer size: 463x141, stride: 1852, size: 261132
+[2026-06-01 00:11:14] Forwarding SHM buffer attach to SWM (Sprot ID=3)
+[2026-06-01 00:11:14] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_buffer@28.release
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_callback@35.done argc=1
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:14] Sprot event: Frame update for surface Sprot ID=3. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.frame argc=1
+[2026-06-01 00:11:14] surface_frame: handle=1 id=35
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:14] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:14] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:14] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:14] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:14] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_buffer@23.release
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@29.frame argc=1
+[2026-06-01 00:11:14] surface_frame: handle=3 id=34
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@29.attach argc=3
+[2026-06-01 00:11:14] surface_attach: handle=3 buffer=set
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@29.damage_buffer argc=4
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@29.commit
+[2026-06-01 00:11:14] surface_commit: handle=3 buffer=set configured=1 sprot_id=3
+[2026-06-01 00:11:14] Surface commit for surface handle=3. Attached SHM buffer size: 463x141, stride: 1852, size: 261132
+[2026-06-01 00:11:14] Forwarding SHM buffer attach to SWM (Sprot ID=3)
+[2026-06-01 00:11:14] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_buffer@28.release
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:14] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:14] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:14] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:14] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:14] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_buffer@23.release
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:14] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:14] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:14] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:14] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:14] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:14] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_buffer@25.release
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_callback@35.done argc=1
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:14] Sprot event: Frame update for surface Sprot ID=2. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_callback@34.done argc=1
+[2026-06-01 00:11:14] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:14] Sprot event: Frame update for surface Sprot ID=3. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO REQ] pid=186566 wl_surface@15.frame argc=1
+[2026-06-01 00:11:15] surface_frame: handle=1 id=34
+[2026-06-01 00:11:15] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:15] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:15] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:15] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:15] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:15] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:15] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:15] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_buffer@25.release
+[2026-06-01 00:11:15] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:15] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:15] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:15] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:15] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:15] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:15] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:15] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_buffer@23.release
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_callback@34.done argc=1
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:15] Sprot event: Frame update for surface Sprot ID=2. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:15] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] Sprot event: Pointer button button=1 wl_button=272 state=1
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.button argc=4
+[2026-06-01 00:11:16] Sprot event: Pointer button button=1 wl_button=272 state=0
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.button argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@29.frame argc=1
+[2026-06-01 00:11:16] surface_frame: handle=3 id=34
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@29.attach argc=3
+[2026-06-01 00:11:16] surface_attach: handle=3 buffer=set
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@29.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@29.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@29.commit
+[2026-06-01 00:11:16] surface_commit: handle=3 buffer=set configured=1 sprot_id=3
+[2026-06-01 00:11:16] Surface commit for surface handle=3. Attached SHM buffer size: 463x141, stride: 1852, size: 261132
+[2026-06-01 00:11:16] Forwarding SHM buffer attach to SWM (Sprot ID=3)
+[2026-06-01 00:11:16] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_buffer@28.release
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_callback@34.done argc=1
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:16] Sprot event: Frame update for surface Sprot ID=3. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@29.frame argc=1
+[2026-06-01 00:11:16] surface_frame: handle=3 id=34
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@29.attach argc=3
+[2026-06-01 00:11:16] surface_attach: handle=3 buffer=set
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@29.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@29.commit
+[2026-06-01 00:11:16] surface_commit: handle=3 buffer=set configured=1 sprot_id=3
+[2026-06-01 00:11:16] Surface commit for surface handle=3. Attached SHM buffer size: 463x141, stride: 1852, size: 261132
+[2026-06-01 00:11:16] Forwarding SHM buffer attach to SWM (Sprot ID=3)
+[2026-06-01 00:11:16] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_buffer@28.release
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 zxdg_toplevel_decoration_v1@33.destroy
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 xdg_toplevel@32.destroy
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 xdg_surface@31.destroy
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@29.destroy
+[2026-06-01 00:11:16] Surface resource destroyed. handle=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_display@1.sync argc=1
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_callback@35.done argc=1
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_shm_pool@30.destroy
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_buffer@28.destroy
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.frame argc=1
+[2026-06-01 00:11:16] surface_frame: handle=1 id=29
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:16] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:16] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:16] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:16] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:16] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_buffer@23.release
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:16] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:16] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:16] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:16] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:16] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_buffer@25.release
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:16] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:16] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:16] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:16] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:16] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_buffer@25.release
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] Sprot event: Pointer entered surface handle=1 at (137, 105)
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.enter argc=4
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_keyboard@12.enter argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_keyboard@12.modifiers argc=5
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_pointer@13.set_cursor argc=4
+[2026-06-01 00:11:16] pointer_set_cursor: serial=15 surface_handle=2 hotspot=3,1
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@27.set_buffer_scale argc=1
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@27.attach argc=3
+[2026-06-01 00:11:16] surface_attach: handle=2 buffer=set
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@27.damage argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@27.commit
+[2026-06-01 00:11:16] surface_commit: handle=2 buffer=set configured=0 sprot_id=0
+[2026-06-01 00:11:16] cursor_image: sent 24x24 hotspot=3,1 res=0
+[2026-06-01 00:11:16] surface_commit: skipping cursor handle=2 pos=0,0
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_buffer@26.release
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_display@1.sync argc=1
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_callback@28.done argc=1
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:16] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:16] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:16] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:16] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:16] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:16] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_buffer@25.release
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_callback@29.done argc=1
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:16] Sprot event: Frame update for surface Sprot ID=2. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:16] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO REQ] pid=186566 wl_surface@15.frame argc=1
+[2026-06-01 00:11:17] surface_frame: handle=1 id=29
+[2026-06-01 00:11:17] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:17] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:17] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:17] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:17] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:17] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:17] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:17] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_buffer@25.release
+[2026-06-01 00:11:17] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:17] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:17] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:17] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:17] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:17] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:17] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:17] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_buffer@23.release
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_callback@29.done argc=1
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:17] Sprot event: Frame update for surface Sprot ID=2. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] Sprot event: Pointer button button=1 wl_button=272 state=1
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.button argc=4
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] Sprot event: Pointer button button=1 wl_button=272 state=0
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.button argc=4
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.motion argc=3
+[2026-06-01 00:11:17] Sprot event: Pointer left surface handle=1
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_pointer@13.leave argc=2
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_keyboard@12.leave argc=2
+[2026-06-01 00:11:17] [PROTO REQ] pid=186566 wl_display@1.sync argc=1
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_callback@29.done argc=1
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:17] [PROTO REQ] pid=186566 wl_surface@15.frame argc=1
+[2026-06-01 00:11:17] surface_frame: handle=1 id=29
+[2026-06-01 00:11:17] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:17] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:17] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:17] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:17] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:17] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:17] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:17] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:17] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:17] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:17] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:17] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:17] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:17] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_buffer@23.release
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_callback@29.done argc=1
+[2026-06-01 00:11:17] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:17] Sprot event: Frame update for surface Sprot ID=2. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:18] [PROTO REQ] pid=186566 wl_surface@15.frame argc=1
+[2026-06-01 00:11:18] surface_frame: handle=1 id=29
+[2026-06-01 00:11:18] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:18] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:18] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:18] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:18] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:18] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:18] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:18] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:18] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:18] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:18] [PROTO EVT] pid=186566 wl_buffer@23.release
+[2026-06-01 00:11:18] [PROTO REQ] pid=186566 wl_surface@15.attach argc=3
+[2026-06-01 00:11:18] surface_attach: handle=1 buffer=set
+[2026-06-01 00:11:18] [PROTO REQ] pid=186566 wl_surface@15.damage_buffer argc=4
+[2026-06-01 00:11:18] [PROTO REQ] pid=186566 wl_surface@15.commit
+[2026-06-01 00:11:18] surface_commit: handle=1 buffer=set configured=1 sprot_id=2
+[2026-06-01 00:11:18] Surface commit for surface handle=1. Attached SHM buffer size: 1272x713, stride: 5088, size: 3627744
+[2026-06-01 00:11:18] Forwarding SHM buffer attach to SWM (Sprot ID=2)
+[2026-06-01 00:11:18] SHM commit results: attach=0, commit=0
+[2026-06-01 00:11:18] [PROTO EVT] pid=186566 wl_buffer@25.release
+[2026-06-01 00:11:18] [PROTO EVT] pid=186566 wl_callback@29.done argc=1
+[2026-06-01 00:11:18] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:18] Sprot event: Frame update for surface Sprot ID=2. Serviced 1 Wayland callbacks.
+[2026-06-01 00:11:19] Sprot event: Close surface Sprot ID=2
+[2026-06-01 00:11:19] [PROTO EVT] pid=186566 xdg_toplevel@17.close
+[2026-06-01 00:11:19] [PROTO REQ] pid=186566 zxdg_toplevel_decoration_v1@18.destroy
+[2026-06-01 00:11:19] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:19] [PROTO REQ] pid=186566 xdg_toplevel@17.destroy
+[2026-06-01 00:11:19] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:19] [PROTO REQ] pid=186566 xdg_surface@16.destroy
+[2026-06-01 00:11:19] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:19] [PROTO REQ] pid=186566 wl_surface@15.destroy
+[2026-06-01 00:11:19] Surface resource destroyed. handle=1
+[2026-06-01 00:11:19] [PROTO EVT] pid=186566 wl_display@1.delete_id argc=1
+[2026-06-01 00:11:21] Sprot event: Disconnect received. Terminating client connection.
+[2026-06-01 00:11:21] Wayland client disconnected. Cleaning up resources.
+[wayland_bridge 2026-06-01 00:11:21 pid=186562] application exited with status 255
+[wayland_bridge 2026-06-01 00:11:21 pid=186562] stopping wlbridge pid=186563 after application exit
+[wayland_bridge 2026-06-01 00:11:21 pid=186562] done
