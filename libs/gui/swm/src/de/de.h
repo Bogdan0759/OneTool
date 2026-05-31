@@ -7,6 +7,8 @@
 
 #define DE_TASKBAR_H        32
 #define DE_LAUNCHER_W       72
+#define DE_STATS_W          132
+#define DE_TICK_W           66
 #define DE_CLOCK_W          54
 #define DE_ITEM_W_MAX       148
 #define DE_ITEM_W_MIN       64
@@ -15,7 +17,7 @@
 #define DE_MAX_ITEMS        12
 #define DE_MENU_W           180
 #define DE_MENU_ITEM_H      22
-#define DE_MENU_ENTRIES     5
+#define DE_MENU_ENTRIES     6
 #define DE_TOOLTIP_FADE_SEC 0.18f
 #define DE_TOOLTIP_GAP      8
 #define DE_TOOLTIP_PAD_X    8

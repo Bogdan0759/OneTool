@@ -12,6 +12,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/sysmacros.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
@@ -869,6 +870,21 @@ static void surface_frame(struct wl_client *client, struct wl_resource *resource
     wl_list_insert(&s->frame_callbacks, wl_resource_get_link(callback));
 }
 
+static void finish_frame_callbacks(struct bridge_surface *s) {
+    struct wl_resource *cb, *tmp;
+    wl_resource_for_each_safe(cb, tmp, &s->frame_callbacks) {
+        wl_callback_send_done(cb, 0);
+        wl_resource_destroy(cb);
+    }
+}
+
+static void release_attached_buffer(struct bridge_surface *s) {
+    if (s->buffer_resource) {
+        wl_buffer_send_release(s->buffer_resource);
+        s->buffer_resource = NULL;
+    }
+}
+
 static void surface_set_opaque_region(struct wl_client *client, struct wl_resource *resource, struct wl_resource *region) {
     (void)client; (void)resource; (void)region;
 }
@@ -944,30 +960,22 @@ static void surface_commit(struct wl_client *client, struct wl_resource *resourc
         send_cursor_image(s->client, s);
         debug_log("surface_commit: skipping cursor handle=%u pos=%d,%d",
             s->client_handle, s->subsurface_x, s->subsurface_y);
-        if (s->buffer_resource) {
-            wl_buffer_send_release(s->buffer_resource);
-            s->buffer_resource = NULL;
-        }
-        struct wl_resource *cb, *tmp;
-        wl_resource_for_each_safe(cb, tmp, &s->frame_callbacks) {
-            wl_callback_send_done(cb, 0);
-            wl_resource_destroy(cb);
-        }
+        release_attached_buffer(s);
+        finish_frame_callbacks(s);
         return;
     }
 
     if (s->is_subsurface) {
         debug_log("surface_commit: skipping %s handle=%u pos=%d,%d",
             "subsurface", s->client_handle, s->subsurface_x, s->subsurface_y);
-        if (s->buffer_resource) {
-            wl_buffer_send_release(s->buffer_resource);
-            s->buffer_resource = NULL;
-        }
-        struct wl_resource *cb, *tmp;
-        wl_resource_for_each_safe(cb, tmp, &s->frame_callbacks) {
-            wl_callback_send_done(cb, 0);
-            wl_resource_destroy(cb);
-        }
+        release_attached_buffer(s);
+        finish_frame_callbacks(s);
+        return;
+    }
+
+    if (!s->xdg_toplevel_resource) {
+        debug_log("surface_commit: skipping unroled surface handle=%u", s->client_handle);
+        finish_frame_callbacks(s);
         return;
     }
 
@@ -1658,6 +1666,11 @@ static void pointer_set_cursor(struct wl_client *client, struct wl_resource *res
         s->is_cursor = 1;
         s->cursor_hotspot_x = hotspot_x;
         s->cursor_hotspot_y = hotspot_y;
+        if (s->buffer_resource) {
+            send_cursor_image(c, s);
+            release_attached_buffer(s);
+            finish_frame_callbacks(s);
+        }
     }
     debug_log("pointer_set_cursor: serial=%u surface_handle=%u hotspot=%d,%d",
         serial, s ? s->client_handle : 0, hotspot_x, hotspot_y);
@@ -1988,7 +2001,42 @@ static const struct zwp_linux_dmabuf_feedback_v1_interface feedback_implementati
     .destroy = feedback_destroy,
 };
 
-static void send_dmabuf_feedback(struct wl_resource *feedback_resource) {
+static int ensure_render_node_info(struct bridge_client *c) {
+    if (g_render_node_info.queried) {
+        return g_render_node_info.has_drm;
+    }
+
+    g_render_node_info.queried = 1;
+    if (!c || !c->sprot_conn) {
+        return 0;
+    }
+
+    sprot_body_render_node_t info;
+    if (sprot_query_render_node(c->sprot_conn, &info, 1000) != 0) {
+        debug_log("ensure_render_node_info: query failed: %s", sprot_last_error());
+        return 0;
+    }
+
+    if (!info.has_drm || info.render_node_path[0] == '\0') {
+        debug_log("ensure_render_node_info: SWM has no render node");
+        return 0;
+    }
+
+    strncpy(g_render_node_info.render_node_path, info.render_node_path,
+            sizeof(g_render_node_info.render_node_path) - 1);
+    g_render_node_info.render_node_path[sizeof(g_render_node_info.render_node_path) - 1] = '\0';
+    g_render_node_info.render_major = info.render_major;
+    g_render_node_info.render_minor = info.render_minor;
+    g_render_node_info.has_drm = 1;
+    debug_log("ensure_render_node_info: render node %s dev=%u:%u",
+              g_render_node_info.render_node_path,
+              g_render_node_info.render_major, g_render_node_info.render_minor);
+    return 1;
+}
+
+static void send_dmabuf_feedback(struct bridge_client *c, struct wl_resource *feedback_resource) {
+    ensure_render_node_info(c);
+
     if (!g_render_node_info.queried || !g_render_node_info.has_drm) {
         debug_log("send_dmabuf_feedback: render node not available, skipping");
         zwp_linux_dmabuf_feedback_v1_send_done(feedback_resource);
@@ -2033,13 +2081,7 @@ static void send_dmabuf_feedback(struct wl_resource *feedback_resource) {
     zwp_linux_dmabuf_feedback_v1_send_format_table(feedback_resource, memfd, table_size);
     close(memfd);
 
-    struct {
-        uint32_t major;
-        uint32_t minor;
-    } dev_id = {
-        .major = g_render_node_info.render_major,
-        .minor = g_render_node_info.render_minor,
-    };
+    dev_t dev_id = makedev(g_render_node_info.render_major, g_render_node_info.render_minor);
 
     struct wl_array dev_array;
     wl_array_init(&dev_array);
@@ -2102,6 +2144,7 @@ static void linux_dmabuf_create_params(struct wl_client *client,
 static void linux_dmabuf_get_default_feedback(struct wl_client *client,
                                               struct wl_resource *resource, uint32_t id) {
     (void)resource;
+    struct bridge_client *bridge_client = get_or_create_client(client);
     struct dmabuf_feedback *feedback = calloc(1, sizeof(*feedback));
     if (!feedback) {
         wl_client_post_no_memory(client);
@@ -2112,7 +2155,7 @@ static void linux_dmabuf_get_default_feedback(struct wl_client *client,
     wl_resource_set_implementation(feedback->resource, &feedback_implementation,
                                   feedback, feedback_destroy_handler);
 
-    send_dmabuf_feedback(feedback->resource);
+    send_dmabuf_feedback(bridge_client, feedback->resource);
     debug_log("linux_dmabuf_get_default_feedback: sent default feedback");
 }
 
@@ -2121,6 +2164,7 @@ static void linux_dmabuf_get_surface_feedback(struct wl_client *client,
                                               uint32_t id, struct wl_resource *surface) {
     (void)resource;
     (void)surface;
+    struct bridge_client *bridge_client = get_or_create_client(client);
     struct dmabuf_feedback *feedback = calloc(1, sizeof(*feedback));
     if (!feedback) {
         wl_client_post_no_memory(client);
@@ -2132,7 +2176,7 @@ static void linux_dmabuf_get_surface_feedback(struct wl_client *client,
     wl_resource_set_implementation(feedback->resource, &feedback_implementation,
                                   feedback, feedback_destroy_handler);
 
-    send_dmabuf_feedback(feedback->resource);
+    send_dmabuf_feedback(bridge_client, feedback->resource);
     debug_log("linux_dmabuf_get_surface_feedback: sent surface feedback");
 }
 

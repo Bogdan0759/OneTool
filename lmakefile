@@ -252,9 +252,11 @@ string CLICK_SRC = "tools/games/click.c";
 string CLICK_OBJ = "tools/games/click.o";
 string RANAL_DEMO_SRC = "tools/games/ranal_demo.c";
 string RANAL_DEMO_OBJ = "tools/games/ranal_demo.o";
+string ABOUT_SRC = "tools/gui/about.c";
+string ABOUT_OBJ = "tools/gui/about.o";
 string TERM_SRC = "tools/gui/term.c";
 string TERM_OBJ = "tools/gui/term.o";
-string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/filesystem/fsize.o tools/filesystem/ls.o tools/filesystem/cat.o tools/filesystem/free.o tools/filesystem/size.o tools/filesystem/nm.o tools/dev/gapi_supported.o tools/dev/srapi_demo.o tools/dev/converter/srvid2mp4.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o tools/network/nsetup.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o libs/elf/elf.o libs/memory/memory.o libs/srapi/src/core/context.o libs/srapi/src/core/debug.o libs/srapi/src/core/framebuffer.o libs/srapi/src/core/export.o libs/srapi/src/core/command.o libs/srapi/src/core/buffer.o libs/srapi/src/core/image.o libs/srapi/src/core/image_view.o libs/srapi/src/core/queue.o libs/srapi/src/core/tile_cache.o libs/srapi/src/core/time.o libs/srapi/src/backend/cpu/renderer.o libs/srapi/src/backend/gpu/gpu.o libs/srapi/src/backend/gpu/i915.o libs/srapi/src/backend/gpu/i915/render3d.o libs/srapi/src/backend/gpu/i915/vm.o libs/srapi/src/backend/fbdev/fbdev.o libs/srapi/src/backend/drm/buffer.o libs/srapi/src/backend/drm/drm.o libs/srapi/src/backend/drm/record.o libs/srapi/src/display/drm_probe.o libs/srapi/src/vm/shader.o libs/srapi/src/vm/exec.o libs/srapi/src/vm/exec_simd.o libs/srapi/src/vm/threadpool.o libs/srapi/src/io/ppm.o libs/srapi/src/input/input.o libs/srapi/src/input/evdev.o libs/srapi/src/input/scancode.o libs/gui/ranal/src/app.o libs/gui/ranal/src/widget.o libs/gui/ranal/src/font.o libs/gui/ranal/src/context.o libs/gui/ranal/src/swm_client.o libs/gui/sprot/src/msg.o libs/gui/sprot/src/client.o libs/gui/sprot/src/srapi_bridge.o libs/gui/sprot/src/vk_interop.o libs/gui/swm/src/main.o libs/gui/swm/src/backend/srapi_drm.o libs/gui/swm/src/buffer/buffer.o libs/gui/swm/src/de/de.o libs/gui/swm/src/probe/render_node.o tools/dev/sprot_hello.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/dev/mlink/cli.o tools/dev/mlink/object.o tools/dev/mlink/elf-reader.o tools/dev/mlink/symtab.o tools/dev/mlink/layout.o tools/dev/mlink/reloc.o tools/dev/mlink/emit.o tools/dev/mlink/bytes.o tools/dev/mlink/log.o tools/dev/mlink/macro.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o tools/system/configure/size.o tools/system/video/cvm.o tools/system/userc/users.o tools/system/userc/tui.o tools/games/click.o tools/games/ranal_demo.o tools/gui/term.o libs/gui/swm/wayland/wayland_bridge.o";
+string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/filesystem/fsize.o tools/filesystem/ls.o tools/filesystem/cat.o tools/filesystem/free.o tools/filesystem/size.o tools/filesystem/nm.o tools/dev/gapi_supported.o tools/dev/srapi_demo.o tools/dev/converter/srvid2mp4.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o tools/network/nsetup.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o libs/elf/elf.o libs/memory/memory.o libs/srapi/src/core/context.o libs/srapi/src/core/debug.o libs/srapi/src/core/framebuffer.o libs/srapi/src/core/export.o libs/srapi/src/core/command.o libs/srapi/src/core/buffer.o libs/srapi/src/core/image.o libs/srapi/src/core/image_view.o libs/srapi/src/core/queue.o libs/srapi/src/core/tile_cache.o libs/srapi/src/core/time.o libs/srapi/src/backend/cpu/renderer.o libs/srapi/src/backend/gpu/gpu.o libs/srapi/src/backend/gpu/i915.o libs/srapi/src/backend/gpu/i915/render3d.o libs/srapi/src/backend/gpu/i915/vm.o libs/srapi/src/backend/fbdev/fbdev.o libs/srapi/src/backend/drm/buffer.o libs/srapi/src/backend/drm/drm.o libs/srapi/src/backend/drm/record.o libs/srapi/src/display/drm_probe.o libs/srapi/src/vm/shader.o libs/srapi/src/vm/exec.o libs/srapi/src/vm/exec_simd.o libs/srapi/src/vm/threadpool.o libs/srapi/src/io/ppm.o libs/srapi/src/input/input.o libs/srapi/src/input/evdev.o libs/srapi/src/input/scancode.o libs/gui/ranal/src/app.o libs/gui/ranal/src/widget.o libs/gui/ranal/src/font.o libs/gui/ranal/src/context.o libs/gui/ranal/src/swm_client.o libs/gui/sprot/src/msg.o libs/gui/sprot/src/client.o libs/gui/sprot/src/srapi_bridge.o libs/gui/sprot/src/vk_interop.o libs/gui/swm/src/main.o libs/gui/swm/src/backend/srapi_drm.o libs/gui/swm/src/buffer/buffer.o libs/gui/swm/src/de/de.o libs/gui/swm/src/probe/render_node.o tools/dev/sprot_hello.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/dev/mlink/cli.o tools/dev/mlink/object.o tools/dev/mlink/elf-reader.o tools/dev/mlink/symtab.o tools/dev/mlink/layout.o tools/dev/mlink/reloc.o tools/dev/mlink/emit.o tools/dev/mlink/bytes.o tools/dev/mlink/log.o tools/dev/mlink/macro.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o tools/system/configure/size.o tools/system/video/cvm.o tools/system/userc/users.o tools/system/userc/tui.o tools/games/click.o tools/games/ranal_demo.o tools/gui/about.o tools/gui/term.o libs/gui/swm/wayland/wayland_bridge.o";
 
 task all() {
     build();
@@ -449,6 +451,10 @@ task build() {
     if (@is_outdated(RANAL_DEMO_OBJ, RANAL_DEMO_SRC, RANAL_HDR)) {
         @echo("[CC] %s", RANAL_DEMO_SRC);
         @run("%s %s %s -Dmain=rd -c %s -o %s", CC, CFLAGS, RANAL_CFLAGS, RANAL_DEMO_SRC, RANAL_DEMO_OBJ);
+    }
+    if (@is_outdated(ABOUT_OBJ, ABOUT_SRC, RANAL_HDR, SRAPI_HDR, SPROT_HDR)) {
+        @echo("[CC] %s", ABOUT_SRC);
+        @run("%s %s %s %s -Dmain=ab -c %s -o %s", CC, CFLAGS, RANAL_CFLAGS, SPROT_CFLAGS, ABOUT_SRC, ABOUT_OBJ);
     }
     if (@is_outdated(TERM_OBJ, TERM_SRC, RANAL_HDR)) {
         @echo("[CC] %s", TERM_SRC);
@@ -807,6 +813,7 @@ task build() {
         USERC_TUI_OBJ,
         CLICK_OBJ,
         RANAL_DEMO_OBJ,
+        ABOUT_OBJ,
         TERM_OBJ,
         EXTRA_TOOLS_BUNDLE_OBJ
     )) {
@@ -924,6 +931,7 @@ task clean() {
     @run("rm -f %s", USERC_TUI_OBJ);
     @run("rm -f %s", CLICK_OBJ);
     @run("rm -f %s", RANAL_DEMO_OBJ);
+    @run("rm -f %s", ABOUT_OBJ);
     @run("rm -f %s", TERM_OBJ);
     @run("rm -f %s", EXTRA_TOOLS_BUNDLE_OBJ);
     @run("rm -f %s", "libs/gui/swm/wayland/wayland_bridge.o");

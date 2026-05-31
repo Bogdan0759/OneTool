@@ -33,6 +33,7 @@ int cv(int argc, char *argv[]);
 int uc(int argc, char *argv[]);
 int ck(int argc, char *argv[]);
 int rd(int argc, char *argv[]);
+int ab(int argc, char *argv[]);
 int sw(int argc, char *argv[]);
 int sh(int argc, char *argv[]);
 int tr(int argc, char *argv[]);
@@ -79,6 +80,8 @@ const struct onetool_tool onetool_builtin_tools[] = {
     {"click", ck, "SRAPI click-the-cube minigame (15s)",
      ONETOOL_ARGV0_TOOL_NAME},
     {"ranal_demo", rd, "demo of the ranal GUI library",
+     ONETOOL_ARGV0_TOOL_NAME},
+    {"about", ab, "system information viewer",
      ONETOOL_ARGV0_TOOL_NAME},
     {"swm", sw, "simple window manager / compositor (sprot v0.1)",
      ONETOOL_ARGV0_TOOL_NAME},

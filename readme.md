@@ -36,6 +36,7 @@ implemented tools:
 - `nm` - prints elf symbols
 - `click` - SRAPI click-the-cube minigame (15s round)
 - `ranal_demo` - demo of the ranal GUI library
+- `about` - KDE-like system information viewer
 - `swm` - simple window manager / compositor (sprot v0.1) (swm = simple window manager)
 - `sprot_hello` - minimal sprot client (draws a colored rectangle)
 - `term` - GUI terminal built on ranal (standalone or as a swm client via `--swm`)

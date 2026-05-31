@@ -28,6 +28,7 @@
 
 typedef enum {
     DE_MENU_TERM = 0,
+    DE_MENU_ABOUT,
     DE_MENU_TILE,
     DE_MENU_CASCADE,
     DE_MENU_MINIMIZE_ALL,
@@ -36,6 +37,7 @@ typedef enum {
 
 static const char *k_menu_labels[DE_MENU_ENTRIES] = {
     "Term",
+    "About system",
     "Tile windows",
     "Cascade",
     "Minimize all",
@@ -51,6 +53,8 @@ struct de {
 
     /* Pre-computed hit rectangles in screen coordinates. */
     int32_t launcher_x, launcher_y, launcher_w, launcher_h;
+    int32_t stats_x, stats_y, stats_w, stats_h;
+    int32_t tick_x, tick_y, tick_w, tick_h;
     int32_t clock_x, clock_y, clock_w, clock_h;
     int32_t items_origin_x;
     int32_t item_w;
@@ -71,6 +75,13 @@ struct de {
 
     char clock_text[16];
     uint64_t last_clock_minute;
+    char stats_text[40];
+    struct timespec last_stats_time;
+    int have_stats_time;
+    uint64_t tick_counter;
+    uint64_t prev_cpu_total;
+    uint64_t prev_cpu_idle;
+    int have_cpu_sample;
 
     /* Per-item tooltip fade [0..1]. 1.0 = fully visible, 0.0 = hidden. */
     float    item_tooltip_alpha[DE_MAX_ITEMS];
@@ -139,6 +150,12 @@ static double elapsed_seconds_since(struct timespec *prev, int *have_prev) {
     *prev = now;
     *have_prev = 1;
     return dt;
+}
+
+static double timespec_delta_seconds(const struct timespec *older,
+                                     const struct timespec *newer) {
+    return (double)(newer->tv_sec - older->tv_sec) +
+           (double)(newer->tv_nsec - older->tv_nsec) * 1e-9;
 }
 
 /*
@@ -230,8 +247,18 @@ static void compute_layout(de_t *de) {
     de->clock_x = de->display_w - DE_CLOCK_W - DE_TASK_PADDING;
     de->clock_y = de->taskbar_top + DE_TASK_PADDING;
 
+    de->tick_w = DE_TICK_W;
+    de->tick_h = DE_TASKBAR_H - 2 * DE_TASK_PADDING;
+    de->tick_x = de->clock_x - DE_TICK_W - DE_TASK_PADDING;
+    de->tick_y = de->taskbar_top + DE_TASK_PADDING;
+
+    de->stats_w = DE_STATS_W;
+    de->stats_h = DE_TASKBAR_H - 2 * DE_TASK_PADDING;
+    de->stats_x = de->tick_x - DE_STATS_W - DE_TASK_PADDING;
+    de->stats_y = de->taskbar_top + DE_TASK_PADDING;
+
     de->items_origin_x = de->launcher_x + de->launcher_w + DE_TASK_PADDING * 2;
-    int32_t items_avail = de->clock_x - de->items_origin_x - DE_TASK_PADDING;
+    int32_t items_avail = de->stats_x - de->items_origin_x - DE_TASK_PADDING;
     if (items_avail < 0) items_avail = 0;
     /* Compute item width that fits DE_MAX_ITEMS slots, clamped to min/max. */
     int32_t slots = DE_MAX_ITEMS;
@@ -262,6 +289,102 @@ static void format_clock(de_t *de) {
     snprintf(de->clock_text, sizeof(de->clock_text), "%02d:%02d", tm_now.tm_hour, tm_now.tm_min);
     if (de->clock_label != NULL) {
         ranal_set_text(de->clock_label, de->clock_text);
+        de->taskbar_dirty = 1;
+    }
+}
+
+static int read_cpu_times(uint64_t *total_out, uint64_t *idle_out) {
+    FILE *f = fopen("/proc/stat", "r");
+    if (f == NULL) return 0;
+
+    char line[256];
+    int ok = 0;
+    if (fgets(line, sizeof(line), f) != NULL) {
+        unsigned long long user = 0, nice = 0, system = 0, idle = 0;
+        unsigned long long iowait = 0, irq = 0, softirq = 0, steal = 0;
+        int n = sscanf(line, "cpu %llu %llu %llu %llu %llu %llu %llu %llu",
+                       &user, &nice, &system, &idle,
+                       &iowait, &irq, &softirq, &steal);
+        if (n >= 4) {
+            uint64_t total = (uint64_t)(user + nice + system + idle);
+            if (n > 4) total += (uint64_t)iowait;
+            if (n > 5) total += (uint64_t)irq;
+            if (n > 6) total += (uint64_t)softirq;
+            if (n > 7) total += (uint64_t)steal;
+            *total_out = total;
+            *idle_out = (uint64_t)(idle + (n > 4 ? iowait : 0));
+            ok = 1;
+        }
+    }
+    fclose(f);
+    return ok;
+}
+
+static int read_mem_percent(int *percent_out) {
+    FILE *f = fopen("/proc/meminfo", "r");
+    if (f == NULL) return 0;
+
+    char line[256];
+    unsigned long long total = 0;
+    unsigned long long available = 0;
+    while (fgets(line, sizeof(line), f) != NULL) {
+        sscanf(line, "MemTotal: %llu kB", &total);
+        sscanf(line, "MemAvailable: %llu kB", &available);
+        if (total > 0 && available > 0) break;
+    }
+    fclose(f);
+
+    if (total == 0 || available > total) return 0;
+    unsigned long long used = total - available;
+    int pct = (int)((used * 100ull + total / 2ull) / total);
+    *percent_out = clampi(pct, 0, 100);
+    return 1;
+}
+
+static void format_system_stats(de_t *de) {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    if (de->have_stats_time && de->stats_text[0] != '\0' &&
+        timespec_delta_seconds(&de->last_stats_time, &now) < 0.5) {
+        return;
+    }
+    de->last_stats_time = now;
+    de->have_stats_time = 1;
+
+    int cpu_tenths = -1;
+    uint64_t total = 0;
+    uint64_t idle = 0;
+    if (read_cpu_times(&total, &idle)) {
+        if (de->have_cpu_sample && total > de->prev_cpu_total) {
+            uint64_t delta_total = total - de->prev_cpu_total;
+            uint64_t delta_idle = (idle >= de->prev_cpu_idle) ? idle - de->prev_cpu_idle : 0u;
+            uint64_t busy = (delta_total > delta_idle) ? delta_total - delta_idle : 0u;
+            cpu_tenths = (int)((busy * 1000u + delta_total / 2u) / delta_total);
+            cpu_tenths = clampi(cpu_tenths, 0, 1000);
+        }
+        de->prev_cpu_total = total;
+        de->prev_cpu_idle = idle;
+        de->have_cpu_sample = 1;
+    }
+
+    int mem_percent = -1;
+    if (!read_mem_percent(&mem_percent)) mem_percent = -1;
+
+    char buf[sizeof(de->stats_text)];
+    if (cpu_tenths >= 0 && mem_percent >= 0) {
+        snprintf(buf, sizeof(buf), "CPU %d.%d%% RAM %d%%",
+                 cpu_tenths / 10, cpu_tenths % 10, mem_percent);
+    } else if (cpu_tenths >= 0) {
+        snprintf(buf, sizeof(buf), "CPU %d.%d%% RAM --",
+                 cpu_tenths / 10, cpu_tenths % 10);
+    } else if (mem_percent >= 0) {
+        snprintf(buf, sizeof(buf), "CPU --.-%% RAM %d%%", mem_percent);
+    } else {
+        snprintf(buf, sizeof(buf), "CPU --.-%% RAM --");
+    }
+
+    if (strcmp(buf, de->stats_text) != 0) {
+        snprintf(de->stats_text, sizeof(de->stats_text), "%s", buf);
         de->taskbar_dirty = 1;
     }
 }
@@ -318,6 +441,16 @@ static void build_taskbar_widgets(de_t *de) {
             de->item_labels[i] = lbl;
         }
     }
+
+    ranal_widget_t *sp = build_panel_button(de->taskbar_root,
+        de->stats_x, DE_TASK_PADDING,
+        de->stats_w, de->stats_h, COL_BAR_BG);
+    (void)sp;
+
+    ranal_widget_t *tp = build_panel_button(de->taskbar_root,
+        de->tick_x, DE_TASK_PADDING,
+        de->tick_w, de->tick_h, COL_BAR_BG);
+    (void)tp;
 
     /* Clock (panel + centered label). */
     ranal_widget_t *cp = build_panel_button(de->taskbar_root,
@@ -392,7 +525,11 @@ de_t *de_create(swm_state_t *swm) {
 
     de->taskbar_dirty = 1;
     de->menu_dirty = 1;
+    ranal_context_t *prev = ranal_get_current();
+    ranal_set_current(de->taskbar_ctx);
     format_clock(de);
+    format_system_stats(de);
+    ranal_set_current(prev);
     return de;
 }
 
@@ -545,6 +682,7 @@ static void apply_menu_to_widgets(de_t *de) {
 void de_tick(de_t *de, uint64_t frame_count) {
     (void)frame_count;
     if (de == NULL) return;
+    de->tick_counter++;
 
     /*
      * All ranal_set_* calls update g_ranal->dirty, so we must switch the
@@ -555,6 +693,7 @@ void de_tick(de_t *de, uint64_t frame_count) {
     ranal_context_t *prev = ranal_get_current();
     ranal_set_current(de->taskbar_ctx);
     format_clock(de);
+    format_system_stats(de);
     rebuild_items_from_swm(de);
     apply_items_to_widgets(de);
     apply_launcher_to_widgets(de);
@@ -686,18 +825,16 @@ static void de_action_quit(de_t *de) {
     de->swm->should_quit = 1;
 }
 
-static void de_action_term(de_t *de) {
+static void de_launch_tool(de_t *de, const char *tool, const char *size_arg, const char *title) {
     (void)de;
     pid_t pid = fork();
     if (pid < 0) return;
     if (pid == 0) {
-        /* Grandchild trick: orphan the term process so swm doesn't have to
+        /* Grandchild trick: orphan launched tools so swm doesn't have to
            reap it. The intermediate child exits immediately. */
         pid_t inner = fork();
         if (inner < 0) _exit(127);
         if (inner == 0) {
-            /* Detach stdio so a launched terminal doesn't share swm's
-               controlling tty noise. */
             int devnull = open("/dev/null", O_RDWR | O_CLOEXEC);
             if (devnull >= 0) {
                 dup2(devnull, 0);
@@ -711,10 +848,16 @@ static void de_action_term(de_t *de) {
             ssize_t n = readlink("/proc/self/exe", self_path, sizeof(self_path) - 1);
             if (n <= 0) _exit(127);
             self_path[n] = '\0';
-            char *args[] = {
-                self_path, (char *)"term", (char *)"--swm",
-                (char *)"--title", (char *)"term", NULL,
-            };
+
+            char *args[8];
+            int argc = 0;
+            args[argc++] = self_path;
+            args[argc++] = (char *)tool;
+            args[argc++] = (char *)"--swm";
+            if (size_arg != NULL) args[argc++] = (char *)size_arg;
+            args[argc++] = (char *)"--title";
+            args[argc++] = (char *)title;
+            args[argc] = NULL;
             execv(self_path, args);
             _exit(127);
         }
@@ -724,9 +867,18 @@ static void de_action_term(de_t *de) {
     waitpid(pid, &status, 0);
 }
 
+static void de_action_term(de_t *de) {
+    de_launch_tool(de, "term", NULL, "term");
+}
+
+static void de_action_about(de_t *de) {
+    de_launch_tool(de, "about", "760x480", "About system");
+}
+
 static void run_menu_action(de_t *de, int idx) {
     switch (idx) {
         case DE_MENU_TERM:         de_action_term(de); break;
+        case DE_MENU_ABOUT:        de_action_about(de); break;
         case DE_MENU_TILE:         de_action_tile(de); break;
         case DE_MENU_CASCADE:      de_action_cascade(de); break;
         case DE_MENU_MINIMIZE_ALL: de_action_minimize_all(de); break;
@@ -861,6 +1013,33 @@ static void blit_surface_into_fb(ranal_surface_t *src,
     }
 }
 
+static void render_system_stats(de_t *de, struct srapi_framebuffer *fb) {
+    format_system_stats(de);
+    const char *text = de->stats_text[0] != '\0' ? de->stats_text : "CPU --.-% RAM --%";
+    int32_t text_w = (int32_t)strlen(text) * RANAL_FONT_ADVANCE_X;
+    int32_t tx = de->stats_x + (de->stats_w - text_w) / 2;
+    if (tx < de->stats_x + 4) tx = de->stats_x + 4;
+    int32_t ty = de->stats_y + (de->stats_h - RANAL_GLYPH_HEIGHT) / 2;
+
+    fb_blend_rect(fb, de->stats_x, de->stats_y, de->stats_w, de->stats_h,
+                  COL_BAR_BG, 255u);
+    fb_blend_text(fb, tx, ty, text, COL_TEXT_BRIGHT, 255u);
+}
+
+static void render_tick_counter(de_t *de, struct srapi_framebuffer *fb) {
+    char text[16];
+    snprintf(text, sizeof(text), "T %06llu",
+             (unsigned long long)(de->tick_counter % 1000000ull));
+    int32_t text_w = (int32_t)strlen(text) * RANAL_FONT_ADVANCE_X;
+    int32_t tx = de->tick_x + (de->tick_w - text_w) / 2;
+    if (tx < de->tick_x + 4) tx = de->tick_x + 4;
+    int32_t ty = de->tick_y + (de->tick_h - RANAL_GLYPH_HEIGHT) / 2;
+
+    fb_blend_rect(fb, de->tick_x, de->tick_y, de->tick_w, de->tick_h,
+                  COL_BAR_BG, 255u);
+    fb_blend_text(fb, tx, ty, text, COL_TEXT_ACCENT, 255u);
+}
+
 static void render_item_tooltips(de_t *de, struct srapi_framebuffer *fb) {
     /*
      * For each task button that has a non-zero fade alpha, draw a small
@@ -945,6 +1124,9 @@ void de_render(de_t *de, struct srapi_framebuffer *fb) {
         ranal_surface_t *src = ranal_context_surface(de->taskbar_ctx);
         blit_surface_into_fb(src, fb, 0, de->taskbar_top);
     }
+
+    render_system_stats(de, fb);
+    render_tick_counter(de, fb);
 
     /* Hovered task tooltips. Drawn on top of the bar, below the menu. */
     render_item_tooltips(de, fb);
