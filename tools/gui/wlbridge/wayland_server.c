@@ -1,6 +1,8 @@
 #define _GNU_SOURCE
 #include "wayland_server.h"
 #include "xdg-shell-protocol.h"
+#include "xdg-decoration-protocol.h"
+#include "viewporter-protocol.h"
 #include <sprot/client.h>
 
 #include <wayland-server.h>
@@ -771,6 +773,33 @@ static void surface_resource_destroy(struct wl_resource *resource) {
     }
 }
 
+// Region implementation
+static void region_destroy(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    debug_log("region_destroy: id=%u", wl_resource_get_id(resource));
+    wl_resource_destroy(resource);
+}
+
+static void region_add(struct wl_client *client, struct wl_resource *resource,
+                       int32_t x, int32_t y, int32_t width, int32_t height) {
+    (void)client;
+    debug_log("region_add: id=%u rect=%d,%d %dx%d",
+              wl_resource_get_id(resource), x, y, width, height);
+}
+
+static void region_subtract(struct wl_client *client, struct wl_resource *resource,
+                            int32_t x, int32_t y, int32_t width, int32_t height) {
+    (void)client;
+    debug_log("region_subtract: id=%u rect=%d,%d %dx%d",
+              wl_resource_get_id(resource), x, y, width, height);
+}
+
+static const struct wl_region_interface region_implementation = {
+    .destroy = region_destroy,
+    .add = region_add,
+    .subtract = region_subtract,
+};
+
 // Compositor interface implementation
 static void compositor_create_surface(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
     struct bridge_client *c = get_or_create_client(client);
@@ -793,8 +822,13 @@ static void compositor_create_surface(struct wl_client *client, struct wl_resour
 }
 
 static void compositor_create_region(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
-    (void)client; (void)resource;
     debug_log("compositor_create_region: id=%u", id);
+    struct wl_resource *region = wl_resource_create(client, &wl_region_interface, wl_resource_get_version(resource), id);
+    if (!region) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+    wl_resource_set_implementation(region, &region_implementation, NULL, NULL);
 }
 
 static const struct wl_compositor_interface compositor_implementation = {
@@ -1129,6 +1163,124 @@ static void subcompositor_bind(struct wl_client *client, void *data, uint32_t ve
     wl_resource_set_implementation(resource, &subcompositor_implementation, NULL, NULL);
 }
 
+// Viewporter stubs
+static void viewport_destroy(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    wl_resource_destroy(resource);
+}
+
+static void viewport_set_source(struct wl_client *client, struct wl_resource *resource,
+                                wl_fixed_t x, wl_fixed_t y, wl_fixed_t width, wl_fixed_t height) {
+    (void)client; (void)resource;
+    debug_log("viewport_set_source: %d,%d %dx%d", wl_fixed_to_int(x), wl_fixed_to_int(y),
+              wl_fixed_to_int(width), wl_fixed_to_int(height));
+}
+
+static void viewport_set_destination(struct wl_client *client, struct wl_resource *resource,
+                                     int32_t width, int32_t height) {
+    (void)client; (void)resource;
+    debug_log("viewport_set_destination: %dx%d", width, height);
+}
+
+static const struct wp_viewport_interface viewport_implementation = {
+    .destroy = viewport_destroy,
+    .set_source = viewport_set_source,
+    .set_destination = viewport_set_destination,
+};
+
+static void viewporter_destroy(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    wl_resource_destroy(resource);
+}
+
+static void viewporter_get_viewport(struct wl_client *client, struct wl_resource *resource,
+                                    uint32_t id, struct wl_resource *surface) {
+    (void)surface;
+    uint32_t version = wl_resource_get_version(resource);
+    debug_log("viewporter_get_viewport: id=%u version=%u", id, version);
+    struct wl_resource *viewport = wl_resource_create(client, &wp_viewport_interface, version, id);
+    if (!viewport) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+    wl_resource_set_implementation(viewport, &viewport_implementation, NULL, NULL);
+}
+
+static const struct wp_viewporter_interface viewporter_implementation = {
+    .destroy = viewporter_destroy,
+    .get_viewport = viewporter_get_viewport,
+};
+
+static void viewporter_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
+    (void)data;
+    debug_log("viewporter_bind: version=%u id=%u", version, id);
+    struct wl_resource *resource = wl_resource_create(client, &wp_viewporter_interface, version, id);
+    if (!resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+    wl_resource_set_implementation(resource, &viewporter_implementation, NULL, NULL);
+}
+
+// xdg-decoration stubs
+static void toplevel_decoration_destroy(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    wl_resource_destroy(resource);
+}
+
+static void toplevel_decoration_set_mode(struct wl_client *client, struct wl_resource *resource, uint32_t mode) {
+    (void)client;
+    debug_log("toplevel_decoration_set_mode: mode=%u", mode);
+    zxdg_toplevel_decoration_v1_send_configure(resource, ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE);
+}
+
+static void toplevel_decoration_unset_mode(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    debug_log("toplevel_decoration_unset_mode");
+    zxdg_toplevel_decoration_v1_send_configure(resource, ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE);
+}
+
+static const struct zxdg_toplevel_decoration_v1_interface toplevel_decoration_implementation = {
+    .destroy = toplevel_decoration_destroy,
+    .set_mode = toplevel_decoration_set_mode,
+    .unset_mode = toplevel_decoration_unset_mode,
+};
+
+static void decoration_manager_destroy(struct wl_client *client, struct wl_resource *resource) {
+    (void)client;
+    wl_resource_destroy(resource);
+}
+
+static void decoration_manager_get_toplevel_decoration(struct wl_client *client, struct wl_resource *resource,
+                                                       uint32_t id, struct wl_resource *toplevel) {
+    (void)toplevel;
+    uint32_t version = wl_resource_get_version(resource);
+    debug_log("decoration_manager_get_toplevel_decoration: id=%u version=%u", id, version);
+    struct wl_resource *decoration = wl_resource_create(client, &zxdg_toplevel_decoration_v1_interface, version, id);
+    if (!decoration) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+    wl_resource_set_implementation(decoration, &toplevel_decoration_implementation, NULL, NULL);
+    zxdg_toplevel_decoration_v1_send_configure(decoration, ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE);
+}
+
+static const struct zxdg_decoration_manager_v1_interface decoration_manager_implementation = {
+    .destroy = decoration_manager_destroy,
+    .get_toplevel_decoration = decoration_manager_get_toplevel_decoration,
+};
+
+static void decoration_manager_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
+    (void)data;
+    debug_log("decoration_manager_bind: version=%u id=%u", version, id);
+    struct wl_resource *resource = wl_resource_create(client, &zxdg_decoration_manager_v1_interface, version, id);
+    if (!resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+    wl_resource_set_implementation(resource, &decoration_manager_implementation, NULL, NULL);
+}
+
 // Seat resources
 static void seat_pointer_destroy(struct wl_resource *resource) {
     struct seat_resource *sr = wl_resource_get_user_data(resource);
@@ -1315,7 +1467,17 @@ int wayland_server_run(const char *display_name, const char *swm_socket, const c
         if (g_debug_file) fclose(g_debug_file);
         return 1;
     }
-    if (!wl_global_create(g_server.display, &xdg_wm_base_interface, 1, NULL, xdg_wm_base_bind)) {
+    if (!wl_global_create(g_server.display, &wp_viewporter_interface, 1, NULL, viewporter_bind)) {
+        wl_display_destroy(g_server.display);
+        if (g_debug_file) fclose(g_debug_file);
+        return 1;
+    }
+    if (!wl_global_create(g_server.display, &xdg_wm_base_interface, 7, NULL, xdg_wm_base_bind)) {
+        wl_display_destroy(g_server.display);
+        if (g_debug_file) fclose(g_debug_file);
+        return 1;
+    }
+    if (!wl_global_create(g_server.display, &zxdg_decoration_manager_v1_interface, 1, NULL, decoration_manager_bind)) {
         wl_display_destroy(g_server.display);
         if (g_debug_file) fclose(g_debug_file);
         return 1;

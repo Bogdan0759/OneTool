@@ -1,214 +1,382 @@
-[wayland_bridge 2026-05-31 16:01:20 pid=18097] starting argc=6 argv0=./onetool
-[wayland_bridge 2026-05-31 16:01:20 pid=18097] display=wayland-5 swm_socket=/tmp/swm.sock
-[wayland_bridge 2026-05-31 16:01:20 pid=18097] debug_file=glx.log
-[wayland_bridge 2026-05-31 16:01:20 pid=18097] app command=firefox-esr
-[wayland_bridge 2026-05-31 16:01:20 pid=18097] wlbridge forked pid=18098
-[wayland_bridge 2026-05-31 16:01:20 pid=18098] exec wlbridge path=./wlbridge display_arg=--display=wayland-5 socket_arg=--socket=/tmp/swm.sock debug=glx.log
-[2026-05-31 16:01:20] wlbridge server starting. display: wayland-5, swm_socket: /tmp/swm.sock
-[2026-05-31 16:01:20] Wayland proxy running.
-[wayland_bridge 2026-05-31 16:01:21 pid=18097] wlbridge still running after startup delay
-[wayland_bridge 2026-05-31 16:01:21 pid=18097] starting app: firefox-esr
-[wayland_bridge 2026-05-31 16:01:21 pid=18097] app forked pid=18100
-[wayland_bridge 2026-05-31 16:01:21 pid=18100] exec app via /bin/sh -c, WAYLAND_DISPLAY=wayland-5 XDG_RUNTIME_DIR=/run/user/1000 GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1 QT_QPA_PLATFORM=wayland WAYLAND_DEBUG=1 GDK_DEBUG=misc,events,dnd,selection,clipboard,opengl,vulkan MOZ_LOG=Widget:5,WidgetWayland:5,WidgetPopup:5,Gtk:5 MOZ_LOG_FILE=glx.log.moz
-[2026-05-31 16:01:21] [CLIENT_CONNECT] new wl_client pid=18101 uid=1000 ptr=0x5565a0c4dd40
-[2026-05-31 16:01:21] [CLIENT_CONNECT] new wl_client pid=18101 uid=1000 ptr=0x5565a0c4dfc0
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_display@1.get_registry argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_registry@2.global name=1 interface=wl_compositor version=4
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_registry@2.global name=2 interface=wl_subcompositor version=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_registry@2.global name=3 interface=wl_shm version=2
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_registry@2.global name=4 interface=wl_data_device_manager version=3
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_registry@2.global name=5 interface=xdg_wm_base version=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_registry@2.global name=6 interface=wl_seat version=5
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_registry@2.global name=7 interface=wl_output version=3
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_display@1.sync argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_callback@3.done argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_display@1.delete_id argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_registry@2.bind name=1 interface=wl_compositor version=3 new_id=4
-[2026-05-31 16:01:21] compositor_bind: version=3 id=4 pid=18101
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_registry@2.bind name=2 interface=wl_subcompositor version=1 new_id=5
-[2026-05-31 16:01:21] subcompositor_bind: version=1 id=5
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_registry@2.bind name=3 interface=wl_shm version=1 new_id=6
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_shm@6.format argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_shm@6.format argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_registry@2.bind name=4 interface=wl_data_device_manager version=3 new_id=7
-[2026-05-31 16:01:21] data_device_manager_bind: version=3 id=7
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_registry@2.bind name=7 interface=wl_output version=2 new_id=8
-[2026-05-31 16:01:21] output_bind: version=2 id=8 pid=18101
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_output@8.geometry argc=8
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_output@8.mode argc=4
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_output@8.scale argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_output@8.done
-[2026-05-31 16:01:21] output_bind: done
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_display@1.sync argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_callback@9.done argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_display@1.delete_id argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_shm@6.create_pool argc=3
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_shm_pool@3.resize argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_shm_pool@3.resize argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_shm_pool@3.resize argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_shm_pool@3.resize argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_shm_pool@3.resize argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_shm_pool@3.resize argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_shm_pool@3.resize argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_shm_pool@3.resize argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_registry@2.bind name=6 interface=wl_seat version=5 new_id=10
-[2026-05-31 16:01:21] seat_bind: version=5 id=10 pid=18101
-[2026-05-31 16:01:21] New Wayland client connected. pid=18101 Initializing Sprot connection...
-[2026-05-31 16:01:21] Client registration complete.
-[2026-05-31 16:01:21] seat_bind: sending capabilities=0x3 (POINTER|KEYBOARD)
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_seat@10.capabilities argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_seat@10.name argc=1
-[2026-05-31 16:01:21] seat_bind: sent seat name 'seat0'
-[2026-05-31 16:01:21] seat_bind: done
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_compositor@4.create_surface argc=1
-[2026-05-31 16:01:21] Wayland surface created. Assigned internal handle=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_data_device_manager@7.get_data_device argc=2
-[2026-05-31 16:01:21] data_device_manager_get_data_device: id=12 seat=10 version=3
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_data_device@12.selection argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_compositor@4.create_surface argc=1
-[2026-05-31 16:01:21] Wayland surface created. Assigned internal handle=2
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_display@1.sync argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_callback@14.done argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_display@1.delete_id argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_seat@10.get_pointer argc=1
-[2026-05-31 16:01:21] seat_get_pointer: id=9
-[2026-05-31 16:01:21] seat_get_pointer: done, pointer resource created
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_seat@10.get_keyboard argc=1
-[2026-05-31 16:01:21] seat_get_keyboard: id=15 seat_version=5
-[2026-05-31 16:01:21] seat_get_keyboard: keyboard resource created, version=5
-[2026-05-31 16:01:21] seat_get_keyboard: sending keymap fd=15 size=313
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_keyboard@15.keymap argc=3
-[2026-05-31 16:01:21] seat_get_keyboard: keymap sent
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_keyboard@15.repeat_info argc=2
-[2026-05-31 16:01:21] seat_get_keyboard: repeat_info sent
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_keyboard@15.modifiers argc=5
-[2026-05-31 16:01:21] seat_get_keyboard: modifiers sent. keyboard_focus=null
-[2026-05-31 16:01:21] seat_get_keyboard: done
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_registry@2.bind name=5 interface=xdg_wm_base version=1 new_id=14
-[2026-05-31 16:01:21] xdg_wm_base_bind: version=1 id=14 pid=18101
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_display@1.get_registry argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_registry@16.global name=1 interface=wl_compositor version=4
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_registry@16.global name=2 interface=wl_subcompositor version=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_registry@16.global name=3 interface=wl_shm version=2
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_registry@16.global name=4 interface=wl_data_device_manager version=3
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_registry@16.global name=5 interface=xdg_wm_base version=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_registry@16.global name=6 interface=wl_seat version=5
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_registry@16.global name=7 interface=wl_output version=3
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_display@1.sync argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_callback@17.done argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_display@1.delete_id argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_registry@16.bind name=1 interface=wl_compositor version=4 new_id=18
-[2026-05-31 16:01:21] compositor_bind: version=4 id=18 pid=18101
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_registry@16.bind name=2 interface=wl_subcompositor version=1 new_id=19
-[2026-05-31 16:01:21] subcompositor_bind: version=1 id=19
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_registry@16.bind name=3 interface=wl_shm version=1 new_id=20
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_shm@20.format argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_shm@20.format argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_registry@16.bind name=6 interface=wl_seat version=5 new_id=21
-[2026-05-31 16:01:21] seat_bind: version=5 id=21 pid=18101
-[2026-05-31 16:01:21] seat_bind: sending capabilities=0x3 (POINTER|KEYBOARD)
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_seat@21.capabilities argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_seat@21.name argc=1
-[2026-05-31 16:01:21] seat_bind: sent seat name 'seat0'
-[2026-05-31 16:01:21] seat_bind: done
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_display@1.sync argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_callback@17.done argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_display@1.delete_id argc=1
-[2026-05-31 16:01:21] [CLIENT_CONNECT] new wl_client pid=18118 uid=1000 ptr=0x5565a0c4dd40
-[2026-05-31 16:01:21] [PROTO REQ] pid=18118 wl_display@1.get_registry argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@2.global name=1 interface=wl_compositor version=4
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@2.global name=2 interface=wl_subcompositor version=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@2.global name=3 interface=wl_shm version=2
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@2.global name=4 interface=wl_data_device_manager version=3
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@2.global name=5 interface=xdg_wm_base version=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@2.global name=6 interface=wl_seat version=5
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@2.global name=7 interface=wl_output version=3
-[2026-05-31 16:01:21] [PROTO REQ] pid=18118 wl_display@1.sync argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_callback@3.done argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_display@1.delete_id argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18118 wl_display@1.sync argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_callback@3.done argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_display@1.delete_id argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18118 wl_display@1.get_registry argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@3.global name=1 interface=wl_compositor version=4
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@3.global name=2 interface=wl_subcompositor version=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@3.global name=3 interface=wl_shm version=2
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@3.global name=4 interface=wl_data_device_manager version=3
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@3.global name=5 interface=xdg_wm_base version=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@3.global name=6 interface=wl_seat version=5
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@3.global name=7 interface=wl_output version=3
-[2026-05-31 16:01:21] [PROTO REQ] pid=18118 wl_display@1.sync argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_callback@4.done argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_display@1.delete_id argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18118 wl_display@1.sync argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_callback@4.done argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_display@1.delete_id argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18118 wl_display@1.get_registry argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@4.global name=1 interface=wl_compositor version=4
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@4.global name=2 interface=wl_subcompositor version=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@4.global name=3 interface=wl_shm version=2
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@4.global name=4 interface=wl_data_device_manager version=3
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@4.global name=5 interface=xdg_wm_base version=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@4.global name=6 interface=wl_seat version=5
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@4.global name=7 interface=wl_output version=3
-[2026-05-31 16:01:21] [PROTO REQ] pid=18118 wl_display@1.sync argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_callback@5.done argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_display@1.delete_id argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18118 wl_registry@4.bind name=3 interface=wl_shm version=1 new_id=6
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_shm@6.format argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_shm@6.format argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18118 wl_display@1.sync argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_callback@5.done argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_display@1.delete_id argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18118 wl_display@1.sync argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_callback@5.done argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_display@1.delete_id argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18118 wl_display@1.get_registry argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@5.global name=1 interface=wl_compositor version=4
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@5.global name=2 interface=wl_subcompositor version=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@5.global name=3 interface=wl_shm version=2
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@5.global name=4 interface=wl_data_device_manager version=3
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@5.global name=5 interface=xdg_wm_base version=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@5.global name=6 interface=wl_seat version=5
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_registry@5.global name=7 interface=wl_output version=3
-[2026-05-31 16:01:21] [PROTO REQ] pid=18118 wl_display@1.sync argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_callback@7.done argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_display@1.delete_id argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18118 wl_registry@5.bind name=3 interface=wl_shm version=1 new_id=8
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_shm@8.format argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_shm@8.format argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18118 wl_display@1.sync argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_callback@7.done argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_display@1.delete_id argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18118 wl_display@1.sync argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_callback@7.done argc=1
-[2026-05-31 16:01:21] [PROTO EVT] pid=18118 wl_display@1.delete_id argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_seat@21.get_pointer argc=1
-[2026-05-31 16:01:21] seat_get_pointer: id=22
-[2026-05-31 16:01:21] seat_get_pointer: done, pointer resource created
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_seat@21.get_keyboard argc=1
-[2026-05-31 16:01:21] seat_get_keyboard: id=23 seat_version=5
-[2026-05-31 16:01:21] seat_get_keyboard: keyboard resource created, version=5
-[2026-05-31 16:01:21] seat_get_keyboard: sending keymap fd=15 size=313
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_keyboard@23.keymap argc=3
-[2026-05-31 16:01:21] seat_get_keyboard: keymap sent
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_keyboard@23.repeat_info argc=2
-[2026-05-31 16:01:21] seat_get_keyboard: repeat_info sent
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_keyboard@23.modifiers argc=5
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_keyboard@15.modifiers argc=5
-[2026-05-31 16:01:21] seat_get_keyboard: modifiers sent. keyboard_focus=null
-[2026-05-31 16:01:21] seat_get_keyboard: done
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_compositor@4.create_surface argc=1
-[2026-05-31 16:01:21] Wayland surface created. Assigned internal handle=3
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_surface@17.destroy
-[2026-05-31 16:01:21] Surface resource destroyed. handle=3
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_display@1.delete_id argc=1
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_compositor@4.create_surface argc=1
-[2026-05-31 16:01:21] Wayland surface created. Assigned internal handle=4
-[2026-05-31 16:01:21] [PROTO REQ] pid=18101 wl_surface@24.destroy
-[2026-05-31 16:01:21] Surface resource destroyed. handle=4
-[2026-05-31 16:01:21] [PROTO EVT] pid=18101 wl_display@1.delete_id argc=1
-[2026-05-31 16:01:21] Wayland client disconnected. Cleaning up resources.
-[wayland_bridge 2026-05-31 16:01:21 pid=18097] application exited with status 0
-[wayland_bridge 2026-05-31 16:01:21 pid=18097] stopping wlbridge pid=18098 after application exit
-[wayland_bridge 2026-05-31 16:01:22 pid=18097] done
+[wayland_bridge 2026-05-31 16:09:56 pid=22532] starting argc=6 argv0=./onetool
+[wayland_bridge 2026-05-31 16:09:56 pid=22532] display=wayland-5 swm_socket=/tmp/swm.sock
+[wayland_bridge 2026-05-31 16:09:56 pid=22532] debug_file=glx.log
+[wayland_bridge 2026-05-31 16:09:56 pid=22532] app command=foot
+[wayland_bridge 2026-05-31 16:09:56 pid=22532] wlbridge forked pid=22533
+[wayland_bridge 2026-05-31 16:09:56 pid=22533] exec wlbridge path=./wlbridge display_arg=--display=wayland-5 socket_arg=--socket=/tmp/swm.sock debug=glx.log
+[2026-05-31 16:09:56] wlbridge server starting. display: wayland-5, swm_socket: /tmp/swm.sock
+[2026-05-31 16:09:56] Wayland proxy running.
+[wayland_bridge 2026-05-31 16:09:57 pid=22532] wlbridge still running after startup delay
+[wayland_bridge 2026-05-31 16:09:57 pid=22532] starting app: foot
+[wayland_bridge 2026-05-31 16:09:57 pid=22532] app forked pid=22534
+[wayland_bridge 2026-05-31 16:09:57 pid=22534] exec app via /bin/sh -c, WAYLAND_DISPLAY=wayland-5 XDG_RUNTIME_DIR=/run/user/1000 GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1 QT_QPA_PLATFORM=wayland WAYLAND_DEBUG=1 GDK_DEBUG=misc,events,dnd,selection,clipboard,opengl,vulkan MOZ_LOG=Widget:5,WidgetWayland:5,WidgetPopup:5,Gtk:5 MOZ_LOG_FILE=glx.log.moz
+[2026-05-31 16:09:57] [CLIENT_CONNECT] new wl_client pid=22535 uid=1000 ptr=0x55f7cd0d7de0
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_display@1.get_registry argc=1
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_registry@2.global name=1 interface=wl_compositor version=4
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_registry@2.global name=2 interface=wl_subcompositor version=1
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_registry@2.global name=3 interface=wl_shm version=2
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_registry@2.global name=4 interface=wl_data_device_manager version=3
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_registry@2.global name=5 interface=wp_viewporter version=1
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_registry@2.global name=6 interface=xdg_wm_base version=7
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_registry@2.global name=7 interface=zxdg_decoration_manager_v1 version=1
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_registry@2.global name=8 interface=wl_seat version=5
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_registry@2.global name=9 interface=wl_output version=3
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_display@1.sync argc=1
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_callback@3.done argc=1
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_display@1.delete_id argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_registry@2.bind name=1 interface=wl_compositor version=4 new_id=4
+[2026-05-31 16:09:57] compositor_bind: version=4 id=4 pid=22535
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_registry@2.bind name=2 interface=wl_subcompositor version=1 new_id=5
+[2026-05-31 16:09:57] subcompositor_bind: version=1 id=5
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_registry@2.bind name=3 interface=wl_shm version=2 new_id=6
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_shm@6.format argc=1
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_shm@6.format argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_registry@2.bind name=4 interface=wl_data_device_manager version=3 new_id=7
+[2026-05-31 16:09:57] data_device_manager_bind: version=3 id=7
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_registry@2.bind name=5 interface=wp_viewporter version=1 new_id=8
+[2026-05-31 16:09:57] viewporter_bind: version=1 id=8
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_registry@2.bind name=6 interface=xdg_wm_base version=5 new_id=9
+[2026-05-31 16:09:57] xdg_wm_base_bind: version=5 id=9 pid=22535
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_registry@2.bind name=7 interface=zxdg_decoration_manager_v1 version=1 new_id=10
+[2026-05-31 16:09:57] decoration_manager_bind: version=1 id=10
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_registry@2.bind name=8 interface=wl_seat version=5 new_id=11
+[2026-05-31 16:09:57] seat_bind: version=5 id=11 pid=22535
+[2026-05-31 16:09:57] New Wayland client connected. pid=22535 Initializing Sprot connection...
+[2026-05-31 16:09:57] Client registration complete.
+[2026-05-31 16:09:57] seat_bind: sending capabilities=0x3 (POINTER|KEYBOARD)
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_seat@11.capabilities argc=1
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_seat@11.name argc=1
+[2026-05-31 16:09:57] seat_bind: sent seat name 'seat0'
+[2026-05-31 16:09:57] seat_bind: done
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_data_device_manager@7.get_data_device argc=2
+[2026-05-31 16:09:57] data_device_manager_get_data_device: id=12 seat=11 version=3
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_data_device@12.selection argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_registry@2.bind name=9 interface=wl_output version=3 new_id=13
+[2026-05-31 16:09:57] output_bind: version=3 id=13 pid=22535
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_output@13.geometry argc=8
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_output@13.mode argc=4
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_output@13.scale argc=1
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_output@13.done
+[2026-05-31 16:09:57] output_bind: done
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_display@1.sync argc=1
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_callback@3.done argc=1
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_display@1.delete_id argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_seat@11.get_keyboard argc=1
+[2026-05-31 16:09:57] seat_get_keyboard: id=14 seat_version=5
+[2026-05-31 16:09:57] seat_get_keyboard: keyboard resource created, version=5
+[2026-05-31 16:09:57] seat_get_keyboard: sending keymap fd=15 size=313
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_keyboard@14.keymap argc=3
+[2026-05-31 16:09:57] seat_get_keyboard: keymap sent
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_keyboard@14.repeat_info argc=2
+[2026-05-31 16:09:57] seat_get_keyboard: repeat_info sent
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_keyboard@14.modifiers argc=5
+[2026-05-31 16:09:57] seat_get_keyboard: modifiers sent. keyboard_focus=null
+[2026-05-31 16:09:57] seat_get_keyboard: done
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_compositor@4.create_surface argc=1
+[2026-05-31 16:09:57] Wayland surface created. Assigned internal handle=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wp_viewporter@8.get_viewport argc=2
+[2026-05-31 16:09:57] viewporter_get_viewport: id=16 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_seat@11.get_pointer argc=1
+[2026-05-31 16:09:57] seat_get_pointer: id=17
+[2026-05-31 16:09:57] seat_get_pointer: done, pointer resource created
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_compositor@4.create_surface argc=1
+[2026-05-31 16:09:57] Wayland surface created. Assigned internal handle=2
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_compositor@4.create_region argc=1
+[2026-05-31 16:09:57] compositor_create_region: id=18
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_region@18.add argc=4
+[2026-05-31 16:09:57] region_add: id=18 rect=0,0 2147483647x2147483647
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@3.set_opaque_region argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_region@18.destroy
+[2026-05-31 16:09:57] region_destroy: id=18
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_display@1.delete_id argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 xdg_wm_base@9.get_xdg_surface argc=2
+[2026-05-31 16:09:57] Wayland request: xdg_wm_base.get_xdg_surface for surface handle=2
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 xdg_surface@19.get_toplevel argc=1
+[2026-05-31 16:09:57] Wayland request: xdg_surface.get_toplevel for surface handle=2
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 xdg_toplevel@20.set_app_id argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 zxdg_decoration_manager_v1@10.get_toplevel_decoration argc=2
+[2026-05-31 16:09:57] decoration_manager_get_toplevel_decoration: id=21 version=1
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 zxdg_toplevel_decoration_v1@21.configure argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 zxdg_toplevel_decoration_v1@21.set_mode argc=1
+[2026-05-31 16:09:57] toplevel_decoration_set_mode: mode=2
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 zxdg_toplevel_decoration_v1@21.configure argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@3.commit
+[2026-05-31 16:09:57] surface_commit: handle=2 buffer=null configured=0 sprot_id=0
+[2026-05-31 16:09:57] surface_commit: initial commit (no buffer) for handle=2. Sending XDG configure.
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 xdg_toplevel@20.configure argc=3
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 xdg_surface@19.configure argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_compositor@4.create_surface argc=1
+[2026-05-31 16:09:57] Wayland surface created. Assigned internal handle=3
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subcompositor@5.get_subsurface argc=3
+[2026-05-31 16:09:57] subcompositor_get_subsurface: id=23 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wp_viewporter@8.get_viewport argc=2
+[2026-05-31 16:09:57] viewporter_get_viewport: id=24 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subsurface@23.set_sync
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_compositor@4.create_region argc=1
+[2026-05-31 16:09:57] compositor_create_region: id=25
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@22.set_input_region argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_region@25.destroy
+[2026-05-31 16:09:57] region_destroy: id=25
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_display@1.delete_id argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 xdg_toplevel@20.set_title argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_compositor@4.create_surface argc=1
+[2026-05-31 16:09:57] Wayland surface created. Assigned internal handle=4
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subcompositor@5.get_subsurface argc=3
+[2026-05-31 16:09:57] subcompositor_get_subsurface: id=18 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wp_viewporter@8.get_viewport argc=2
+[2026-05-31 16:09:57] viewporter_get_viewport: id=26 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subsurface@18.set_sync
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_compositor@4.create_surface argc=1
+[2026-05-31 16:09:57] Wayland surface created. Assigned internal handle=5
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subcompositor@5.get_subsurface argc=3
+[2026-05-31 16:09:57] subcompositor_get_subsurface: id=28 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wp_viewporter@8.get_viewport argc=2
+[2026-05-31 16:09:57] viewporter_get_viewport: id=29 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subsurface@28.set_sync
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_compositor@4.create_surface argc=1
+[2026-05-31 16:09:57] Wayland surface created. Assigned internal handle=6
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subcompositor@5.get_subsurface argc=3
+[2026-05-31 16:09:57] subcompositor_get_subsurface: id=31 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wp_viewporter@8.get_viewport argc=2
+[2026-05-31 16:09:57] viewporter_get_viewport: id=32 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subsurface@31.set_sync
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_compositor@4.create_surface argc=1
+[2026-05-31 16:09:57] Wayland surface created. Assigned internal handle=7
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subcompositor@5.get_subsurface argc=3
+[2026-05-31 16:09:57] subcompositor_get_subsurface: id=34 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wp_viewporter@8.get_viewport argc=2
+[2026-05-31 16:09:57] viewporter_get_viewport: id=35 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subsurface@34.set_sync
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_compositor@4.create_surface argc=1
+[2026-05-31 16:09:57] Wayland surface created. Assigned internal handle=8
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subcompositor@5.get_subsurface argc=3
+[2026-05-31 16:09:57] subcompositor_get_subsurface: id=37 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wp_viewporter@8.get_viewport argc=2
+[2026-05-31 16:09:57] viewporter_get_viewport: id=38 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subsurface@37.set_sync
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_compositor@4.create_surface argc=1
+[2026-05-31 16:09:57] Wayland surface created. Assigned internal handle=9
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subcompositor@5.get_subsurface argc=3
+[2026-05-31 16:09:57] subcompositor_get_subsurface: id=40 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wp_viewporter@8.get_viewport argc=2
+[2026-05-31 16:09:57] viewporter_get_viewport: id=41 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subsurface@40.set_sync
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_compositor@4.create_surface argc=1
+[2026-05-31 16:09:57] Wayland surface created. Assigned internal handle=10
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subcompositor@5.get_subsurface argc=3
+[2026-05-31 16:09:57] subcompositor_get_subsurface: id=43 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wp_viewporter@8.get_viewport argc=2
+[2026-05-31 16:09:57] viewporter_get_viewport: id=44 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subsurface@43.set_sync
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_compositor@4.create_surface argc=1
+[2026-05-31 16:09:57] Wayland surface created. Assigned internal handle=11
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subcompositor@5.get_subsurface argc=3
+[2026-05-31 16:09:57] subcompositor_get_subsurface: id=46 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wp_viewporter@8.get_viewport argc=2
+[2026-05-31 16:09:57] viewporter_get_viewport: id=47 version=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subsurface@46.set_sync
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 xdg_surface@19.ack_configure argc=1
+[2026-05-31 16:09:57] xdg_surface_ack_configure: handle=2 serial=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 xdg_toplevel@20.set_min_size argc=2
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 xdg_surface@19.set_window_geometry argc=4
+[2026-05-31 16:09:57] Wayland request: xdg_surface.set_window_geometry to 696x494
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subsurface@18.set_position argc=2
+[2026-05-31 16:09:57] subsurface_set_position: 0,-26
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subsurface@28.set_position argc=2
+[2026-05-31 16:09:57] subsurface_set_position: -5,-26
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subsurface@31.set_position argc=2
+[2026-05-31 16:09:57] subsurface_set_position: 696,-26
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subsurface@34.set_position argc=2
+[2026-05-31 16:09:57] subsurface_set_position: -5,-31
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subsurface@37.set_position argc=2
+[2026-05-31 16:09:57] subsurface_set_position: -5,468
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subsurface@40.set_position argc=2
+[2026-05-31 16:09:57] subsurface_set_position: 618,0
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subsurface@43.set_position argc=2
+[2026-05-31 16:09:57] subsurface_set_position: 644,0
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_subsurface@46.set_position argc=2
+[2026-05-31 16:09:57] subsurface_set_position: 670,0
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_shm@6.create_pool argc=3
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_shm_pool@48.create_buffer argc=6
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_shm_pool@48.create_buffer argc=6
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_shm_pool@48.create_buffer argc=6
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_shm_pool@48.create_buffer argc=6
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_shm_pool@48.create_buffer argc=6
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_shm_pool@48.create_buffer argc=6
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_shm_pool@48.create_buffer argc=6
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_shm_pool@48.create_buffer argc=6
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@27.set_buffer_scale argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@27.attach argc=3
+[2026-05-31 16:09:57] surface_attach: handle=5 buffer=set
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@27.damage_buffer argc=4
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@27.commit
+[2026-05-31 16:09:57] surface_commit: handle=5 buffer=set configured=0 sprot_id=0
+[2026-05-31 16:09:57] Surface commit for surface handle=5. Attached buffer size: 5x494, stride: 20, size: 9880
+[2026-05-31 16:09:57] Creating new Sprot surface for client connection...
+[2026-05-31 16:09:57] Created new shared memory mapping (memfd) of size 9880 for surface handle=5
+[2026-05-31 16:09:57] Sprot surface ID is not yet ready. Deferring attach and commit.
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_buffer@50.release
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@30.set_buffer_scale argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@30.attach argc=3
+[2026-05-31 16:09:57] surface_attach: handle=6 buffer=set
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@30.damage_buffer argc=4
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@30.commit
+[2026-05-31 16:09:57] surface_commit: handle=6 buffer=set configured=0 sprot_id=0
+[2026-05-31 16:09:57] Surface commit for surface handle=6. Attached buffer size: 5x494, stride: 20, size: 9880
+[2026-05-31 16:09:57] Creating new Sprot surface for client connection...
+[2026-05-31 16:09:57] Created new shared memory mapping (memfd) of size 9880 for surface handle=6
+[2026-05-31 16:09:57] Sprot surface ID is not yet ready. Deferring attach and commit.
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_buffer@51.release
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@33.set_buffer_scale argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@33.attach argc=3
+[2026-05-31 16:09:57] surface_attach: handle=7 buffer=set
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@33.damage_buffer argc=4
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@33.commit
+[2026-05-31 16:09:57] surface_commit: handle=7 buffer=set configured=0 sprot_id=0
+[2026-05-31 16:09:57] Surface commit for surface handle=7. Attached buffer size: 706x5, stride: 2824, size: 14120
+[2026-05-31 16:09:57] Creating new Sprot surface for client connection...
+[2026-05-31 16:09:57] Created new shared memory mapping (memfd) of size 14120 for surface handle=7
+[2026-05-31 16:09:57] Sprot surface ID is not yet ready. Deferring attach and commit.
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_buffer@52.release
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@36.set_buffer_scale argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@36.attach argc=3
+[2026-05-31 16:09:57] surface_attach: handle=8 buffer=set
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@36.damage_buffer argc=4
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@36.commit
+[2026-05-31 16:09:57] surface_commit: handle=8 buffer=set configured=0 sprot_id=0
+[2026-05-31 16:09:57] Surface commit for surface handle=8. Attached buffer size: 706x5, stride: 2824, size: 14120
+[2026-05-31 16:09:57] Creating new Sprot surface for client connection...
+[2026-05-31 16:09:57] Created new shared memory mapping (memfd) of size 14120 for surface handle=8
+[2026-05-31 16:09:57] Sprot surface ID is not yet ready. Deferring attach and commit.
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_buffer@53.release
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@39.set_buffer_scale argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@39.attach argc=3
+[2026-05-31 16:09:57] surface_attach: handle=9 buffer=set
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@39.damage_buffer argc=4
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@39.commit
+[2026-05-31 16:09:57] surface_commit: handle=9 buffer=set configured=0 sprot_id=0
+[2026-05-31 16:09:57] Surface commit for surface handle=9. Attached buffer size: 26x26, stride: 104, size: 2704
+[2026-05-31 16:09:57] Creating new Sprot surface for client connection...
+[2026-05-31 16:09:57] Created new shared memory mapping (memfd) of size 2704 for surface handle=9
+[2026-05-31 16:09:57] Sprot surface ID is not yet ready. Deferring attach and commit.
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_buffer@54.release
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@42.set_buffer_scale argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@42.attach argc=3
+[2026-05-31 16:09:57] surface_attach: handle=10 buffer=set
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@42.damage_buffer argc=4
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@42.commit
+[2026-05-31 16:09:57] surface_commit: handle=10 buffer=set configured=0 sprot_id=0
+[2026-05-31 16:09:57] Surface commit for surface handle=10. Attached buffer size: 26x26, stride: 104, size: 2704
+[2026-05-31 16:09:57] Creating new Sprot surface for client connection...
+[2026-05-31 16:09:57] Created new shared memory mapping (memfd) of size 2704 for surface handle=10
+[2026-05-31 16:09:57] Sprot surface ID is not yet ready. Deferring attach and commit.
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_buffer@55.release
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@45.set_buffer_scale argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@45.attach argc=3
+[2026-05-31 16:09:57] surface_attach: handle=11 buffer=set
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@45.damage_buffer argc=4
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@45.commit
+[2026-05-31 16:09:57] surface_commit: handle=11 buffer=set configured=0 sprot_id=0
+[2026-05-31 16:09:57] Surface commit for surface handle=11. Attached buffer size: 26x26, stride: 104, size: 2704
+[2026-05-31 16:09:57] Creating new Sprot surface for client connection...
+[2026-05-31 16:09:57] Created new shared memory mapping (memfd) of size 2704 for surface handle=11
+[2026-05-31 16:09:57] Sprot surface ID is not yet ready. Deferring attach and commit.
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_buffer@56.release
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@25.set_buffer_scale argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@25.attach argc=3
+[2026-05-31 16:09:57] surface_attach: handle=4 buffer=set
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@25.damage_buffer argc=4
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_compositor@4.create_region argc=1
+[2026-05-31 16:09:57] compositor_create_region: id=57
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_region@57.add argc=4
+[2026-05-31 16:09:57] region_add: id=57 rect=0,0 696x26
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@25.set_opaque_region argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_region@57.destroy
+[2026-05-31 16:09:57] region_destroy: id=57
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_display@1.delete_id argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@25.commit
+[2026-05-31 16:09:57] surface_commit: handle=4 buffer=set configured=0 sprot_id=0
+[2026-05-31 16:09:57] Surface commit for surface handle=4. Attached buffer size: 696x26, stride: 2784, size: 72384
+[2026-05-31 16:09:57] Creating new Sprot surface for client connection...
+[2026-05-31 16:09:57] Created new shared memory mapping (memfd) of size 72384 for surface handle=4
+[2026-05-31 16:09:57] Sprot surface ID is not yet ready. Deferring attach and commit.
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_buffer@49.release
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@25.set_buffer_scale argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@25.attach argc=3
+[2026-05-31 16:09:57] surface_attach: handle=4 buffer=set
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@25.damage_buffer argc=4
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@25.commit
+[2026-05-31 16:09:57] surface_commit: handle=4 buffer=set configured=0 sprot_id=0
+[2026-05-31 16:09:57] Surface commit for surface handle=4. Attached buffer size: 696x26, stride: 2784, size: 72384
+[2026-05-31 16:09:57] Sprot surface ID is not yet ready. Deferring attach and commit.
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_buffer@49.release
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_shm@6.create_pool argc=3
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_shm_pool@58.create_buffer argc=6
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@3.damage_buffer argc=4
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@3.damage_buffer argc=4
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@3.damage_buffer argc=4
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@3.damage_buffer argc=4
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@3.damage_buffer argc=4
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@3.frame argc=1
+[2026-05-31 16:09:57] surface_frame: handle=2 id=60
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@3.set_buffer_scale argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@3.attach argc=3
+[2026-05-31 16:09:57] surface_attach: handle=2 buffer=set
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_surface@3.commit
+[2026-05-31 16:09:57] surface_commit: handle=2 buffer=set configured=1 sprot_id=0
+[2026-05-31 16:09:57] Surface commit for surface handle=2. Attached buffer size: 696x468, stride: 2784, size: 1302912
+[2026-05-31 16:09:57] Creating new Sprot surface for client connection...
+[2026-05-31 16:09:57] Created new shared memory mapping (memfd) of size 1302912 for surface handle=2
+[2026-05-31 16:09:57] Sprot surface ID is not yet ready. Deferring attach and commit.
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_buffer@59.release
+[2026-05-31 16:09:57] Sprot event: Surface created. Sprot ID=2 assigned to handle=1
+[2026-05-31 16:09:57] Set Sprot role to SPROT_SURFACE_ROLE_TOPLEVEL for Sprot ID=2 (res=-1)
+[2026-05-31 16:09:57] Sprot event: Surface created. Sprot ID=3 assigned to handle=2
+[2026-05-31 16:09:57] Set Sprot role to SPROT_SURFACE_ROLE_TOPLEVEL for Sprot ID=3 (res=-1)
+[2026-05-31 16:09:57] Executing deferred surface commit for surface Sprot ID=3
+[2026-05-31 16:09:57] Deferred commit results: attach=-1, commit=-1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_buffer@50.destroy
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_display@1.delete_id argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_buffer@51.destroy
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_display@1.delete_id argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_buffer@52.destroy
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_display@1.delete_id argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_buffer@53.destroy
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_display@1.delete_id argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_buffer@54.destroy
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_display@1.delete_id argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_buffer@55.destroy
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_display@1.delete_id argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_buffer@56.destroy
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_display@1.delete_id argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_buffer@49.destroy
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_display@1.delete_id argc=1
+[2026-05-31 16:09:57] [PROTO REQ] pid=22535 wl_shm_pool@48.destroy
+[2026-05-31 16:09:57] [PROTO EVT] pid=22535 wl_display@1.delete_id argc=1
+[2026-05-31 16:09:57] Sprot event: Surface created. Sprot ID=4 assigned to handle=3
+[2026-05-31 16:09:57] Set Sprot role to SPROT_SURFACE_ROLE_TOPLEVEL for Sprot ID=4 (res=-1)
+[2026-05-31 16:09:57] Sprot event: Surface created. Sprot ID=5 assigned to handle=4
+[2026-05-31 16:09:57] Set Sprot role to SPROT_SURFACE_ROLE_TOPLEVEL for Sprot ID=5 (res=-1)
+[2026-05-31 16:09:57] Executing deferred surface commit for surface Sprot ID=5
+[2026-05-31 16:09:57] Deferred commit results: attach=-1, commit=-1
+[2026-05-31 16:09:57] Sprot event: Surface created. Sprot ID=6 assigned to handle=5
+[2026-05-31 16:09:57] Set Sprot role to SPROT_SURFACE_ROLE_TOPLEVEL for Sprot ID=6 (res=0)
+[2026-05-31 16:09:57] Executing deferred surface commit for surface Sprot ID=6
+[2026-05-31 16:09:57] Deferred commit results: attach=0, commit=0
+[2026-05-31 16:09:57] Sprot event: Surface created. Sprot ID=7 assigned to handle=6
+[2026-05-31 16:09:57] Set Sprot role to SPROT_SURFACE_ROLE_TOPLEVEL for Sprot ID=7 (res=0)
+[2026-05-31 16:09:57] Executing deferred surface commit for surface Sprot ID=7
+[2026-05-31 16:09:57] Deferred commit results: attach=0, commit=0
+[2026-05-31 16:09:57] Sprot event: Surface created. Sprot ID=8 assigned to handle=7
+[2026-05-31 16:09:57] Set Sprot role to SPROT_SURFACE_ROLE_TOPLEVEL for Sprot ID=8 (res=0)
+[2026-05-31 16:09:57] Executing deferred surface commit for surface Sprot ID=8
+[2026-05-31 16:09:57] Deferred commit results: attach=0, commit=0
+[2026-05-31 16:09:57] Sprot event: Surface created. Sprot ID=9 assigned to handle=8
+[2026-05-31 16:09:57] Set Sprot role to SPROT_SURFACE_ROLE_TOPLEVEL for Sprot ID=9 (res=0)
+[2026-05-31 16:09:57] Executing deferred surface commit for surface Sprot ID=9
+[2026-05-31 16:09:57] Deferred commit results: attach=0, commit=0
+[2026-05-31 16:09:57] Sprot event error: code=4, message=surface limit per client. Terminating client connection.
+[2026-05-31 16:09:57] Wayland client disconnected. Cleaning up resources.
+[wayland_bridge 2026-05-31 16:09:59 pid=22532] wlbridge terminated by signal 11
+[wayland_bridge 2026-05-31 16:09:59 pid=22532] stopping app pid=22534 because wlbridge stopped
+[wayland_bridge 2026-05-31 16:09:59 pid=22532] done
