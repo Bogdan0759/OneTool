@@ -1,5 +1,14 @@
-[2026-05-28 10:05:06] wlbridge server starting. display: wayland-5, swm_socket: /tmp/swm.sock
-[2026-05-28 10:05:06] Wayland proxy running.
-[2026-05-28 10:05:06] New Wayland client connected. Initializing Sprot connection...
-[2026-05-28 10:05:06] Client registration complete.
-[2026-05-28 10:05:06] Wayland client disconnected. Cleaning up resources.
+[2026-05-31 10:28:35] wlbridge server starting. display: wayland-5, swm_socket: /tmp/swm.sock
+[2026-05-31 10:28:35] Wayland proxy running.
+[2026-05-31 10:28:35] compositor_bind: version=3 id=4
+[2026-05-31 10:28:35] output_bind: version=2 id=6
+[2026-05-31 10:28:35] output_bind: done
+[2026-05-31 10:28:35] xdg_wm_base_bind: version=1 id=7
+[2026-05-31 10:28:35] compositor_bind: version=4 id=10
+[2026-05-31 10:28:35] seat_bind: version=5 id=12
+[2026-05-31 10:28:35] New Wayland client connected. Initializing Sprot connection...
+[2026-05-31 10:28:35] Client registration complete.
+[2026-05-31 10:28:35] seat_bind: sending capabilities=0x3 (POINTER|KEYBOARD)
+[2026-05-31 10:28:35] seat_bind: sent seat name 'seat0'
+[2026-05-31 10:28:35] seat_bind: done
+[2026-05-31 10:28:35] Wayland client disconnected. Cleaning up resources.

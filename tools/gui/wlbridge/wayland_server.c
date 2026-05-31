@@ -13,10 +13,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
+#include <linux/input-event-codes.h>
 
 #define MAX_SURFACES 64
 
 struct bridge_client;
+
+struct bridge_surface;
 
 struct bridge_surface {
     struct wl_resource *resource;
@@ -43,6 +46,7 @@ struct bridge_surface {
 
 struct seat_resource {
     struct wl_resource *resource;
+    struct bridge_client *client;
     struct wl_list link;
 };
 
@@ -55,6 +59,14 @@ struct bridge_client {
     struct wl_list seat_pointers;
     struct wl_list seat_keyboards;
     struct wl_list seat_resources;
+    struct bridge_surface *keyboard_focus;
+    uint32_t keyboard_serial;
+    uint32_t keyboard_mods_depressed;
+    uint32_t keyboard_mods_latched;
+    uint32_t keyboard_mods_locked;
+    uint32_t keyboard_group;
+    uint32_t pressed_keys[32];
+    size_t pressed_key_count;
     struct wl_list link;
 };
 
@@ -68,6 +80,28 @@ struct bridge_server {
 
 static struct bridge_server g_server;
 static FILE *g_debug_file = NULL;
+static int g_keymap_fd = -1;
+static uint32_t g_keymap_size = 0;
+static const char g_default_keymap[] =
+    "xkb_keymap {\n"
+    "xkb_keycodes \"(unnamed)\" {\n"
+    "minimum = 8;\n"
+    "maximum = 255;\n"
+    "include \"evdev+aliases(qwerty)\"\n"
+    "};\n"
+    "xkb_types \"(unnamed)\" {\n"
+    "include \"complete\"\n"
+    "};\n"
+    "xkb_compatibility \"(unnamed)\" {\n"
+    "include \"complete\"\n"
+    "};\n"
+    "xkb_symbols \"(unnamed)\" {\n"
+    "include \"pc+us+inet(evdev)\"\n"
+    "};\n"
+    "xkb_geometry \"(unnamed)\" {\n"
+    "include \"pc(pc105)\"\n"
+    "};\n"
+    "};\n";
 
 #include <stdarg.h>
 #include <time.h>
@@ -86,6 +120,139 @@ static void debug_log(const char *fmt, ...) {
     va_end(args);
     fprintf(g_debug_file, "\n");
     fflush(g_debug_file);
+}
+
+static uint32_t next_keyboard_serial(struct bridge_client *c) {
+    c->keyboard_serial++;
+    if (c->keyboard_serial == 0) {
+        c->keyboard_serial = 1;
+    }
+    return c->keyboard_serial;
+}
+
+static uint32_t evdev_to_xkb_mod(uint32_t scancode) {
+    switch (scancode) {
+        case KEY_LEFTSHIFT:
+        case KEY_RIGHTSHIFT:
+            return 1u << 0;
+        case KEY_LEFTCTRL:
+        case KEY_RIGHTCTRL:
+            return 1u << 2;
+        case KEY_LEFTALT:
+        case KEY_RIGHTALT:
+            return 1u << 3;
+        case KEY_CAPSLOCK:
+            return 1u << 1;
+        default:
+            return 0;
+    }
+}
+
+static void send_keyboard_modifiers(struct bridge_client *c, uint32_t serial) {
+    struct seat_resource *sr;
+    wl_list_for_each(sr, &c->seat_keyboards, link) {
+        wl_keyboard_send_modifiers(sr->resource, serial,
+            c->keyboard_mods_depressed,
+            c->keyboard_mods_latched,
+            c->keyboard_mods_locked,
+            c->keyboard_group);
+    }
+}
+
+static void clear_pressed_keys(struct bridge_client *c) {
+    c->pressed_key_count = 0;
+    c->keyboard_mods_depressed = 0;
+}
+
+static void set_keyboard_focus(struct bridge_client *c, struct bridge_surface *surface, uint32_t serial) {
+    if (c->keyboard_focus == surface) {
+        return;
+    }
+
+    struct wl_array keys;
+    wl_array_init(&keys);
+
+    if (c->keyboard_focus != NULL) {
+        struct seat_resource *sr;
+        wl_list_for_each(sr, &c->seat_keyboards, link) {
+            wl_keyboard_send_leave(sr->resource, serial, c->keyboard_focus->resource);
+        }
+    }
+
+    clear_pressed_keys(c);
+    c->keyboard_focus = surface;
+
+    if (surface != NULL) {
+        struct seat_resource *sr;
+        wl_list_for_each(sr, &c->seat_keyboards, link) {
+            wl_keyboard_send_enter(sr->resource, serial, surface->resource, &keys);
+        }
+        send_keyboard_modifiers(c, serial);
+    }
+
+    wl_array_release(&keys);
+}
+
+static void update_pressed_keys(struct bridge_client *c, uint32_t scancode, uint32_t pressed) {
+    size_t i;
+    for (i = 0; i < c->pressed_key_count; i++) {
+        if (c->pressed_keys[i] == scancode) {
+            break;
+        }
+    }
+
+    if (pressed) {
+        if (i == c->pressed_key_count && c->pressed_key_count < MAX_SURFACES) {
+            c->pressed_keys[c->pressed_key_count++] = scancode;
+        }
+    } else if (i < c->pressed_key_count) {
+        memmove(&c->pressed_keys[i], &c->pressed_keys[i + 1],
+            (c->pressed_key_count - i - 1) * sizeof(c->pressed_keys[0]));
+        c->pressed_key_count--;
+    }
+
+    uint32_t mod = evdev_to_xkb_mod(scancode);
+    if (mod == 0) {
+        return;
+    }
+
+    if (scancode == KEY_CAPSLOCK && pressed) {
+        c->keyboard_mods_locked ^= mod;
+        return;
+    }
+
+    if (pressed) {
+        c->keyboard_mods_depressed |= mod;
+    } else {
+        c->keyboard_mods_depressed &= ~mod;
+    }
+}
+
+static int ensure_keymap(void) {
+    if (g_keymap_fd >= 0) {
+        return 0;
+    }
+
+    g_keymap_size = (uint32_t)strlen(g_default_keymap);
+    g_keymap_fd = memfd_create("wlbridge-keymap", MFD_CLOEXEC);
+    if (g_keymap_fd < 0) {
+        debug_log("Error: keymap memfd_create failed: %s", strerror(errno));
+        return -1;
+    }
+    if (ftruncate(g_keymap_fd, g_keymap_size) != 0) {
+        debug_log("Error: keymap ftruncate failed: %s", strerror(errno));
+        close(g_keymap_fd);
+        g_keymap_fd = -1;
+        return -1;
+    }
+    ssize_t written = pwrite(g_keymap_fd, g_default_keymap, g_keymap_size, 0);
+    if (written < 0 || (size_t)written != g_keymap_size) {
+        debug_log("Error: keymap write failed: %s", strerror(errno));
+        close(g_keymap_fd);
+        g_keymap_fd = -1;
+        return -1;
+    }
+    return 0;
 }
 
 // Forward declarations
@@ -222,13 +389,15 @@ static int client_sprot_fd_handler(int fd, uint32_t mask, void *data) {
             case SPROT_EVENT_POINTER_ENTER: {
                 struct bridge_surface *s = find_surface_by_sprot_id(c, ev.object_id);
                 if (s) {
+                    uint32_t serial = ev.serial ? ev.serial : next_keyboard_serial(c);
                     debug_log("Sprot event: Pointer entered surface handle=%u at (%d, %d)", s->client_handle, ev.u.pointer_motion.x, ev.u.pointer_motion.y);
                     struct seat_resource *sr;
                     wl_list_for_each(sr, &c->seat_pointers, link) {
-                        wl_pointer_send_enter(sr->resource, ev.serial, s->resource,
+                        wl_pointer_send_enter(sr->resource, serial, s->resource,
                             wl_fixed_from_int(ev.u.pointer_motion.x),
                             wl_fixed_from_int(ev.u.pointer_motion.y));
                     }
+                    set_keyboard_focus(c, s, serial);
                 }
                 break;
             }
@@ -236,10 +405,14 @@ static int client_sprot_fd_handler(int fd, uint32_t mask, void *data) {
             case SPROT_EVENT_POINTER_LEAVE: {
                 struct bridge_surface *s = find_surface_by_sprot_id(c, ev.object_id);
                 if (s) {
+                    uint32_t serial = ev.serial ? ev.serial : next_keyboard_serial(c);
                     debug_log("Sprot event: Pointer left surface handle=%u", s->client_handle);
                     struct seat_resource *sr;
                     wl_list_for_each(sr, &c->seat_pointers, link) {
-                        wl_pointer_send_leave(sr->resource, ev.serial, s->resource);
+                        wl_pointer_send_leave(sr->resource, serial, s->resource);
+                    }
+                    if (c->keyboard_focus == s) {
+                        set_keyboard_focus(c, NULL, serial);
                     }
                 }
                 break;
@@ -267,11 +440,17 @@ static int client_sprot_fd_handler(int fd, uint32_t mask, void *data) {
             }
 
             case SPROT_EVENT_KEY: {
-                struct seat_resource *sr;
                 debug_log("Sprot event: Keyboard key scancode=%u state=%u", ev.u.key.scancode, ev.u.key.state);
-                wl_list_for_each(sr, &c->seat_keyboards, link) {
+                if (c->keyboard_focus != NULL) {
+                    uint32_t serial = ev.serial ? ev.serial : next_keyboard_serial(c);
                     uint32_t state = ev.u.key.state ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED;
-                    wl_keyboard_send_key(sr->resource, ev.serial, 0, ev.u.key.scancode, state);
+                    update_pressed_keys(c, ev.u.key.scancode, ev.u.key.state);
+
+                    struct seat_resource *sr;
+                    wl_list_for_each(sr, &c->seat_keyboards, link) {
+                        wl_keyboard_send_key(sr->resource, serial, 0, ev.u.key.scancode, state);
+                    }
+                    send_keyboard_modifiers(c, serial);
                 }
                 break;
             }
@@ -376,6 +555,7 @@ static void surface_attach(struct wl_client *client, struct wl_resource *resourc
     (void)client;
     (void)x;
     (void)y;
+    debug_log("surface_attach: handle=%u buffer=%s", s->client_handle, buffer ? "set" : "null");
     s->buffer_resource = buffer;
 }
 
@@ -389,6 +569,7 @@ static void callback_resource_destroy(struct wl_resource *resource) {
 
 static void surface_frame(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
     struct bridge_surface *s = wl_resource_get_user_data(resource);
+    debug_log("surface_frame: handle=%u id=%u", s->client_handle, id);
     struct wl_resource *callback = wl_resource_create(client, &wl_callback_interface, 1, id);
     wl_resource_set_implementation(callback, NULL, NULL, callback_resource_destroy);
     wl_list_insert(&s->frame_callbacks, wl_resource_get_link(callback));
@@ -406,9 +587,12 @@ static void surface_commit(struct wl_client *client, struct wl_resource *resourc
     struct bridge_surface *s = wl_resource_get_user_data(resource);
     (void)client;
 
+    debug_log("surface_commit: handle=%u buffer=%s configured=%d sprot_id=%u",
+        s->client_handle, s->buffer_resource ? "set" : "null", s->configured, s->sprot_id);
+
     if (!s->buffer_resource) {
         if (!s->configured) {
-            debug_log("Initial surface commit (no buffer) for surface handle=%u. Sending XDG configure.", s->client_handle);
+            debug_log("surface_commit: initial commit (no buffer) for handle=%u. Sending XDG configure.", s->client_handle);
             if (s->xdg_toplevel_resource) {
                 struct wl_array states;
                 wl_array_init(&states);
@@ -419,13 +603,15 @@ static void surface_commit(struct wl_client *client, struct wl_resource *resourc
                 xdg_surface_send_configure(s->xdg_surface_resource, 1);
             }
             s->configured = 1;
+        } else {
+            debug_log("surface_commit: no buffer, already configured. Skipping.");
         }
         return;
     }
 
     struct wl_shm_buffer *shm_buf = wl_shm_buffer_get(s->buffer_resource);
     if (!shm_buf) {
-        debug_log("Warning: committed surface has buffer but not SHM");
+        debug_log("surface_commit: WARNING handle=%u buffer is not SHM (maybe EGL/dmabuf?)", s->client_handle);
         return;
     }
 
@@ -566,7 +752,8 @@ static void compositor_create_surface(struct wl_client *client, struct wl_resour
 }
 
 static void compositor_create_region(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
-    (void)client; (void)resource; (void)id;
+    (void)client; (void)resource;
+    debug_log("compositor_create_region: id=%u", id);
 }
 
 static const struct wl_compositor_interface compositor_implementation = {
@@ -576,6 +763,7 @@ static const struct wl_compositor_interface compositor_implementation = {
 
 static void compositor_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     (void)data;
+    debug_log("compositor_bind: version=%u id=%u", version, id);
     struct wl_resource *resource = wl_resource_create(client, &wl_compositor_interface, version, id);
     wl_resource_set_implementation(resource, &compositor_implementation, NULL, NULL);
 }
@@ -586,7 +774,8 @@ static void xdg_wm_base_destroy(struct wl_client *client, struct wl_resource *re
 }
 
 static void xdg_wm_base_create_positioner(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
-    (void)client; (void)resource; (void)id;
+    (void)client; (void)resource;
+    debug_log("xdg_wm_base_create_positioner: id=%u", id);
 }
 
 static void xdg_surface_resource_destroy(struct wl_resource *resource) {
@@ -619,8 +808,9 @@ static void xdg_surface_set_window_geometry(struct wl_client *client, struct wl_
 }
 
 static void xdg_surface_ack_configure(struct wl_client *client, struct wl_resource *resource, uint32_t serial) {
-    (void)client; (void)resource; (void)serial;
-    debug_log("Wayland request: xdg_surface.ack_configure serial=%u", serial);
+    struct bridge_surface *s = wl_resource_get_user_data(resource);
+    (void)client;
+    debug_log("xdg_surface_ack_configure: handle=%u serial=%u", s ? s->client_handle : 0, serial);
 }
 
 static const struct xdg_surface_interface xdg_surface_implementation = {
@@ -653,6 +843,7 @@ static const struct xdg_wm_base_interface xdg_wm_base_implementation = {
 
 static void xdg_wm_base_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     (void)data;
+    debug_log("xdg_wm_base_bind: version=%u id=%u", version, id);
     struct wl_resource *resource = wl_resource_create(client, &xdg_wm_base_interface, version, id);
     wl_resource_set_implementation(resource, &xdg_wm_base_implementation, NULL, NULL);
 }
@@ -751,25 +942,60 @@ static void seat_keyboard_destroy(struct wl_resource *resource) {
 static void seat_get_pointer(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
     struct bridge_client *c = wl_resource_get_user_data(resource);
     (void)client;
+    debug_log("seat_get_pointer: id=%u", id);
 
     struct seat_resource *sr = calloc(1, sizeof(*sr));
     sr->resource = wl_resource_create(client, &wl_pointer_interface, wl_resource_get_version(resource), id);
     wl_resource_set_implementation(sr->resource, NULL, sr, seat_pointer_destroy);
     wl_list_insert(&c->seat_pointers, &sr->link);
+    debug_log("seat_get_pointer: done, pointer resource created");
 }
 
 static void seat_get_keyboard(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
     struct bridge_client *c = wl_resource_get_user_data(resource);
     (void)client;
+    debug_log("seat_get_keyboard: id=%u seat_version=%u", id, wl_resource_get_version(resource));
 
     struct seat_resource *sr = calloc(1, sizeof(*sr));
     sr->resource = wl_resource_create(client, &wl_keyboard_interface, wl_resource_get_version(resource), id);
     wl_resource_set_implementation(sr->resource, NULL, sr, seat_keyboard_destroy);
     wl_list_insert(&c->seat_keyboards, &sr->link);
+    debug_log("seat_get_keyboard: keyboard resource created, version=%u", wl_resource_get_version(sr->resource));
+
+    if (ensure_keymap() == 0) {
+        int keymap_fd = dup(g_keymap_fd);
+        if (keymap_fd >= 0) {
+            debug_log("seat_get_keyboard: sending keymap fd=%d size=%u", keymap_fd, g_keymap_size);
+            wl_keyboard_send_keymap(sr->resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1, keymap_fd, g_keymap_size);
+            close(keymap_fd);
+            debug_log("seat_get_keyboard: keymap sent");
+        } else {
+            debug_log("seat_get_keyboard: ERROR dup(g_keymap_fd) failed: %s", strerror(errno));
+        }
+    } else {
+        debug_log("seat_get_keyboard: ERROR ensure_keymap() failed");
+    }
+    if (wl_resource_get_version(sr->resource) >= 4) {
+        wl_keyboard_send_repeat_info(sr->resource, 25, 600);
+        debug_log("seat_get_keyboard: repeat_info sent");
+    }
+    send_keyboard_modifiers(c, next_keyboard_serial(c));
+    debug_log("seat_get_keyboard: modifiers sent. keyboard_focus=%s",
+        c->keyboard_focus ? "set" : "null");
+
+    if (c->keyboard_focus != NULL) {
+        struct wl_array keys;
+        wl_array_init(&keys);
+        wl_keyboard_send_enter(sr->resource, next_keyboard_serial(c), c->keyboard_focus->resource, &keys);
+        wl_array_release(&keys);
+        debug_log("seat_get_keyboard: enter sent to keyboard_focus handle=%u", c->keyboard_focus->client_handle);
+    }
+    debug_log("seat_get_keyboard: done");
 }
 
 static void seat_get_touch(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
-    (void)client; (void)resource; (void)id;
+    (void)client; (void)resource;
+    debug_log("seat_get_touch: id=%u (not implemented)", id);
 }
 
 static void seat_release(struct wl_client *client, struct wl_resource *resource) {
@@ -791,8 +1017,10 @@ static void seat_resource_destroy(struct wl_resource *resource) {
 
 static void seat_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     (void)data;
+    debug_log("seat_bind: version=%u id=%u", version, id);
     struct bridge_client *c = get_or_create_client(client);
     if (!c) {
+        debug_log("seat_bind: ERROR get_or_create_client returned NULL");
         return;
     }
 
@@ -801,13 +1029,20 @@ static void seat_bind(struct wl_client *client, void *data, uint32_t version, ui
     wl_resource_set_implementation(sr->resource, &seat_implementation, c, seat_resource_destroy);
     wl_list_insert(&c->seat_resources, &sr->link);
 
-    // Send capabilities: Pointer & Keyboard supported
-    wl_seat_send_capabilities(sr->resource, WL_SEAT_CAPABILITY_POINTER | WL_SEAT_CAPABILITY_KEYBOARD);
+    uint32_t caps = WL_SEAT_CAPABILITY_POINTER | WL_SEAT_CAPABILITY_KEYBOARD;
+    debug_log("seat_bind: sending capabilities=0x%x (POINTER|KEYBOARD)", caps);
+    wl_seat_send_capabilities(sr->resource, caps);
+    if (version >= 2) {
+        wl_seat_send_name(sr->resource, "seat0");
+        debug_log("seat_bind: sent seat name 'seat0'");
+    }
+    debug_log("seat_bind: done");
 }
 
 // Output implementation
 static void output_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     (void)data;
+    debug_log("output_bind: version=%u id=%u", version, id);
     struct wl_resource *resource = wl_resource_create(client, &wl_output_interface, version, id);
     wl_resource_set_implementation(resource, NULL, NULL, NULL);
 
@@ -815,9 +1050,13 @@ static void output_bind(struct wl_client *client, void *data, uint32_t version, 
     if (version >= 2) {
         wl_output_send_mode(resource, WL_OUTPUT_MODE_CURRENT | WL_OUTPUT_MODE_PREFERRED, 1920, 1080, 60000);
     }
+    if (version >= 4) {
+        wl_output_send_scale(resource, 1);
+    }
     if (version >= 3) {
         wl_output_send_done(resource);
     }
+    debug_log("output_bind: done");
 }
 
 int wayland_server_run(const char *display_name, const char *swm_socket, const char *debug_file) {
@@ -886,6 +1125,10 @@ int wayland_server_run(const char *display_name, const char *swm_socket, const c
 
     debug_log("wlbridge server shutting down.");
     wl_display_destroy(g_server.display);
+    if (g_keymap_fd >= 0) {
+        close(g_keymap_fd);
+        g_keymap_fd = -1;
+    }
     if (g_debug_file) {
         fclose(g_debug_file);
         g_debug_file = NULL;
