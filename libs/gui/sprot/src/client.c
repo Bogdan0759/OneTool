@@ -11,6 +11,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/un.h>
@@ -29,6 +30,20 @@ struct sprot_surface {
     int attached;
     uint32_t attach_kind;
     uint32_t attach_format;
+    uint32_t attach_width;
+    uint32_t attach_height;
+    uint32_t attach_stride;
+    uint32_t attach_size;
+    int attach_fd_key_valid;
+    uint64_t attach_fd_dev;
+    uint64_t attach_fd_ino;
+    int attach_dmabuf_key_valid;
+    uint32_t attach_drm_format;
+    uint32_t attach_num_planes;
+    uint64_t attach_modifier;
+    uint32_t attach_plane_offsets[SPROT_MAX_DMABUF_PLANES];
+    uint32_t attach_plane_strides[SPROT_MAX_DMABUF_PLANES];
+    uint32_t attach_total_size;
     struct sprot_surface *next;
 };
 
@@ -82,12 +97,125 @@ uint32_t sprot_internal_surface_id(const sprot_surface_t *surface) {
     return surface != NULL ? surface->id : 0;
 }
 
+static int calc_surface_layout(uint32_t width, uint32_t height, uint32_t *stride, size_t *size) {
+    if (width == 0 || height == 0 || stride == NULL || size == NULL) return -1;
+    if (width > UINT32_MAX / 4u) return -1;
+    uint32_t s = width * 4u;
+    uint64_t total = (uint64_t)s * height;
+    if (total == 0 || total > UINT32_MAX) return -1;
+    *stride = s;
+    *size = (size_t)total;
+    return 0;
+}
+
+static int fd_key(int fd, uint64_t *dev, uint64_t *ino) {
+    struct stat st;
+    if (fd < 0 || dev == NULL || ino == NULL) return 0;
+    if (fstat(fd, &st) != 0) return 0;
+    *dev = (uint64_t)st.st_dev;
+    *ino = (uint64_t)st.st_ino;
+    return 1;
+}
+
+static void surface_clear_attachment(sprot_surface_t *surface) {
+    if (surface == NULL) return;
+    surface->attached = 0;
+    surface->attach_fd_key_valid = 0;
+    surface->attach_dmabuf_key_valid = 0;
+}
+
+static int surface_attach_matches_fd(sprot_surface_t *surface, int fd,
+                                     uint32_t width, uint32_t height,
+                                     uint32_t stride, uint32_t buffer_size,
+                                     uint32_t kind, uint32_t format) {
+    uint64_t dev, ino;
+    if (surface == NULL || !surface->attached || !surface->attach_fd_key_valid) return 0;
+    if (surface->attach_kind != kind || surface->attach_format != format) return 0;
+    if (surface->attach_width != width || surface->attach_height != height ||
+        surface->attach_stride != stride || surface->attach_size != buffer_size) return 0;
+    if (!fd_key(fd, &dev, &ino)) return 0;
+    return surface->attach_fd_dev == dev && surface->attach_fd_ino == ino;
+}
+
+static void surface_mark_attached_fd(sprot_surface_t *surface, int fd,
+                                     uint32_t width, uint32_t height,
+                                     uint32_t stride, uint32_t buffer_size,
+                                     uint32_t kind, uint32_t format) {
+    if (surface == NULL) return;
+    surface->attached = 1;
+    surface->attach_kind = kind;
+    surface->attach_format = format;
+    surface->attach_width = width;
+    surface->attach_height = height;
+    surface->attach_stride = stride;
+    surface->attach_size = buffer_size;
+    surface->attach_dmabuf_key_valid = 0;
+    surface->attach_fd_key_valid = fd_key(fd, &surface->attach_fd_dev, &surface->attach_fd_ino);
+}
+
 void sprot_internal_surface_mark_attached(sprot_surface_t *surface,
                                            uint32_t kind, uint32_t format) {
     if (surface == NULL) return;
     surface->attached = 1;
     surface->attach_kind = kind;
     surface->attach_format = format;
+    surface->attach_fd_key_valid = 0;
+    surface->attach_dmabuf_key_valid = 0;
+}
+
+int sprot_internal_surface_dmabuf_matches(
+    sprot_surface_t *surface,
+    int fd,
+    uint32_t width,
+    uint32_t height,
+    uint32_t drm_format,
+    uint64_t modifier,
+    uint32_t num_planes,
+    const uint32_t *plane_offsets,
+    const uint32_t *plane_strides,
+    uint32_t total_size
+) {
+    if (surface == NULL || plane_offsets == NULL || plane_strides == NULL ||
+        num_planes == 0 || num_planes > SPROT_MAX_DMABUF_PLANES) return 0;
+    if (!surface_attach_matches_fd(surface, fd, width, height, plane_strides[0],
+                                   total_size, SPROT_BUFFER_DMABUF,
+                                   SPROT_PIXEL_FORMAT_BGRA8888)) return 0;
+    if (!surface->attach_dmabuf_key_valid) return 0;
+    if (surface->attach_drm_format != drm_format ||
+        surface->attach_modifier != modifier ||
+        surface->attach_num_planes != num_planes ||
+        surface->attach_total_size != total_size) return 0;
+    for (uint32_t i = 0; i < num_planes; i++) {
+        if (surface->attach_plane_offsets[i] != plane_offsets[i] ||
+            surface->attach_plane_strides[i] != plane_strides[i]) return 0;
+    }
+    return 1;
+}
+
+void sprot_internal_surface_mark_dmabuf_attached(
+    sprot_surface_t *surface,
+    int fd,
+    uint32_t width,
+    uint32_t height,
+    uint32_t drm_format,
+    uint64_t modifier,
+    uint32_t num_planes,
+    const uint32_t *plane_offsets,
+    const uint32_t *plane_strides,
+    uint32_t total_size
+) {
+    if (surface == NULL || plane_offsets == NULL || plane_strides == NULL) return;
+    surface_mark_attached_fd(surface, fd, width, height, plane_strides[0], total_size,
+                             SPROT_BUFFER_DMABUF, SPROT_PIXEL_FORMAT_BGRA8888);
+    surface->attach_dmabuf_key_valid = 1;
+    surface->attach_drm_format = drm_format;
+    surface->attach_modifier = modifier;
+    surface->attach_num_planes = num_planes;
+    surface->attach_total_size = total_size;
+    for (uint32_t i = 0; i < SPROT_MAX_DMABUF_PLANES; i++) {
+        surface->attach_plane_offsets[i] = i < num_planes ? plane_offsets[i] : 0;
+        surface->attach_plane_strides[i] = i < num_planes ? plane_strides[i] : 0;
+    }
 }
 
 int sprot_internal_pending_push(sprot_connection_t *conn, const sprot_event_t *ev) {
@@ -222,6 +350,12 @@ sprot_surface_t *sprot_create_surface(sprot_connection_t *conn, uint32_t width, 
         set_err("sprot: bad args");
         return NULL;
     }
+    uint32_t stride;
+    size_t size;
+    if (calc_surface_layout(width, height, &stride, &size) != 0) {
+        set_err("sprot: bad surface size");
+        return NULL;
+    }
     sprot_surface_t *s = calloc(1, sizeof(*s));
     if (s == NULL) {
         set_err("sprot: out of memory");
@@ -230,8 +364,8 @@ sprot_surface_t *sprot_create_surface(sprot_connection_t *conn, uint32_t width, 
     s->conn = conn;
     s->width = width;
     s->height = height;
-    s->stride = width * 4u;
-    s->size = (size_t)s->stride * height;
+    s->stride = stride;
+    s->size = size;
     s->fd = memfd_anon("sprot-buf", s->size);
     if (s->fd < 0) {
         set_err("sprot: memfd_create: %s", strerror(errno));
@@ -362,8 +496,12 @@ int sprot_resize_surface(sprot_surface_t *surface, uint32_t width, uint32_t heig
         return 0;
     }
 
-    uint32_t new_stride = width * 4u;
-    size_t new_size = (size_t)new_stride * height;
+    uint32_t new_stride;
+    size_t new_size;
+    if (calc_surface_layout(width, height, &new_stride, &new_size) != 0) {
+        set_err("sprot: bad resize size");
+        return -1;
+    }
     int new_fd = memfd_anon("sprot-buf", new_size);
     if (new_fd < 0) {
         set_err("sprot: resize memfd_create: %s", strerror(errno));
@@ -388,7 +526,7 @@ int sprot_resize_surface(sprot_surface_t *surface, uint32_t width, uint32_t heig
     surface->height = height;
     surface->stride = new_stride;
     surface->size = new_size;
-    surface->attached = 0;
+    surface_clear_attachment(surface);
     return 0;
 }
 
@@ -405,9 +543,17 @@ int sprot_attach_fd(
     sprot_header_t hdr;
     sprot_body_surface_attach_buffer_t body;
 
-    if (surface == NULL || surface->conn == NULL || surface->id == 0 || fd < 0) {
+    uint64_t min_size = (uint64_t)stride * height;
+    if (surface == NULL || surface->conn == NULL || surface->id == 0 || fd < 0 ||
+        width == 0 || height == 0 || width > UINT32_MAX / 4u ||
+        stride < width * 4u || min_size > UINT32_MAX || buffer_size < min_size) {
         set_err("sprot: bad attach args");
         return -1;
+    }
+
+    if (surface_attach_matches_fd(surface, fd, width, height, stride, buffer_size,
+                                  buffer_kind, format)) {
+        return 0;
     }
 
     hdr.type = SPROT_REQ_SURFACE_ATTACH_BUFFER;
@@ -428,9 +574,8 @@ int sprot_attach_fd(
         return -1;
     }
 
-    surface->attached = 1;
-    surface->attach_kind = buffer_kind;
-    surface->attach_format = format;
+    surface_mark_attached_fd(surface, fd, width, height, stride, buffer_size,
+                             buffer_kind, format);
     return 0;
 }
 

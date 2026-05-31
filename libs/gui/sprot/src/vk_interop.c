@@ -106,6 +106,11 @@ int sprot_surface_attach_dmabuf(
         sprot_internal_set_error("sprot_vk: bad args to sprot_surface_attach_dmabuf");
         return -1;
     }
+    if (width > UINT32_MAX / 4u || plane_strides[0] < width * 4u ||
+        total_size < (uint64_t)plane_strides[0] * height) {
+        sprot_internal_set_error("sprot_vk: bad dmabuf dimensions");
+        return -1;
+    }
     conn = sprot_internal_surface_conn(surface);
     sid  = sprot_internal_surface_id(surface);
     if (conn == NULL || sid == 0) {
@@ -126,6 +131,13 @@ int sprot_surface_attach_dmabuf(
         body.plane_strides[i] = plane_strides[i];
     }
 
+    if (sprot_internal_surface_dmabuf_matches(surface, fd, width, height,
+                                              drm_format, modifier, num_planes,
+                                              plane_offsets, plane_strides,
+                                              total_size)) {
+        return 0;
+    }
+
     memset(&hdr, 0, sizeof(hdr));
     hdr.type      = SPROT_REQ_SURFACE_ATTACH_DMABUF;
     hdr.object_id = sid;
@@ -137,8 +149,9 @@ int sprot_surface_attach_dmabuf(
         return -1;
     }
 
-    sprot_internal_surface_mark_attached(surface,
-                                         SPROT_BUFFER_DMABUF,
-                                         SPROT_PIXEL_FORMAT_BGRA8888);
+    sprot_internal_surface_mark_dmabuf_attached(surface, fd, width, height,
+                                                drm_format, modifier, num_planes,
+                                                plane_offsets, plane_strides,
+                                                total_size);
     return 0;
 }

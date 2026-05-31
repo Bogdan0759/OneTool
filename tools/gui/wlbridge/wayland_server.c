@@ -898,6 +898,7 @@ static void flush_pending_surface_commit(struct bridge_surface *s) {
                 s->pending_dmabuf->strides,
                 s->pending_dmabuf->strides[0] * s->pending_dmabuf->height
             );
+            close(dup_fd);
             int commit_res = sprot_commit(s->sprot_surface);
             sprot_request_frame(s->sprot_surface);
             debug_log("Deferred DMA-BUF commit results: attach=%d, commit=%d", attach_res, commit_res);
@@ -913,6 +914,7 @@ static void flush_pending_surface_commit(struct bridge_surface *s) {
                                              s->pending_height, s->pending_stride,
                                              (uint32_t)s->pending_size, SPROT_BUFFER_SHM,
                                              SPROT_PIXEL_FORMAT_BGRA8888);
+            close(dup_fd);
             int commit_res = sprot_commit(s->sprot_surface);
             sprot_request_frame(s->sprot_surface);
             debug_log("Deferred SHM commit results: attach=%d, commit=%d", attach_res, commit_res);
@@ -1344,6 +1346,7 @@ static void handle_dmabuf_buffer(struct bridge_surface *s, struct dmabuf_buffer 
         dmabuf->strides,
         dmabuf->strides[0] * dmabuf->height
     );
+    close(dup_fd);
 
     if (attach_res != 0) {
         debug_log("Error: sprot_surface_attach_dmabuf failed: %d", attach_res);
@@ -1472,6 +1475,7 @@ static void surface_commit(struct wl_client *client, struct wl_resource *resourc
             if (dup_fd >= 0) {
                 debug_log("Forwarding SHM buffer attach to SWM (Sprot ID=%u)", s->sprot_id);
                 int attach_res = sprot_attach_fd(s->sprot_surface, dup_fd, width, height, stride, (uint32_t)size, SPROT_BUFFER_SHM, SPROT_PIXEL_FORMAT_BGRA8888);
+                close(dup_fd);
                 int commit_res = sprot_commit(s->sprot_surface);
                 sprot_request_frame(s->sprot_surface);
                 debug_log("SHM commit results: attach=%d, commit=%d", attach_res, commit_res);

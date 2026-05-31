@@ -33,6 +33,7 @@ typedef struct swm_surface {
     uint32_t stride;
     size_t buffer_size;
     uint32_t buffer_kind;
+    int buffer_has_alpha;
     swm_buffer_t *buffer;
     int has_pending;
     int committed;

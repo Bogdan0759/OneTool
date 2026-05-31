@@ -169,6 +169,18 @@ string SWM_BACKEND_OBJ = "libs/gui/swm/src/backend/srapi_drm.o";
 string SWM_BUFFER_HDR = "libs/gui/swm/src/buffer/buffer.h";
 string SWM_BUFFER_SRC = "libs/gui/swm/src/buffer/buffer.c";
 string SWM_BUFFER_OBJ = "libs/gui/swm/src/buffer/buffer.o";
+string SWM_SURFACE_HDR = "libs/gui/swm/src/surface/surface.h";
+string SWM_SURFACE_SRC = "libs/gui/swm/src/surface/surface.c";
+string SWM_SURFACE_OBJ = "libs/gui/swm/src/surface/surface.o";
+string SWM_RENDER_HDR = "libs/gui/swm/src/render/render.h";
+string SWM_RENDER_SRC = "libs/gui/swm/src/render/render.c";
+string SWM_RENDER_OBJ = "libs/gui/swm/src/render/render.o";
+string SWM_PROTOCOL_HDR = "libs/gui/swm/src/protocol/protocol.h";
+string SWM_PROTOCOL_SRC = "libs/gui/swm/src/protocol/protocol.c";
+string SWM_PROTOCOL_OBJ = "libs/gui/swm/src/protocol/protocol.o";
+string SWM_INTERACTION_HDR = "libs/gui/swm/src/interaction/interaction.h";
+string SWM_INTERACTION_SRC = "libs/gui/swm/src/interaction/interaction.c";
+string SWM_INTERACTION_OBJ = "libs/gui/swm/src/interaction/interaction.o";
 string SWM_DE_HDR = "libs/gui/swm/src/de/de.h";
 string SWM_DE_SRC = "libs/gui/swm/src/de/de.c";
 string SWM_DE_OBJ = "libs/gui/swm/src/de/de.o";
@@ -256,7 +268,7 @@ string ABOUT_SRC = "tools/gui/about.c";
 string ABOUT_OBJ = "tools/gui/about.o";
 string TERM_SRC = "tools/gui/term.c";
 string TERM_OBJ = "tools/gui/term.o";
-string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/filesystem/fsize.o tools/filesystem/ls.o tools/filesystem/cat.o tools/filesystem/free.o tools/filesystem/size.o tools/filesystem/nm.o tools/dev/gapi_supported.o tools/dev/srapi_demo.o tools/dev/converter/srvid2mp4.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o tools/network/nsetup.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o libs/elf/elf.o libs/memory/memory.o libs/srapi/src/core/context.o libs/srapi/src/core/debug.o libs/srapi/src/core/framebuffer.o libs/srapi/src/core/export.o libs/srapi/src/core/command.o libs/srapi/src/core/buffer.o libs/srapi/src/core/image.o libs/srapi/src/core/image_view.o libs/srapi/src/core/queue.o libs/srapi/src/core/tile_cache.o libs/srapi/src/core/time.o libs/srapi/src/backend/cpu/renderer.o libs/srapi/src/backend/gpu/gpu.o libs/srapi/src/backend/gpu/i915.o libs/srapi/src/backend/gpu/i915/render3d.o libs/srapi/src/backend/gpu/i915/vm.o libs/srapi/src/backend/fbdev/fbdev.o libs/srapi/src/backend/drm/buffer.o libs/srapi/src/backend/drm/drm.o libs/srapi/src/backend/drm/record.o libs/srapi/src/display/drm_probe.o libs/srapi/src/vm/shader.o libs/srapi/src/vm/exec.o libs/srapi/src/vm/exec_simd.o libs/srapi/src/vm/threadpool.o libs/srapi/src/io/ppm.o libs/srapi/src/input/input.o libs/srapi/src/input/evdev.o libs/srapi/src/input/scancode.o libs/gui/ranal/src/app.o libs/gui/ranal/src/widget.o libs/gui/ranal/src/font.o libs/gui/ranal/src/context.o libs/gui/ranal/src/swm_client.o libs/gui/sprot/src/msg.o libs/gui/sprot/src/client.o libs/gui/sprot/src/srapi_bridge.o libs/gui/sprot/src/vk_interop.o libs/gui/swm/src/main.o libs/gui/swm/src/backend/srapi_drm.o libs/gui/swm/src/buffer/buffer.o libs/gui/swm/src/de/de.o libs/gui/swm/src/probe/render_node.o tools/dev/sprot_hello.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/dev/mlink/cli.o tools/dev/mlink/object.o tools/dev/mlink/elf-reader.o tools/dev/mlink/symtab.o tools/dev/mlink/layout.o tools/dev/mlink/reloc.o tools/dev/mlink/emit.o tools/dev/mlink/bytes.o tools/dev/mlink/log.o tools/dev/mlink/macro.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o tools/system/configure/size.o tools/system/video/cvm.o tools/system/userc/users.o tools/system/userc/tui.o tools/games/click.o tools/games/ranal_demo.o tools/gui/about.o tools/gui/term.o libs/gui/swm/wayland/wayland_bridge.o";
+string LINK_OBJS = "main.o tui.o tools/filesystem/lastmod.o tools/filesystem/exec.o tools/filesystem/fsinfo.o tools/filesystem/fsize.o tools/filesystem/ls.o tools/filesystem/cat.o tools/filesystem/free.o tools/filesystem/size.o tools/filesystem/nm.o tools/dev/gapi_supported.o tools/dev/srapi_demo.o tools/dev/converter/srvid2mp4.o tools/network/down/cli.o tools/network/down/core/parse.o tools/network/down/core/send.o tools/network/down/core/robots.o tools/network/nsetup.o libs/net/url.o libs/net/transport.o libs/net/http.o libs/net/robots.o libs/TUI/tui.o libs/elf/elf.o libs/memory/memory.o libs/srapi/src/core/context.o libs/srapi/src/core/debug.o libs/srapi/src/core/framebuffer.o libs/srapi/src/core/export.o libs/srapi/src/core/command.o libs/srapi/src/core/buffer.o libs/srapi/src/core/image.o libs/srapi/src/core/image_view.o libs/srapi/src/core/queue.o libs/srapi/src/core/tile_cache.o libs/srapi/src/core/time.o libs/srapi/src/backend/cpu/renderer.o libs/srapi/src/backend/gpu/gpu.o libs/srapi/src/backend/gpu/i915.o libs/srapi/src/backend/gpu/i915/render3d.o libs/srapi/src/backend/gpu/i915/vm.o libs/srapi/src/backend/fbdev/fbdev.o libs/srapi/src/backend/drm/buffer.o libs/srapi/src/backend/drm/drm.o libs/srapi/src/backend/drm/record.o libs/srapi/src/display/drm_probe.o libs/srapi/src/vm/shader.o libs/srapi/src/vm/exec.o libs/srapi/src/vm/exec_simd.o libs/srapi/src/vm/threadpool.o libs/srapi/src/io/ppm.o libs/srapi/src/input/input.o libs/srapi/src/input/evdev.o libs/srapi/src/input/scancode.o libs/gui/ranal/src/app.o libs/gui/ranal/src/widget.o libs/gui/ranal/src/font.o libs/gui/ranal/src/context.o libs/gui/ranal/src/swm_client.o libs/gui/sprot/src/msg.o libs/gui/sprot/src/client.o libs/gui/sprot/src/srapi_bridge.o libs/gui/sprot/src/vk_interop.o libs/gui/swm/src/main.o libs/gui/swm/src/backend/srapi_drm.o libs/gui/swm/src/buffer/buffer.o libs/gui/swm/src/surface/surface.o libs/gui/swm/src/render/render.o libs/gui/swm/src/protocol/protocol.o libs/gui/swm/src/interaction/interaction.o libs/gui/swm/src/de/de.o libs/gui/swm/src/probe/render_node.o tools/dev/sprot_hello.o tools/network/ping/cli.o tools/dev/lmake.o tools/dev/packagers/lpack/lpack.o tools/dev/mlink/cli.o tools/dev/mlink/object.o tools/dev/mlink/elf-reader.o tools/dev/mlink/symtab.o tools/dev/mlink/layout.o tools/dev/mlink/reloc.o tools/dev/mlink/emit.o tools/dev/mlink/bytes.o tools/dev/mlink/log.o tools/dev/mlink/macro.o tools/power/reboot.o tools/power/shutdown.o tools/system/taskmng/info.o tools/system/taskmng/list.o tools/system/taskmng/process.o tools/system/taskmng/tui.o tools/system/configure/main.o tools/system/configure/create.o tools/system/configure/helpers.o tools/system/configure/mount.o tools/system/configure/other.o tools/system/configure/size.o tools/system/video/cvm.o tools/system/userc/users.o tools/system/userc/tui.o tools/games/click.o tools/games/ranal_demo.o tools/gui/about.o tools/gui/term.o libs/gui/swm/wayland/wayland_bridge.o";
 
 task all() {
     build();
@@ -654,7 +666,7 @@ task build() {
         @echo("[CC] %s", SPROT_VK_INTEROP_SRC);
         @run("%s %s %s -c %s -o %s", CC, CFLAGS, SPROT_CFLAGS, SPROT_VK_INTEROP_SRC, SPROT_VK_INTEROP_OBJ);
     }
-    if (@is_outdated(SWM_MAIN_OBJ, SWM_MAIN_SRC, SWM_HDR, SWM_DE_HDR, SWM_BACKEND_HDR, SWM_BUFFER_HDR, SWM_PROBE_RENDER_NODE_HDR, SPROT_HDR, SRAPI_HDR)) {
+    if (@is_outdated(SWM_MAIN_OBJ, SWM_MAIN_SRC, SWM_HDR, SWM_DE_HDR, SWM_BACKEND_HDR, SWM_RENDER_HDR, SWM_PROTOCOL_HDR, SWM_INTERACTION_HDR, SPROT_HDR, SRAPI_HDR)) {
         @echo("[CC] %s", SWM_MAIN_SRC);
         @run("%s %s %s -Dmain=sw -c %s -o %s", CC, CFLAGS, SWM_CFLAGS, SWM_MAIN_SRC, SWM_MAIN_OBJ);
     }
@@ -665,6 +677,22 @@ task build() {
     if (@is_outdated(SWM_BUFFER_OBJ, SWM_BUFFER_SRC, SWM_BUFFER_HDR, SPROT_HDR)) {
         @echo("[CC] %s", SWM_BUFFER_SRC);
         @run("%s %s %s -c %s -o %s", CC, CFLAGS, SWM_CFLAGS, SWM_BUFFER_SRC, SWM_BUFFER_OBJ);
+    }
+    if (@is_outdated(SWM_SURFACE_OBJ, SWM_SURFACE_SRC, SWM_SURFACE_HDR, SWM_HDR, SWM_BUFFER_HDR, SWM_DE_HDR, SPROT_HDR)) {
+        @echo("[CC] %s", SWM_SURFACE_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SWM_CFLAGS, SWM_SURFACE_SRC, SWM_SURFACE_OBJ);
+    }
+    if (@is_outdated(SWM_RENDER_OBJ, SWM_RENDER_SRC, SWM_RENDER_HDR, SWM_HDR, SWM_BUFFER_HDR, SWM_SURFACE_HDR, SWM_DE_HDR, SPROT_HDR, SRAPI_HDR)) {
+        @echo("[CC] %s", SWM_RENDER_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SWM_CFLAGS, SWM_RENDER_SRC, SWM_RENDER_OBJ);
+    }
+    if (@is_outdated(SWM_PROTOCOL_OBJ, SWM_PROTOCOL_SRC, SWM_PROTOCOL_HDR, SWM_HDR, SWM_BACKEND_HDR, SWM_BUFFER_HDR, SWM_SURFACE_HDR, SWM_DE_HDR, SWM_PROBE_RENDER_NODE_HDR, SPROT_HDR, SRAPI_HDR)) {
+        @echo("[CC] %s", SWM_PROTOCOL_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SWM_CFLAGS, SWM_PROTOCOL_SRC, SWM_PROTOCOL_OBJ);
+    }
+    if (@is_outdated(SWM_INTERACTION_OBJ, SWM_INTERACTION_SRC, SWM_INTERACTION_HDR, SWM_HDR, SWM_SURFACE_HDR, SWM_PROTOCOL_HDR, SWM_DE_HDR, SPROT_HDR, SRAPI_HDR)) {
+        @echo("[CC] %s", SWM_INTERACTION_SRC);
+        @run("%s %s %s -c %s -o %s", CC, CFLAGS, SWM_CFLAGS, SWM_INTERACTION_SRC, SWM_INTERACTION_OBJ);
     }
     if (@is_outdated(SWM_DE_OBJ, SWM_DE_SRC, SWM_DE_HDR, SWM_HDR, RANAL_HDR, SRAPI_HDR)) {
         @echo("[CC] %s", SWM_DE_SRC);
@@ -897,6 +925,10 @@ task clean() {
     @run("rm -f %s", SWM_MAIN_OBJ);
     @run("rm -f %s", SWM_BACKEND_OBJ);
     @run("rm -f %s", SWM_BUFFER_OBJ);
+    @run("rm -f %s", SWM_SURFACE_OBJ);
+    @run("rm -f %s", SWM_RENDER_OBJ);
+    @run("rm -f %s", SWM_PROTOCOL_OBJ);
+    @run("rm -f %s", SWM_INTERACTION_OBJ);
     @run("rm -f %s", SWM_DE_OBJ);
     @run("rm -f %s", SWM_PROBE_RENDER_NODE_OBJ);
     @run("rm -f %s", SPROT_HELLO_OBJ);
