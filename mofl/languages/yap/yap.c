@@ -92,6 +92,8 @@ each line is an address you can jump to
 GOTO jumps to a line number
 After GOTO finish (see RETURN) execution continues on next line after GOTO
 
+If you want to jump (not call) use GOTOF (GOTO Forever) if you jump with GOTOF interpreter ignore return command
+
 1:  PRINT "start"
 2:  GOTO 5
 3:  PRINT "skipped"
@@ -236,6 +238,10 @@ char* get_next_token(struct lexer* lex) {
     }
 
     if (match_keyword(text, "GOTO")) {
+        return scan_word_token(lex, text);
+    }
+
+    if (match_keyword(text, "GOTOF")) {
         return scan_word_token(lex, text);
     }
 
@@ -982,7 +988,31 @@ void exec_line(char** tokens, int token_count) {
             current_line = target_line - 1;
             return;
         }
-        else if (strcmp(token, "RETURN") == 0) {
+	else if (strcmp(token, "GOTOF") == 0) {
+		// do the same as GOTO but don't push return address to stack
+		pos++;
+		if (pos >= token_count) {
+			printf("invalid gotof syntax: expected target line number\n");
+			current_line = line_count;
+			return;
+		}
+		char* target_value = resolve_token_value(tokens[pos], 0);
+		if (!is_integer(target_value)) {
+			printf("invalid gotof target: %s\n", target_value);
+			current_line = line_count;
+			return;
+		}
+		int target_line = atoi(target_value);
+		pos++;
+		if (target_line < 1 || target_line > line_count) {
+			printf("invalid gotof target: %d\n", target_line);
+			current_line = line_count;
+			return;
+		}
+		current_line = target_line - 1;
+		return;
+	}
+	else if (strcmp(token, "RETURN") == 0) {
             pos++;
             char* value = tokens[pos];
 
