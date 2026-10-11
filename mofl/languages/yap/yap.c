@@ -32,6 +32,9 @@ PRINT number
 READINT stores the value into the variable
 and also updates OPRES with the same integer
 
+READSTR stores the string into the variable
+and also updates OPRES with the same string
+
 math operations
 ADD 2, 3
 PRINT OPRES
@@ -233,6 +236,10 @@ char* get_next_token(struct lexer* lex) {
         return scan_word_token(lex, text);
     }
 
+    if (match_keyword(text, "READSTR")) {
+        return scan_word_token(lex, text);
+    }
+
     if (match_keyword(text, "NFORMAT")) {
         return scan_word_token(lex, text);
     }
@@ -325,7 +332,7 @@ struct variable {
 
 struct variable* vars = NULL;
 int var_count = 0;
-char opres_buffer[64] = "0";
+char opres_buffer[MAXVALUE] = "0";
 char callret_buffer[MAXVALUE] = "";
 extern char* retval;
 
@@ -462,16 +469,53 @@ void set_opres_int(int value) {
     snprintf(opres_buffer, sizeof(opres_buffer), "%d", value);
 }
 
-int read_int_into_var(char* name) {
-    int value = 0;
 
-    if (scanf("%d", &value) != 1) {
+void set_opres_str(char* value) {
+    strncpy(opres_buffer, value, sizeof(opres_buffer) - 1);
+    opres_buffer[sizeof(opres_buffer) - 1] = '\0';
+}
+
+int read_int_into_var(char* name) {
+    char buffer[MAXVALUE];
+	// use fgets instead of scanf
+    if (fgets(buffer, MAXVALUE, stdin) == NULL) {
+        printf("invalid integer input\n");
+        return 0;
+    }
+	
+	// Remove newline character if present
+	size_t len = strlen(buffer);
+	if (len > 0 && buffer[len - 1] == '\n') {
+		buffer[len - 1] = '\0';
+	}
+    
+	int value;
+	if (sscanf(buffer, "%d", &value) != 1) {
         printf("invalid integer input\n");
         return 0;
     }
 
     set_opres_int(value);
     set_var(name, opres_buffer, 0);
+    return 1;
+}
+
+int read_str_into_var(char* name) {
+    char buffer[MAXVALUE];
+    
+    if (fgets(buffer, MAXVALUE, stdin) == NULL) {
+        printf("invalid string input\n");
+        return 0;
+    }
+    
+    // Remove newline character if present
+    size_t len = strlen(buffer);
+    if (len > 0 && buffer[len - 1] == '\n') {
+        buffer[len - 1] = '\0';
+    }
+    
+    set_opres_str(buffer);
+    set_var(name, opres_buffer, 1);
     return 1;
 }
 
@@ -936,6 +980,19 @@ void exec_line(char** tokens, int token_count) {
             }
             return;
         }
+	else if (strcmp(token, "READSTR") == 0) {
+		if (token_count != 2) {
+			printf("invalid READSTR syntax\n");
+			current_line = line_count;
+			return;
+		}
+		pos++;
+		if (!read_str_into_var(tokens[pos])) {
+			current_line = line_count;
+		}
+		
+		return;
+	}
         else if (strcmp(token, "SET") == 0) {
             pos++;
             char* var_name = tokens[pos];
