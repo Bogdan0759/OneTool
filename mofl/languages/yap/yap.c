@@ -906,7 +906,7 @@ void split_lines(char* code) {
     }
 }
 
-void parse_lines(void) {
+int parse_lines(void) {
     for (int i = 0; i < line_count; i++) {
         char* text = lstrip(lines[i]);
         int label = -1;
@@ -931,7 +931,13 @@ void parse_lines(void) {
 
         tokenize(&lex);
         parsed_lines[i].token_count = lex.token_count;
+
+        if (parsed_lines[i].token_count > 0 && label < 0) {
+            printf("syntax error: line number required: %s\n", lines[i]);
+            return 0;
+        }
     }
+    return 1;
 }
 
 int find_line_by_label(int label) {
@@ -950,7 +956,10 @@ void exec(char* code) {
     }
 
     split_lines(code);
-    parse_lines();
+    if (!parse_lines()) {
+        free_program_state();
+        return;
+    }
     
     var_count = 0;
     call_stack_top = 0;
