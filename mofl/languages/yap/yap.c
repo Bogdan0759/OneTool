@@ -89,21 +89,21 @@ IF 10 3 B
 PRINT "same meaning as IF 10 B 3"
 ENDIF
 
-line numbers its adress (starting from 1)
-each line is an address you can jump to
+line labels with colon (starting from 1):
+each numbered line is an address you can jump to
 
-GOTO jumps to a line number
+GOTO jumps to a line label
 After GOTO finish (see RETURN) execution continues on next line after GOTO
 
 If you want to jump (not call) use GOTOF (GOTO Forever) if you jump with GOTOF interpreter ignore return command
 
-1:  PRINT "start"
-2:  GOTO 5
-3:  PRINT "skipped"
-4:  RETURN "done"           ; return to GOTO LINE + 1 line
-5:  PRINT "subroutine"
-6:  RETURN "back"           ; jump back to line 3
-7:  PRINT RETVAL            ; print back str
+10: PRINT "start"
+20: GOTO 50
+30: PRINT "skipped"
+40: RETURN "done"           ; return to GOTO LINE + 1 line
+50: PRINT "subroutine"
+60: RETURN "back"           ; jump back to line 30
+70: PRINT RETVAL            ; print back str
 
 */
 
@@ -118,6 +118,7 @@ struct lexer {
 };
 
 struct parsed_line {
+    int label;
     char* tokens[MAXTOKENS];
     int token_count;
 };
@@ -891,6 +892,7 @@ int find_matching_endif(int start_line) {
 }
 
 int return_flag = 0;
+int line_jumped = 0;
 
 void split_lines(char* code) {
     line_count = 0;
@@ -906,8 +908,23 @@ void split_lines(char* code) {
 
 void parse_lines(void) {
     for (int i = 0; i < line_count; i++) {
+        char* text = lstrip(lines[i]);
+        int label = -1;
+
+        int idx = 0;
+        while (text[idx] >= '0' && text[idx] <= '9') {
+            idx++;
+        }
+        if (idx > 0 && text[idx] == ':') {
+            text[idx] = '\0';
+            label = atoi(text);
+            text = lstrip(text + idx + 1);
+        }
+
+        parsed_lines[i].label = label;
+
         struct lexer lex;
-        lex.text = lines[i];
+        lex.text = text;
         lex.token_list = parsed_lines[i].tokens;
         lex.token_count = 0;
         lex.token_capacity = MAXTOKENS;
@@ -915,6 +932,15 @@ void parse_lines(void) {
         tokenize(&lex);
         parsed_lines[i].token_count = lex.token_count;
     }
+}
+
+int find_line_by_label(int label) {
+    for (int i = 0; i < line_count; i++) {
+        if (parsed_lines[i].label == label) {
+            return i;
+        }
+    }
+    return -1;
 }
 
 void exec(char* code) {
@@ -935,13 +961,13 @@ void exec(char* code) {
     
     current_line = 0;
     while (current_line < line_count) {
-        int executed_line = current_line;
+        line_jumped = 0;
 
         if (parsed_lines[current_line].token_count > 0) {
             exec_line(parsed_lines[current_line].tokens, parsed_lines[current_line].token_count);
         }
 
-        if (current_line == executed_line) {
+        if (!line_jumped) {
             current_line++;
         }
     }
@@ -1022,54 +1048,70 @@ void exec_line(char** tokens, int token_count) {
         }
         else if (strcmp(token, "GOTO") == 0) {
             pos++;
+            if (pos >= token_count) {
+                printf("invalid goto syntax\n");
+                current_line = line_count;
+                line_jumped = 1;
+                return;
+            }
             char* target_value = resolve_token_value(tokens[pos], 0);
             if (!is_integer(target_value)) {
                 printf("invalid goto target: %s\n", target_value);
                 current_line = line_count;
+                line_jumped = 1;
                 return;
             }
-            int target_line = atoi(target_value);
+            int target_label = atoi(target_value);
             pos++;
 
             if (call_stack_top >= MAXCALLSTACK) {
                 printf("call stack overflow\n");
                 current_line = line_count;
+                line_jumped = 1;
                 return;
             }
-            if (target_line < 1 || target_line > line_count) {
-                printf("invalid goto target: %d\n", target_line);
+            int target_idx = find_line_by_label(target_label);
+            if (target_idx < 0) {
+                printf("invalid goto target: %d\n", target_label);
                 current_line = line_count;
+                line_jumped = 1;
                 return;
             }
             call_stack_line[call_stack_top++] = current_line + 1;
-            current_line = target_line - 1;
+            current_line = target_idx;
+            line_jumped = 1;
             return;
         }
-	else if (strcmp(token, "GOTOF") == 0) {
-		// do the same as GOTO but don't push return address to stack
-		pos++;
-		if (pos >= token_count) {
-			printf("invalid gotof syntax: expected target line number\n");
-			current_line = line_count;
-			return;
-		}
-		char* target_value = resolve_token_value(tokens[pos], 0);
-		if (!is_integer(target_value)) {
-			printf("invalid gotof target: %s\n", target_value);
-			current_line = line_count;
-			return;
-		}
-		int target_line = atoi(target_value);
-		pos++;
-		if (target_line < 1 || target_line > line_count) {
-			printf("invalid gotof target: %d\n", target_line);
-			current_line = line_count;
-			return;
-		}
-		current_line = target_line - 1;
-		return;
-	}
-	else if (strcmp(token, "RETURN") == 0) {
+        else if (strcmp(token, "GOTOF") == 0) {
+            pos++;
+            if (pos >= token_count) {
+                printf("invalid gotof syntax\n");
+                current_line = line_count;
+                line_jumped = 1;
+                return;
+            }
+            char* target_value = resolve_token_value(tokens[pos], 0);
+            if (!is_integer(target_value)) {
+                printf("invalid gotof target: %s\n", target_value);
+                current_line = line_count;
+                line_jumped = 1;
+                return;
+            }
+            int target_label = atoi(target_value);
+            pos++;
+
+            int target_idx = find_line_by_label(target_label);
+            if (target_idx < 0) {
+                printf("invalid gotof target: %d\n", target_label);
+                current_line = line_count;
+                line_jumped = 1;
+                return;
+            }
+            current_line = target_idx;
+            line_jumped = 1;
+            return;
+        }
+        else if (strcmp(token, "RETURN") == 0) {
             pos++;
             char* value = tokens[pos];
 
@@ -1078,6 +1120,7 @@ void exec_line(char** tokens, int token_count) {
             
             if (call_stack_top > 0) {
                 current_line = call_stack_line[--call_stack_top];
+                line_jumped = 1;
             }
             return;
         }
@@ -1131,15 +1174,18 @@ void exec_line(char** tokens, int token_count) {
                 if (!is_valid) {
                     printf("invalid IF syntax\n");
                     current_line = line_count;
+                    line_jumped = 1;
                     return;
                 }
                 int endif_line = find_matching_endif(current_line);
                 if (endif_line < 0) {
                     printf("missing ENDIF\n");
                     current_line = line_count;
+                    line_jumped = 1;
                     return;
                 }
                 current_line = endif_line + 1;
+                line_jumped = 1;
                 return;
             }
             return;
